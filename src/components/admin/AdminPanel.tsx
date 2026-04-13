@@ -462,6 +462,7 @@ export function AdminPanel() {
               <div className="space-y-3 text-sm">
                 {[
                   { label: "ID", value: selectedUser.user_id },
+                  { label: "Telefone", value: (selectedUser as any).phone || "Não informado" },
                   { label: "Papel", value: selectedUser.role || "user" },
                   { label: "Status", value: selectedUser.is_blocked ? "Bloqueado" : "Ativo" },
                   { label: "Conversões", value: String(selectedUser.conversions_used) },
