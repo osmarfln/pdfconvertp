@@ -51,7 +51,12 @@ export function useFileConversions() {
 
     const userId = session.user.id;
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    const filePath = `${userId}/originals/${Date.now()}_${file.name}`;
+    const safeName = file.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w.\-]/g, "_")
+      .replace(/_+/g, "_");
+    const filePath = `${userId}/originals/${Date.now()}_${safeName}`;
     
     console.log("[Upload] Uploading to storage path:", filePath);
 
