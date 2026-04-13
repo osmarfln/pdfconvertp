@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,18 +7,85 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function getSupabaseAdmin() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+}
+
+async function processOcrInBackground(jobId: string, imageBase64: string, ocrMime: string, apiKey: string) {
+  const supabaseAdmin = getSupabaseAdmin();
+  
+  try {
+    await supabaseAdmin.from("extraction_jobs").update({ status: "processing" }).eq("id", jobId);
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Extraia todo o texto desta imagem/documento. Retorne apenas o texto extraído, preservando a estrutura e formatação original (parágrafos, listas, etc). Se não houver texto, responda 'Nenhum texto encontrado.'",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${ocrMime};base64,${imageBase64}`,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("OCR error:", response.status, errText);
+      await supabaseAdmin.from("extraction_jobs").update({ 
+        status: "failed", 
+        error_message: response.status === 429 ? "Limite de requisições excedido." : response.status === 402 ? "Créditos de IA esgotados." : "Erro no OCR" 
+      }).eq("id", jobId);
+      return;
+    }
+
+    const result = await response.json();
+    const extractedText = result.choices?.[0]?.message?.content || "";
+
+    await supabaseAdmin.from("extraction_jobs").update({ 
+      status: "completed", 
+      extracted_text: extractedText 
+    }).eq("id", jobId);
+  } catch (error) {
+    console.error("Background OCR error:", error);
+    await supabaseAdmin.from("extraction_jobs").update({ 
+      status: "failed", 
+      error_message: error instanceof Error ? error.message : "Erro desconhecido" 
+    }).eq("id", jobId);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, text, tone, imageBase64, mimeType } = await req.json();
+    const body = await req.json();
+    const { action, text, tone, imageBase64, mimeType, jobId } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     if (action === "correct") {
-      // Text correction with AI
       if (!text || !text.trim()) {
         return new Response(JSON.stringify({ error: "Texto vazio" }), {
           status: 400,
@@ -61,14 +129,12 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
       if (!response.ok) {
         if (response.status === 429) {
           return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em instantes." }), {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         if (response.status === 402) {
           return new Response(JSON.stringify({ error: "Créditos de IA esgotados." }), {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         const errText = await response.text();
@@ -85,11 +151,10 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
     }
 
     if (action === "ocr") {
-      // OCR: extract text from image using vision model
+      // Synchronous OCR (legacy, still works for quick jobs)
       if (!imageBase64) {
         return new Response(JSON.stringify({ error: "Imagem não fornecida" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -103,41 +168,19 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
         },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Extraia todo o texto desta imagem/documento. Retorne apenas o texto extraído, preservando a estrutura e formatação original (parágrafos, listas, etc). Se não houver texto, responda 'Nenhum texto encontrado.'",
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:${ocrMime};base64,${imageBase64}`,
-                  },
-                },
-              ],
-            },
-          ],
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: "Extraia todo o texto desta imagem/documento. Retorne apenas o texto extraído, preservando a estrutura e formatação original (parágrafos, listas, etc). Se não houver texto, responda 'Nenhum texto encontrado.'" },
+              { type: "image_url", image_url: { url: `data:${ocrMime};base64,${imageBase64}` } },
+            ],
+          }],
         }),
       });
 
       if (!response.ok) {
-        if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (response.status === 402) {
-          return new Response(JSON.stringify({ error: "Créditos de IA esgotados." }), {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const errText = await response.text();
-        console.error("OCR error:", response.status, errText);
+        if (response.status === 429) return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (response.status === 402) return new Response(JSON.stringify({ error: "Créditos de IA esgotados." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         throw new Error("Erro no OCR");
       }
 
@@ -149,9 +192,27 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
       });
     }
 
+    if (action === "ocr-background") {
+      // Background OCR with job tracking
+      if (!imageBase64 || !jobId) {
+        return new Response(JSON.stringify({ error: "Dados insuficientes" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const ocrMime = mimeType || "image/png";
+
+      // Start background processing
+      EdgeRuntime.waitUntil(processOcrInBackground(jobId, imageBase64, ocrMime, LOVABLE_API_KEY));
+
+      return new Response(
+        JSON.stringify({ success: true, message: "Processamento iniciado", jobId }),
+        { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (action === "chat") {
-      // Chat assistant
-      const { messages } = await req.json().catch(() => ({ messages: [] }));
+      const { messages } = body;
       
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -176,8 +237,7 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
         const errText = await response.text();
         console.error("Chat error:", response.status, errText);
         return new Response(JSON.stringify({ error: "Erro no chat" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -187,8 +247,7 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
     }
 
     return new Response(JSON.stringify({ error: "Ação inválida" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("ai-correct error:", e);
