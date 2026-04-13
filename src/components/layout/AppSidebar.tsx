@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Sparkles,
   Crown,
+  ShieldCheck,
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { icon: GitCompare, label: "Comparação", id: "compare" },
   { icon: BarChart3, label: "Relatórios", id: "reports" },
   { icon: Download, label: "Exportar", id: "export" },
+  { icon: ShieldCheck, label: "Admin", id: "admin" },
   { icon: Settings, label: "Configurações", id: "settings" },
 ];
 

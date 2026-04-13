@@ -7,6 +7,8 @@ import { FileList } from "@/components/dashboard/FileList";
 import { UploadZone } from "@/components/dashboard/UploadZone";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AIChatWidget } from "@/components/chat/AIChatWidget";
+import { TextComparison } from "@/components/comparison/TextComparison";
+import { AdminPanel } from "@/components/admin/AdminPanel";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -78,7 +80,25 @@ export default function Index() {
             </motion.div>
           )}
 
-          {activeTab !== "dashboard" && activeTab !== "upload" && (
+          {activeTab === "compare" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <TextComparison />
+            </motion.div>
+          )}
+
+          {activeTab === "admin" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <AdminPanel />
+            </motion.div>
+          )}
+
+          {activeTab !== "dashboard" && activeTab !== "upload" && activeTab !== "compare" && activeTab !== "admin" && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
