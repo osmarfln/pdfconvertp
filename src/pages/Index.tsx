@@ -80,7 +80,6 @@ export default function Index() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Loading state
   if (needsPhone === null) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -89,7 +88,6 @@ export default function Index() {
     );
   }
 
-  // Phone gate
   if (needsPhone) {
     return <PhoneGate userId={userId} onComplete={() => setNeedsPhone(false)} />;
   }
@@ -100,29 +98,32 @@ export default function Index() {
     <div className="flex h-screen overflow-hidden">
       <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AppHeader />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <AppHeader onMenuClick={() => {
+          // Dispatch custom event to open mobile sidebar
+          window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
+        }} />
 
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
           {activeTab === "dashboard" && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 md:space-y-6">
               <div>
-                <h2 className="text-2xl font-display font-bold text-foreground">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-foreground">
                   {getGreeting()}, {displayName} 👋
                 </h2>
-                <p className="text-muted-foreground mt-1">
+                <p className="text-muted-foreground mt-1 text-sm">
                   Gerencie seus documentos e use o poder da IA para otimizar seus textos.
                 </p>
               </div>
               <StatsCards />
               <QuickActions onNavigate={setActiveTab} />
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                 <div className="lg:col-span-2">
                   <FileList />
                 </div>
                 <div>
-                  <div className="glass rounded-xl p-5">
-                    <h3 className="font-display font-semibold text-foreground mb-4">Upload Rápido</h3>
+                  <div className="glass rounded-xl p-4 md:p-5">
+                    <h3 className="font-display font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Upload Rápido</h3>
                     <UploadZone />
                   </div>
                 </div>
@@ -131,10 +132,10 @@ export default function Index() {
           )}
 
           {activeTab === "upload" && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-3xl mx-auto">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 md:space-y-6 max-w-3xl mx-auto">
               <div>
-                <h2 className="text-2xl font-display font-bold text-foreground">Upload de Arquivos</h2>
-                <p className="text-muted-foreground mt-1">Envie seus documentos para processamento inteligente.</p>
+                <h2 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-foreground">Upload de Arquivos</h2>
+                <p className="text-muted-foreground mt-1 text-sm">Envie seus documentos para processamento inteligente.</p>
               </div>
               <UploadZone />
             </motion.div>
