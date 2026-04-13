@@ -292,72 +292,73 @@ export function AIPage() {
                 <p>Nenhuma correção encontrada.</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                {paginatedHistory.map((record) => (
-                  <motion.div
-                    key={record.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="glass rounded-xl p-4 space-y-2 cursor-pointer hover:bg-card/80 transition-colors group"
-                    onClick={() => loadFromHistory(record)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">{formatDate(record.created_at)}</span>
-                        <Badge variant="secondary" className="text-xs">{toneLabels[record.tone] || record.tone}</Badge>
-                        <Badge variant="outline" className="text-xs">{record.source_type === "ocr" ? "OCR" : "Digitado"}</Badge>
-                        {record.file_format && (
-                          <Badge variant="outline" className="text-xs uppercase">{record.file_format}</Badge>
-                        )}
+              <>
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {paginatedHistory.map((record) => (
+                    <motion.div
+                      key={record.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="glass rounded-xl p-4 space-y-2 cursor-pointer hover:bg-card/80 transition-colors group"
+                      onClick={() => loadFromHistory(record)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{formatDate(record.created_at)}</span>
+                          <Badge variant="secondary" className="text-xs">{toneLabels[record.tone] || record.tone}</Badge>
+                          <Badge variant="outline" className="text-xs">{record.source_type === "ocr" ? "OCR" : "Digitado"}</Badge>
+                          {record.file_format && (
+                            <Badge variant="outline" className="text-xs uppercase">{record.file_format}</Badge>
+                          )}
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-card border-border" onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir correção?</AlertDialogTitle>
+                              <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteHistoryItem(record.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-card border-border" onClick={(e) => e.stopPropagation()}>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir correção?</AlertDialogTitle>
-                            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteHistoryItem(record.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                    <p className="text-sm text-foreground/70 line-clamp-2">{record.original_text}</p>
-                    <p className="text-sm text-success/80 line-clamp-2">→ {record.corrected_text}</p>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-xs text-muted-foreground">
-                    {filteredHistory.length} resultado{filteredHistory.length !== 1 ? "s" : ""} • Página {currentPage} de {totalPages}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button variant="glass" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)}>
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <Button variant="glass" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
+                      <p className="text-sm text-foreground/70 line-clamp-2">{record.original_text}</p>
+                      <p className="text-sm text-success/80 line-clamp-2">→ {record.corrected_text}</p>
+                    </motion.div>
+                  ))}
                 </div>
-              )}
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-xs text-muted-foreground">
+                      {filteredHistory.length} resultado{filteredHistory.length !== 1 ? "s" : ""} • Página {currentPage} de {totalPages}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button variant="glass" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)}>
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button variant="glass" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
         ) : (
