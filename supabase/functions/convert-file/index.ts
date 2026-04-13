@@ -247,6 +247,47 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    } else if (action === "split") {
+      const startRes = await fetch(`${ILOVEPDF_API}/start/split`, {
+        headers: { Authorization: `Bearer ${iToken}` },
+      });
+      const { server, task } = await startRes.json();
+
+      const { data: sd } = await adminSupabase.storage.from("documents").createSignedUrl(filePath, 3600);
+      if (!sd?.signedUrl) {
+        return new Response(JSON.stringify({ error: "File URL error" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const upRes = await fetch(`https://${server}/v1/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${iToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ task, cloud_file: sd.signedUrl }),
+      });
+      const { server_filename } = await upRes.json();
+
+      await fetch(`https://${server}/v1/process`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${iToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ task, tool: "split", files: [{ server_filename, filename: filePath.split("/").pop() }], split_mode: "fixed_range", fixed_range: 1 }),
+      });
+
+      const downloadRes = await fetch(`https://${server}/v1/download/${task}`, {
+        headers: { Authorization: `Bearer ${iToken}` },
+      });
+      const resultBuffer = await downloadRes.arrayBuffer();
+      const splitPath = `${userId}/converted/split_${Date.now()}.zip`;
+
+      await adminSupabase.storage.from("documents").upload(splitPath, resultBuffer, {
+        contentType: "application/zip",
+      });
+
+      return new Response(JSON.stringify({ success: true, convertedPath: splitPath }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Invalid action" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
