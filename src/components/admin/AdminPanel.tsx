@@ -268,12 +268,24 @@ export function AdminPanel() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-card border-border">
+                            <DropdownMenuItem onClick={() => setSelectedUser(user)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => toggleBlock(user.user_id, user.is_blocked)}
                               className={user.is_blocked ? "text-success" : "text-destructive"}
                             >
                               <Ban className="w-4 h-4 mr-2" />
                               {user.is_blocked ? "Desbloquear" : "Bloquear"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => deleteUser(user.user_id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
