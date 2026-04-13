@@ -88,9 +88,10 @@ Deno.serve(async (req: Request) => {
       const ext = filePath.split(".").pop()?.toLowerCase() || "";
       const toolKey = `${ext}-${targetFormat}`;
       const tool = TOOL_MAP[toolKey];
+      console.log("Convert:", ext, "→", targetFormat, "tool:", tool, "filePath:", filePath);
       if (!tool) {
-        return new Response(JSON.stringify({ error: `Conversão ${ext} → ${targetFormat} não suportada` }), {
-          status: 400,
+        return new Response(JSON.stringify({ success: false, error: `Conversão ${ext} → ${targetFormat} não suportada` }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -99,16 +100,27 @@ Deno.serve(async (req: Request) => {
       const startRes = await fetch(`${ILOVEPDF_API}/start/${tool}`, {
         headers: { Authorization: `Bearer ${iToken}` },
       });
-      const { server, task } = await startRes.json();
+      const startBody = await startRes.json();
+      console.log("Start task:", startRes.status, JSON.stringify(startBody).slice(0, 200));
+      const { server, task } = startBody;
+
+      if (!server || !task) {
+        return new Response(JSON.stringify({ success: false, error: "iLovePDF start failed: " + JSON.stringify(startBody) }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // Get signed URL for the file
-      const { data: signedData } = await adminSupabase.storage
+      const { data: signedData, error: signedError } = await adminSupabase.storage
         .from("documents")
         .createSignedUrl(filePath, 3600);
 
+      console.log("Signed URL:", signedData?.signedUrl ? "OK" : "FAILED", signedError?.message);
+
       if (!signedData?.signedUrl) {
-        return new Response(JSON.stringify({ error: "Could not generate file URL" }), {
-          status: 500,
+        return new Response(JSON.stringify({ success: false, error: "Could not generate file URL: " + (signedError?.message || "unknown") }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
