@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight, PartyPopper } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -50,6 +51,9 @@ export function AIPage() {
   const [ocrProgress, setOcrProgress] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressComplete, setProgressComplete] = useState(false);
 
   // History state
   const [history, setHistory] = useState<CorrectionRecord[]>([]);
@@ -127,6 +131,7 @@ export function AIPage() {
         setIsOcrProcessing(false);
         setActiveJobId(null);
         setOcrProgress("");
+        finishProgress();
         addNotification({ title: "Extração concluída", message: `Texto extraído de ${job.file_name || "arquivo"}`, type: "extraction" });
         toast.success("Texto extraído com sucesso!");
       } else if (job.status === "failed") {
@@ -135,6 +140,8 @@ export function AIPage() {
         setIsOcrProcessing(false);
         setActiveJobId(null);
         setOcrProgress("");
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        setProgressPercent(0);
         toast.error(job.error_message || "Erro ao extrair texto");
       } else {
         setOcrProgress(`Extraindo texto de ${job.file_name || "arquivo"}...`);
@@ -179,10 +186,36 @@ export function AIPage() {
     toast.success("Correção carregada do histórico!");
   };
 
+  const startProgressSimulation = (maxPercent = 90) => {
+    setProgressPercent(0);
+    setProgressComplete(false);
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    let current = 0;
+    progressIntervalRef.current = setInterval(() => {
+      current += Math.random() * 8 + 2;
+      if (current >= maxPercent) {
+        current = maxPercent;
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      }
+      setProgressPercent(Math.round(current));
+    }, 300);
+  };
+
+  const finishProgress = () => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    setProgressPercent(100);
+    setProgressComplete(true);
+    setTimeout(() => {
+      setProgressPercent(0);
+      setProgressComplete(false);
+    }, 3000);
+  };
+
   const handleCorrect = async () => {
     if (!text.trim()) return;
     setIsProcessing(true);
     setCorrected("");
+    startProgressSimulation(90);
 
     try {
       const { data, error } = await supabase.functions.invoke("ai-correct", {
@@ -195,10 +228,13 @@ export function AIPage() {
       setCorrected(data.correctedText);
       await saveToHistory(text, data.correctedText, "typed");
       addNotification({ title: "Correção concluída", message: "Texto corrigido com IA", type: "correction" });
+      finishProgress();
       toast.success("Texto corrigido com sucesso!");
     } catch (err: any) {
       console.error("Correction error:", err);
       toast.error(err.message || "Erro ao corrigir texto");
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      setProgressPercent(0);
     } finally {
       setIsProcessing(false);
     }
@@ -208,6 +244,7 @@ export function AIPage() {
     if (!user) return;
     setIsOcrProcessing(true);
     setOcrProgress(`Preparando extração de ${file.name}...`);
+    startProgressSimulation(85);
     try {
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -483,6 +520,35 @@ export function AIPage() {
                 Limpar
               </Button>
             </div>
+
+            {/* Progress Bar */}
+            {(progressPercent > 0 || progressComplete) && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass rounded-xl p-4 space-y-3 border border-primary/20"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">
+                    {progressComplete ? "Concluído com sucesso!" : "Processando..."}
+                  </span>
+                  <span className={`text-sm font-bold ${progressComplete ? "text-success" : "text-primary"}`}>
+                    {progressPercent}%
+                  </span>
+                </div>
+                <Progress value={progressPercent} className="h-3" />
+                {progressComplete && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-2 text-success"
+                  >
+                    <PartyPopper className="w-4 h-4" />
+                    <span className="text-sm font-medium">Concluído com sucesso!</span>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
 
             {/* OCR Background Progress Banner */}
             {isOcrProcessing && ocrProgress && (

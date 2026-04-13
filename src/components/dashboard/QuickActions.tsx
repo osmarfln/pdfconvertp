@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { FileOutput, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2 } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface QuickActionsProps {
@@ -62,8 +63,30 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       return;
     }
 
-    if (label === "Dividir PDF" || label === "OCR") {
-      toast.info("Funcionalidade em breve!");
+    if (label === "Dividir PDF") {
+      if (pdfFiles.length === 0) {
+        toast.info("Envie um PDF primeiro.");
+        return;
+      }
+      setProcessingAction(label);
+      const file = pdfFiles[0];
+      try {
+        const { data, error } = await supabase.functions.invoke("convert-file", {
+          body: { action: "split", filePath: file.original_path },
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || "Split failed");
+        toast.success("PDF dividido com sucesso!");
+      } catch (err: any) {
+        toast.error("Erro ao dividir: " + err.message);
+      }
+      setProcessingAction(null);
+      return;
+    }
+
+    if (label === "OCR") {
+      onNavigate?.("ai");
+      toast.info("Use a função de extração OCR na página IA & Correção.");
       return;
     }
   };
