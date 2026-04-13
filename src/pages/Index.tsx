@@ -7,6 +7,8 @@ import { FileList } from "@/components/dashboard/FileList";
 import { UploadZone } from "@/components/dashboard/UploadZone";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AIChatWidget } from "@/components/chat/AIChatWidget";
+import { TextComparison } from "@/components/comparison/TextComparison";
+import { AdminPanel } from "@/components/admin/AdminPanel";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
