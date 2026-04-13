@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import logoBg from "@/assets/logo-bg.png";
+import { InstallPWAButton } from "@/components/InstallPWA";
 import {
   LayoutDashboard,
   Upload,
@@ -79,6 +80,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           );
         })}
       </nav>
+
+      {/* Install PWA */}
+      <InstallPWAButton collapsed={collapsed} />
 
       {/* Collapse toggle */}
       <button

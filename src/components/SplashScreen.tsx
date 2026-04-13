@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import logoSrc from "/logo-192.png";
+import logoSrc from "@/assets/logo.png";
 
 export function SplashScreen({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase] = useState<"glow" | "fadeout">("glow");
