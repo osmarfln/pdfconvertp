@@ -198,6 +198,7 @@ export function useFileConversions() {
     convertFile,
     mergeFiles,
     compressFile,
+    splitFile,
     downloadFile,
     deleteConversion,
     refetch: fetchConversions,
