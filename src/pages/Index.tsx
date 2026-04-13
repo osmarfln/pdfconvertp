@@ -80,7 +80,25 @@ export default function Index() {
             </motion.div>
           )}
 
-          {activeTab !== "dashboard" && activeTab !== "upload" && (
+          {activeTab === "compare" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <TextComparison />
+            </motion.div>
+          )}
+
+          {activeTab === "admin" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <AdminPanel />
+            </motion.div>
+          )}
+
+          {activeTab !== "dashboard" && activeTab !== "upload" && activeTab !== "compare" && activeTab !== "admin" && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
