@@ -40,8 +40,11 @@ export function useFileConversions() {
   }, [fetchConversions]);
 
   const uploadFile = useCallback(async (file: File): Promise<FileConversion | null> => {
+    console.log("[Upload] Starting upload for:", file.name, "size:", file.size);
+    
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      console.error("[Upload] No session found");
       toast.error("Você precisa estar logado para enviar arquivos.");
       return null;
     }
@@ -49,15 +52,20 @@ export function useFileConversions() {
     const userId = session.user.id;
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
     const filePath = `${userId}/originals/${Date.now()}_${file.name}`;
+    
+    console.log("[Upload] Uploading to storage path:", filePath);
 
     const { error: uploadError } = await supabase.storage
       .from("documents")
       .upload(filePath, file);
 
     if (uploadError) {
+      console.error("[Upload] Storage upload error:", uploadError);
       toast.error("Erro ao enviar arquivo: " + uploadError.message);
       return null;
     }
+    
+    console.log("[Upload] Storage upload success, inserting record...");
 
     const { data: conv, error: insertError } = await supabase
       .from("file_conversions")
@@ -74,10 +82,12 @@ export function useFileConversions() {
       .single();
 
     if (insertError) {
-      toast.error("Erro ao registrar arquivo.");
+      console.error("[Upload] DB insert error:", insertError);
+      toast.error("Erro ao registrar arquivo: " + insertError.message);
       return null;
     }
 
+    console.log("[Upload] Success! Record:", conv?.id);
     toast.success(`${file.name} enviado com sucesso!`);
     await fetchConversions();
     return conv;

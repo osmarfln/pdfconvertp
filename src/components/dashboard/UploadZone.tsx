@@ -13,9 +13,16 @@ export function UploadZone() {
   const processFiles = useCallback(async (files: File[]) => {
     for (const file of files) {
       setUploading((prev) => [...prev, file.name]);
-      await uploadFile(file);
-      setUploading((prev) => prev.filter((n) => n !== file.name));
-      setUploaded((prev) => [...prev, { name: file.name, size: `${(file.size / 1024 / 1024).toFixed(1)} MB` }]);
+      try {
+        const result = await uploadFile(file);
+        setUploading((prev) => prev.filter((n) => n !== file.name));
+        if (result) {
+          setUploaded((prev) => [...prev, { name: file.name, size: `${(file.size / 1024 / 1024).toFixed(1)} MB` }]);
+        }
+      } catch (err) {
+        console.error("Upload failed for", file.name, err);
+        setUploading((prev) => prev.filter((n) => n !== file.name));
+      }
     }
   }, [uploadFile]);
 
