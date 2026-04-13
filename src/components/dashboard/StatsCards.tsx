@@ -1,42 +1,43 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { FileText, CheckCircle2, Zap, TrendingUp } from "lucide-react";
 
-const stats = [
-  {
-    label: "Total de Arquivos",
-    value: "24",
-    change: "+3 esta semana",
-    icon: FileText,
-    color: "text-primary",
-    bg: "bg-primary/10",
-  },
-  {
-    label: "Processados",
-    value: "18",
-    change: "75% concluídos",
-    icon: CheckCircle2,
-    color: "text-success",
-    bg: "bg-success/10",
-  },
-  {
-    label: "Correções IA",
-    value: "142",
-    change: "Score médio: 87%",
-    icon: Zap,
-    color: "text-warning",
-    bg: "bg-warning/10",
-  },
-  {
-    label: "Melhoria",
-    value: "34%",
-    change: "vs. originais",
-    icon: TrendingUp,
-    color: "text-primary",
-    bg: "bg-primary/10",
-  },
-];
-
 export function StatsCards() {
+  const stats = [
+    {
+      label: "Total de Arquivos",
+      value: "0",
+      change: "Faça upload para começar",
+      icon: FileText,
+      color: "text-primary",
+      bg: "bg-primary/10",
+    },
+    {
+      label: "Processados",
+      value: "0",
+      change: "Nenhum processado",
+      icon: CheckCircle2,
+      color: "text-success",
+      bg: "bg-success/10",
+    },
+    {
+      label: "Correções IA",
+      value: "0",
+      change: "Envie textos para corrigir",
+      icon: Zap,
+      color: "text-warning",
+      bg: "bg-warning/10",
+    },
+    {
+      label: "Melhoria",
+      value: "0%",
+      change: "vs. originais",
+      icon: TrendingUp,
+      color: "text-primary",
+      bg: "bg-primary/10",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {stats.map((stat, i) => (
