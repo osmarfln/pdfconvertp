@@ -1,11 +1,23 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileUp, X, CheckCircle2 } from "lucide-react";
+import { Upload, FileUp, X, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useFileConversions } from "@/hooks/useFileConversions";
 
 export function UploadZone() {
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string }[]>([]);
+  const [uploading, setUploading] = useState<string[]>([]);
+  const [uploaded, setUploaded] = useState<{ name: string; size: string }[]>([]);
+  const { uploadFile } = useFileConversions();
+
+  const processFiles = useCallback(async (files: File[]) => {
+    for (const file of files) {
+      setUploading((prev) => [...prev, file.name]);
+      await uploadFile(file);
+      setUploading((prev) => prev.filter((n) => n !== file.name));
+      setUploaded((prev) => [...prev, { name: file.name, size: `${(file.size / 1024 / 1024).toFixed(1)} MB` }]);
+    }
+  }, [uploadFile]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -17,13 +29,8 @@ export function UploadZone() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    const mapped = files.map((f) => ({
-      name: f.name,
-      size: `${(f.size / 1024 / 1024).toFixed(1)} MB`,
-    }));
-    setUploadedFiles((prev) => [...prev, ...mapped]);
-  }, []);
+    processFiles(Array.from(e.dataTransfer.files));
+  }, [processFiles]);
 
   const handleFileSelect = useCallback(() => {
     const input = document.createElement("input");
@@ -32,18 +39,10 @@ export function UploadZone() {
     input.accept = ".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png";
     input.onchange = (e) => {
       const files = Array.from((e.target as HTMLInputElement).files || []);
-      const mapped = files.map((f) => ({
-        name: f.name,
-        size: `${(f.size / 1024 / 1024).toFixed(1)} MB`,
-      }));
-      setUploadedFiles((prev) => [...prev, ...mapped]);
+      processFiles(files);
     };
     input.click();
-  }, []);
-
-  const removeFile = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+  }, [processFiles]);
 
   return (
     <div className="space-y-4">
@@ -82,9 +81,22 @@ export function UploadZone() {
       </motion.div>
 
       <AnimatePresence>
-        {uploadedFiles.map((file, index) => (
+        {uploading.map((name) => (
           <motion.div
-            key={`${file.name}-${index}`}
+            key={`uploading-${name}`}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary/50 border border-border"
+          >
+            <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
+            <p className="text-sm font-medium text-foreground truncate flex-1">{name}</p>
+            <span className="text-xs text-muted-foreground">Enviando...</span>
+          </motion.div>
+        ))}
+        {uploaded.map((file, index) => (
+          <motion.div
+            key={`done-${file.name}-${index}`}
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -98,7 +110,7 @@ export function UploadZone() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                removeFile(index);
+                setUploaded((prev) => prev.filter((_, i) => i !== index));
               }}
               className="p-1 rounded hover:bg-muted transition-colors"
             >
