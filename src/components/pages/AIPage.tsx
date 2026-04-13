@@ -51,6 +51,9 @@ export function AIPage() {
   const [ocrProgress, setOcrProgress] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressComplete, setProgressComplete] = useState(false);
 
   // History state
   const [history, setHistory] = useState<CorrectionRecord[]>([]);
