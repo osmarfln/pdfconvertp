@@ -44,7 +44,10 @@ export function AIPage() {
   const [tone, setTone] = useState("profissional");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [ocrProgress, setOcrProgress] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // History state
   const [history, setHistory] = useState<CorrectionRecord[]>([]);
@@ -77,6 +80,64 @@ export function AIPage() {
   useEffect(() => {
     fetchHistory();
   }, [user]);
+
+  // Check for pending extraction jobs on mount
+  useEffect(() => {
+    if (!user) return;
+    const checkPendingJobs = async () => {
+      const { data } = await supabase
+        .from("extraction_jobs")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("status", ["pending", "processing"])
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        const job = data[0] as any;
+        setActiveJobId(job.id);
+        setIsOcrProcessing(true);
+        setOcrProgress(`Retomando extração de ${job.file_name || "arquivo"}...`);
+        startPolling(job.id);
+      }
+    };
+    checkPendingJobs();
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [user]);
+
+  const startPolling = (jobId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from("extraction_jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+      if (!data) return;
+      const job = data as any;
+
+      if (job.status === "completed") {
+        clearInterval(pollIntervalRef.current!);
+        pollIntervalRef.current = null;
+        setText(job.extracted_text || "");
+        setIsOcrProcessing(false);
+        setActiveJobId(null);
+        setOcrProgress("");
+        toast.success("Texto extraído com sucesso!");
+      } else if (job.status === "failed") {
+        clearInterval(pollIntervalRef.current!);
+        pollIntervalRef.current = null;
+        setIsOcrProcessing(false);
+        setActiveJobId(null);
+        setOcrProgress("");
+        toast.error(job.error_message || "Erro ao extrair texto");
+      } else {
+        setOcrProgress(`Extraindo texto de ${job.file_name || "arquivo"}...`);
+      }
+    }, 2000);
+  };
 
   const saveToHistory = async (original: string, correctedText: string, sourceType: string, fileFormat?: string) => {
     if (!user) return;
@@ -140,7 +201,9 @@ export function AIPage() {
   };
 
   const handleOCR = async (file: File) => {
+    if (!user) return;
     setIsOcrProcessing(true);
+    setOcrProgress(`Preparando extração de ${file.name}...`);
     try {
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -152,20 +215,38 @@ export function AIPage() {
         reader.readAsDataURL(file);
       });
 
-      const { data, error } = await supabase.functions.invoke("ai-correct", {
-        body: { action: "ocr", imageBase64: base64, mimeType: file.type },
+      // Create job in database
+      const { data: jobData, error: jobError } = await supabase
+        .from("extraction_jobs")
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_type: file.type,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (jobError) throw jobError;
+      const jobId = (jobData as any).id;
+      setActiveJobId(jobId);
+
+      // Invoke background processing
+      const { error } = await supabase.functions.invoke("ai-correct", {
+        body: { action: "ocr-background", imageBase64: base64, mimeType: file.type, jobId },
       });
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Erro no OCR");
 
-      setText(data.extractedText);
-      toast.success("Texto extraído com sucesso!");
+      setOcrProgress(`Extraindo texto de ${file.name}...`);
+      toast.info("Extração iniciada em segundo plano. Você pode navegar para outras páginas.");
+      startPolling(jobId);
     } catch (err: any) {
       console.error("OCR error:", err);
       toast.error(err.message || "Erro ao extrair texto");
-    } finally {
       setIsOcrProcessing(false);
+      setActiveJobId(null);
+      setOcrProgress("");
     }
   };
 
@@ -399,6 +480,16 @@ export function AIPage() {
               </Button>
             </div>
 
+            {/* OCR Background Progress Banner */}
+            {isOcrProcessing && ocrProgress && (
+              <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl p-4 flex items-center gap-3 border border-primary/20">
+                <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{ocrProgress}</p>
+                  <p className="text-xs text-muted-foreground">Você pode navegar para outras páginas. O processo continuará em segundo plano.</p>
+                </div>
+              </motion.div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="space-y-2">
                 <div className="flex items-center gap-2">
