@@ -42,6 +42,7 @@ interface UserProfile {
   user_id: string;
   display_name: string | null;
   email: string | null;
+  phone: string | null;
   is_blocked: boolean;
   conversions_used: number;
   created_at: string;
