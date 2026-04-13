@@ -245,7 +245,6 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ success: true, convertedPath: compressedPath }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
 
     } else if (action === "split") {
       const startRes = await fetch(`${ILOVEPDF_API}/start/split`, {
