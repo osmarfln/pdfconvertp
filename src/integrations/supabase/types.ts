@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      correction_history: {
+        Row: {
+          corrected_text: string
+          created_at: string
+          file_format: string | null
+          id: string
+          original_text: string
+          source_type: string
+          tone: string
+          user_id: string
+        }
+        Insert: {
+          corrected_text: string
+          created_at?: string
+          file_format?: string | null
+          id?: string
+          original_text: string
+          source_type?: string
+          tone?: string
+          user_id: string
+        }
+        Update: {
+          corrected_text?: string
+          created_at?: string
+          file_format?: string | null
+          id?: string
+          original_text?: string
+          source_type?: string
+          tone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       file_conversions: {
         Row: {
           converted_path: string | null
