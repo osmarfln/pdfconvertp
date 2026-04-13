@@ -104,6 +104,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
 
+  useEffect(() => {
+    const handler = () => setMobileOpen((v) => !v);
+    window.addEventListener('toggle-mobile-sidebar', handler);
+    return () => window.removeEventListener('toggle-mobile-sidebar', handler);
+  }, []);
+
   if (isMobile) {
     return (
       <>
