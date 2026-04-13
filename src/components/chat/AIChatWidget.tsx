@@ -19,7 +19,7 @@ const suggestions = [
   "Como converter um PDF para Word?",
   "Quero corrigir a ortografia de um texto",
   "Como usar o OCR para extrair texto?",
-  "Qual a diferença entre os planos?",
+  "O que o assistente pode fazer?",
 ];
 
 export function AIChatWidget() {
@@ -47,7 +47,7 @@ export function AIChatWidget() {
         converter: "Para converter um arquivo, basta fazer upload na área de Upload e selecionar o formato de destino. Suportamos Word → PDF, Excel → PDF, PDF → JPG e muito mais! 📄",
         corrigir: "Ótima escolha! Após fazer upload do seu documento, clique em 'Corrigir com IA'. Nossa IA analisa ortografia, gramática, pontuação e até sugere melhorias de clareza. ✨",
         ocr: "O OCR é ativado automaticamente quando detectamos um PDF escaneado ou imagem. Também pode ativá-lo manualmente na seção de processamento. 🔍",
-        plano: "Temos 3 planos:\n• **Free**: 5 conversões/mês\n• **Pro**: 100 conversões + IA ilimitada\n• **Business**: Uso ilimitado + API + Suporte prioritário\n\nQual se encaixa melhor para você? 💡",
+        assistente: "Posso te ajudar com:\n• Conversão de documentos\n• Correção ortográfica e gramatical com IA\n• Extração de texto (OCR)\n• Comparação de textos\n• Exportação em múltiplos formatos\n\nComo posso ajudar? 💡",
       };
 
       const key = Object.keys(responses).find((k) =>
