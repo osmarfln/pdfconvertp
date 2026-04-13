@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
   Shield,
@@ -11,6 +11,9 @@ import {
   XCircle,
   Settings,
   Activity,
+  Trash2,
+  Eye,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +59,7 @@ export function AdminPanel() {
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const { toast } = useToast();
 
   const fetchUsers = async () => {
@@ -110,6 +114,20 @@ export function AdminPanel() {
       )
     );
     toast({ title: currentlyBlocked ? "Usuário desbloqueado" : "Usuário bloqueado" });
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+    const { error } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("user_id", userId);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+      return;
+    }
+    setUsers((prev) => prev.filter((u) => u.user_id !== userId));
+    toast({ title: "Usuário excluído" });
   };
 
   const totalUsers = users.length;
@@ -264,12 +282,24 @@ export function AdminPanel() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-card border-border">
+                            <DropdownMenuItem onClick={() => setSelectedUser(user)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => toggleBlock(user.user_id, user.is_blocked)}
                               className={user.is_blocked ? "text-success" : "text-destructive"}
                             >
                               <Ban className="w-4 h-4 mr-2" />
                               {user.is_blocked ? "Desbloquear" : "Bloquear"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => deleteUser(user.user_id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -384,6 +414,92 @@ export function AdminPanel() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* User Detail Modal */}
+      <AnimatePresence>
+        {selectedUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setSelectedUser(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass rounded-2xl p-6 w-full max-w-md space-y-4 border border-border"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-bold text-lg text-foreground">Detalhes do Usuário</h3>
+                <button onClick={() => setSelectedUser(null)} className="p-1 rounded-lg hover:bg-muted">
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  {selectedUser.role === "admin" ? (
+                    <Crown className="w-6 h-6 text-warning" />
+                  ) : (
+                    <span className="text-lg font-bold text-foreground">
+                      {(selectedUser.display_name || selectedUser.email || "U")[0].toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">{selectedUser.display_name || "Sem nome"}</p>
+                  <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                {[
+                  { label: "ID", value: selectedUser.user_id },
+                  { label: "Papel", value: selectedUser.role || "user" },
+                  { label: "Status", value: selectedUser.is_blocked ? "Bloqueado" : "Ativo" },
+                  { label: "Conversões", value: String(selectedUser.conversions_used) },
+                  { label: "Cadastro", value: new Date(selectedUser.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
+                  { label: "Última atualização", value: new Date(selectedUser.updated_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
+                ].map((item) => (
+                  <div key={item.label} className="flex justify-between">
+                    <span className="text-muted-foreground">{item.label}</span>
+                    <span className="text-foreground font-medium text-right max-w-[60%] truncate">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="glass"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    toggleBlock(selectedUser.user_id, selectedUser.is_blocked);
+                    setSelectedUser(null);
+                  }}
+                >
+                  <Ban className="w-4 h-4 mr-1" />
+                  {selectedUser.is_blocked ? "Desbloquear" : "Bloquear"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    deleteUser(selectedUser.user_id);
+                    setSelectedUser(null);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Excluir
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
