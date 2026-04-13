@@ -81,6 +81,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         })}
       </nav>
 
+      {/* Install PWA */}
+      <InstallPWAButton collapsed={collapsed} />
+
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
