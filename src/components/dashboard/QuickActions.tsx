@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { FileOutput, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2 } from "lucide-react";
+import { FileOutput, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2, AlertTriangle } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useILovePDFHealth } from "@/hooks/useILovePDFHealth";
 
 interface QuickActionsProps {
   onNavigate?: (tab: string) => void;
@@ -12,6 +13,7 @@ interface QuickActionsProps {
 export function QuickActions({ onNavigate }: QuickActionsProps) {
   const { conversions, convertFile, compressFile } = useFileConversions();
   const [processingAction, setProcessingAction] = useState<string | null>(null);
+  const { healthy, reason, checking, recheck } = useILovePDFHealth();
 
   const pdfFiles = conversions.filter((c) => c.original_format === "pdf" && c.original_path);
   const docFiles = conversions.filter((c) => ["docx", "xlsx", "pptx"].includes(c.original_format) && c.original_path);
@@ -19,6 +21,18 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const handleAction = async (label: string) => {
     if (label === "Corrigir com IA") {
       onNavigate?.("ai");
+      return;
+    }
+
+    if (label === "OCR") {
+      onNavigate?.("ai");
+      toast.info("Use a função de extração OCR na página IA & Correção.");
+      return;
+    }
+
+    // All other actions need iLovePDF
+    if (healthy === false) {
+      toast.error(reason || "Serviço de conversão indisponível no momento. Tente novamente mais tarde.");
       return;
     }
 
@@ -84,11 +98,6 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       return;
     }
 
-    if (label === "OCR") {
-      onNavigate?.("ai");
-      toast.info("Use a função de extração OCR na página IA & Correção.");
-      return;
-    }
   };
 
   const actions = [
@@ -103,7 +112,18 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
 
   return (
     <div className="glass rounded-xl p-5">
-      <h3 className="font-display font-semibold text-foreground mb-4">Ações Rápidas</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-display font-semibold text-foreground">Ações Rápidas</h3>
+        {healthy === false && (
+          <button
+            onClick={recheck}
+            className="flex items-center gap-1.5 text-xs text-warning hover:text-warning/80 transition-colors"
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Serviço de conversão indisponível</span>
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {actions.map((action, i) => (
           <motion.button
