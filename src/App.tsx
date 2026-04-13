@@ -36,24 +36,38 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <NotificationProvider>
-            <Routes>
-              <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
-              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </NotificationProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [showSplash, setShowSplash] = useState(() => {
+    // Only show splash once per session
+    if (sessionStorage.getItem("splash-shown")) return false;
+    return true;
+  });
+
+  const handleSplashComplete = useCallback(() => {
+    sessionStorage.setItem("splash-shown", "1");
+    setShowSplash(false);
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+        <BrowserRouter>
+          <AuthProvider>
+            <NotificationProvider>
+              <Routes>
+                <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </NotificationProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
