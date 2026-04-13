@@ -1,9 +1,17 @@
 import { useState, useEffect } from "react";
-import { Bell, Search, User, Clock } from "lucide-react";
+import { Bell, Search, User, Clock, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function AppHeader() {
   const [now, setNow] = useState(new Date());
+  const { signOut, user } = useAuth();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -35,9 +43,24 @@ export function AppHeader() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-4.5 h-4.5 text-muted-foreground" />
         </Button>
-        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
-          <User className="w-4 h-4 text-primary" />
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+              <User className="w-4 h-4 text-primary" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-card border-border">
+            {user && (
+              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                {user.email}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={signOut} className="text-destructive">
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
