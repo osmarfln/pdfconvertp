@@ -126,6 +126,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // Upload to iLovePDF by URL
+      console.log("Uploading to iLovePDF server:", server);
       const uploadRes = await fetch(`https://${server}/v1/upload`, {
         method: "POST",
         headers: {
@@ -134,7 +135,16 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({ task, cloud_file: signedData.signedUrl }),
       });
-      const { server_filename } = await uploadRes.json();
+      const uploadBody = await uploadRes.json();
+      console.log("Upload result:", uploadRes.status, JSON.stringify(uploadBody).slice(0, 200));
+      const server_filename = uploadBody.server_filename;
+
+      if (!server_filename) {
+        return new Response(JSON.stringify({ success: false, error: "iLovePDF upload failed: " + JSON.stringify(uploadBody) }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // Process
       const processBody: Record<string, unknown> = {
@@ -146,7 +156,8 @@ Deno.serve(async (req: Request) => {
         processBody.output_format = targetFormat;
       }
 
-      await fetch(`https://${server}/v1/process`, {
+      console.log("Processing...");
+      const processRes = await fetch(`https://${server}/v1/process`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${iToken}`,
@@ -154,12 +165,23 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify(processBody),
       });
+      const processText = await processRes.text();
+      console.log("Process result:", processRes.status, processText.slice(0, 200));
+
+      if (!processRes.ok) {
+        return new Response(JSON.stringify({ success: false, error: "iLovePDF process failed: " + processText.slice(0, 300) }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // Download result
+      console.log("Downloading result...");
       const downloadRes = await fetch(`https://${server}/v1/download/${task}`, {
         headers: { Authorization: `Bearer ${iToken}` },
       });
       const resultBuffer = await downloadRes.arrayBuffer();
+      console.log("Download:", downloadRes.status, "size:", resultBuffer.byteLength);
 
       const originalName = filePath.split("/").pop()?.replace(/\.[^.]+$/, "") || "converted";
       const convertedPath = `${userId}/converted/${originalName}.${targetFormat}`;
