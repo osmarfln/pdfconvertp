@@ -42,6 +42,7 @@ interface UserProfile {
   user_id: string;
   display_name: string | null;
   email: string | null;
+  phone: string | null;
   is_blocked: boolean;
   conversions_used: number;
   created_at: string;
@@ -452,12 +453,16 @@ export function AdminPanel() {
                 <div>
                   <p className="font-semibold text-foreground">{selectedUser.display_name || "Sem nome"}</p>
                   <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    📱 {(selectedUser as any).phone || "Sem telefone"}
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-3 text-sm">
                 {[
                   { label: "ID", value: selectedUser.user_id },
+                  { label: "Telefone", value: (selectedUser as any).phone || "Não informado" },
                   { label: "Papel", value: selectedUser.role || "user" },
                   { label: "Status", value: selectedUser.is_blocked ? "Bloqueado" : "Ativo" },
                   { label: "Conversões", value: String(selectedUser.conversions_used) },
