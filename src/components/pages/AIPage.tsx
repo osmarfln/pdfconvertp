@@ -480,6 +480,16 @@ export function AIPage() {
               </Button>
             </div>
 
+            {/* OCR Background Progress Banner */}
+            {isOcrProcessing && ocrProgress && (
+              <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl p-4 flex items-center gap-3 border border-primary/20">
+                <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{ocrProgress}</p>
+                  <p className="text-xs text-muted-foreground">Você pode navegar para outras páginas. O processo continuará em segundo plano.</p>
+                </div>
+              </motion.div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="space-y-2">
                 <div className="flex items-center gap-2">
