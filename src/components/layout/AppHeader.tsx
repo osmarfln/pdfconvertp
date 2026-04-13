@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react";
-import { Bell, Search, User, Clock, LogOut, Sun, Moon } from "lucide-react";
+import { Bell, Search, User, Clock, LogOut, Sun, Moon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 export function AppHeader() {
   const [now, setNow] = useState(new Date());
   const { signOut, user } = useAuth();
+  const { notifications, unreadCount, markAllRead, clearAll } = useNotifications();
   const [isDark, setIsDark] = useState(() => !document.documentElement.classList.contains("light"));
 
   useEffect(() => {
@@ -27,7 +31,6 @@ export function AppHeader() {
     } else {
       document.documentElement.classList.add("light");
     }
-    // Sync with settings localStorage
     try {
       const saved = localStorage.getItem("pdfconvert-settings");
       const settings = saved ? JSON.parse(saved) : {};
@@ -38,6 +41,13 @@ export function AppHeader() {
 
   const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const dateStr = now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+
+  const formatTime = (d: Date) => {
+    const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diff < 60) return "agora";
+    if (diff < 3600) return `${Math.floor(diff / 60)}min`;
+    return `${Math.floor(diff / 3600)}h`;
+  };
 
   return (
     <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-background/80 backdrop-blur-xl sticky top-0 z-30">
@@ -63,9 +73,51 @@ export function AppHeader() {
           {isDark ? <Sun className="w-4.5 h-4.5 text-muted-foreground" /> : <Moon className="w-4.5 h-4.5 text-muted-foreground" />}
         </Button>
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-4.5 h-4.5 text-muted-foreground" />
-        </Button>
+        {/* Notification Bell */}
+        <DropdownMenu onOpenChange={(open) => { if (open) markAllRead(); }}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative">
+              <Bell className="w-4.5 h-4.5 text-muted-foreground" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-destructive-foreground">{unreadCount > 9 ? "9+" : unreadCount}</span>
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80 bg-card border-border max-h-80 overflow-y-auto">
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-sm font-semibold text-foreground">Notificações</span>
+              {notifications.length > 0 && (
+                <Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-muted-foreground" onClick={clearAll}>
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Limpar
+                </Button>
+              )}
+            </div>
+            <DropdownMenuSeparator />
+            {notifications.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Nenhuma notificação
+              </div>
+            ) : (
+              notifications.slice(0, 20).map((n) => (
+                <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-1 py-3 cursor-default">
+                  <div className="flex items-center gap-2 w-full">
+                    {!n.read && <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />}
+                    <span className="text-sm font-medium text-foreground flex-1">{n.title}</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-success/20 text-success">
+                      Pronto
+                    </Badge>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{n.message}</span>
+                  <span className="text-[10px] text-muted-foreground/60">{formatTime(n.createdAt)}</span>
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
