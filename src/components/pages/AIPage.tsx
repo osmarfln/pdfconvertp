@@ -131,6 +131,7 @@ export function AIPage() {
         setIsOcrProcessing(false);
         setActiveJobId(null);
         setOcrProgress("");
+        finishProgress();
         addNotification({ title: "Extração concluída", message: `Texto extraído de ${job.file_name || "arquivo"}`, type: "extraction" });
         toast.success("Texto extraído com sucesso!");
       } else if (job.status === "failed") {
@@ -139,6 +140,8 @@ export function AIPage() {
         setIsOcrProcessing(false);
         setActiveJobId(null);
         setOcrProgress("");
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        setProgressPercent(0);
         toast.error(job.error_message || "Erro ao extrair texto");
       } else {
         setOcrProgress(`Extraindo texto de ${job.file_name || "arquivo"}...`);
