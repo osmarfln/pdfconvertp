@@ -8,6 +8,7 @@ import { FileList } from "@/components/dashboard/FileList";
 import { UploadZone } from "@/components/dashboard/UploadZone";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AIChatWidget } from "@/components/chat/AIChatWidget";
+import { InstallPWAFloating } from "@/components/InstallPWAFloating";
 import { TextComparison } from "@/components/comparison/TextComparison";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { FilesPage } from "@/components/pages/FilesPage";
