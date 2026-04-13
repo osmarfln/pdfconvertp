@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import logoBg from "@/assets/logo-bg.png";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
