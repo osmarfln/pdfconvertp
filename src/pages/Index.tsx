@@ -16,6 +16,7 @@ import { ReportsPage } from "@/components/pages/ReportsPage";
 import { ExportPage } from "@/components/pages/ExportPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { supabase } from "@/integrations/supabase/client";
+import { PhoneGate } from "@/components/auth/PhoneGate";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -27,22 +28,30 @@ function getGreeting(): string {
 export default function Index() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [userName, setUserName] = useState("");
+  const [needsPhone, setNeedsPhone] = useState<boolean | null>(null);
+  const [userId, setUserId] = useState("");
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        setUserId(session.user.id);
         const { data: profile } = await supabase
           .from("profiles")
-          .select("display_name")
+          .select("display_name, phone")
           .eq("user_id", session.user.id)
           .single();
+
         if (profile?.display_name) {
           setUserName(profile.display_name.split(" ")[0]);
         } else {
           const email = session.user.email || "";
           setUserName(email.split("@")[0]);
         }
+
+        setNeedsPhone(!(profile as any)?.phone);
+      } else {
+        setNeedsPhone(false);
       }
     };
 
@@ -50,15 +59,17 @@ export default function Index() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        setUserId(session.user.id);
         supabase
           .from("profiles")
-          .select("display_name")
+          .select("display_name, phone")
           .eq("user_id", session.user.id)
           .single()
           .then(({ data }) => {
             if (data?.display_name) {
               setUserName(data.display_name.split(" ")[0]);
             }
+            setNeedsPhone(!(data as any)?.phone);
           });
       } else {
         setUserName("");
@@ -67,6 +78,20 @@ export default function Index() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Loading state
+  if (needsPhone === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Phone gate
+  if (needsPhone) {
+    return <PhoneGate userId={userId} onComplete={() => setNeedsPhone(false)} />;
+  }
 
   const displayName = userName || "Usuário";
 
