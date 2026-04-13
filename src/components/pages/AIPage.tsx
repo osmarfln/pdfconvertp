@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter } from "lucide-react";
+import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -50,6 +51,9 @@ export function AIPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState("all");
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const fetchHistory = async () => {
     if (!user) return;
@@ -193,16 +197,26 @@ export function AIPage() {
     }
   };
 
-  const filteredHistory = historyFilter === "all"
-    ? history
-    : history.filter((h) => {
-        if (historyFilter === "typed") return h.source_type === "typed";
-        if (historyFilter === "ocr") return h.source_type === "ocr";
-        if (historyFilter === "doc") return h.file_format && ["doc", "docx"].includes(h.file_format);
-        if (historyFilter === "pdf") return h.file_format === "pdf";
-        if (historyFilter === "excel") return h.file_format && ["xls", "xlsx"].includes(h.file_format);
-        return true;
-      });
+  const filteredHistory = history
+    .filter((h) => {
+      if (historyFilter === "typed") return h.source_type === "typed";
+      if (historyFilter === "ocr") return h.source_type === "ocr";
+      if (historyFilter === "doc") return h.file_format && ["doc", "docx"].includes(h.file_format);
+      if (historyFilter === "pdf") return h.file_format === "pdf";
+      if (historyFilter === "excel") return h.file_format && ["xls", "xlsx"].includes(h.file_format);
+      return historyFilter === "all";
+    })
+    .filter((h) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return h.original_text.toLowerCase().includes(q) || h.corrected_text.toLowerCase().includes(q);
+    });
+
+  const totalPages = Math.max(1, Math.ceil(filteredHistory.length / ITEMS_PER_PAGE));
+  const paginatedHistory = filteredHistory.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [historyFilter, searchQuery]);
 
   const toneLabels: Record<string, string> = {
     profissional: "Profissional",
@@ -257,6 +271,17 @@ export function AIPage() {
               ))}
             </div>
 
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar no histórico..."
+                className="pl-9 bg-secondary border-border"
+              />
+            </div>
+
             {loadingHistory ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -267,55 +292,73 @@ export function AIPage() {
                 <p>Nenhuma correção encontrada.</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                {filteredHistory.map((record) => (
-                  <motion.div
-                    key={record.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="glass rounded-xl p-4 space-y-2 cursor-pointer hover:bg-card/80 transition-colors group"
-                    onClick={() => loadFromHistory(record)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">{formatDate(record.created_at)}</span>
-                        <Badge variant="secondary" className="text-xs">{toneLabels[record.tone] || record.tone}</Badge>
-                        <Badge variant="outline" className="text-xs">{record.source_type === "ocr" ? "OCR" : "Digitado"}</Badge>
-                        {record.file_format && (
-                          <Badge variant="outline" className="text-xs uppercase">{record.file_format}</Badge>
-                        )}
+              <>
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {paginatedHistory.map((record) => (
+                    <motion.div
+                      key={record.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="glass rounded-xl p-4 space-y-2 cursor-pointer hover:bg-card/80 transition-colors group"
+                      onClick={() => loadFromHistory(record)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{formatDate(record.created_at)}</span>
+                          <Badge variant="secondary" className="text-xs">{toneLabels[record.tone] || record.tone}</Badge>
+                          <Badge variant="outline" className="text-xs">{record.source_type === "ocr" ? "OCR" : "Digitado"}</Badge>
+                          {record.file_format && (
+                            <Badge variant="outline" className="text-xs uppercase">{record.file_format}</Badge>
+                          )}
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-card border-border" onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir correção?</AlertDialogTitle>
+                              <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteHistoryItem(record.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-card border-border" onClick={(e) => e.stopPropagation()}>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir correção?</AlertDialogTitle>
-                            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteHistoryItem(record.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <p className="text-sm text-foreground/70 line-clamp-2">{record.original_text}</p>
+                      <p className="text-sm text-success/80 line-clamp-2">→ {record.corrected_text}</p>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-xs text-muted-foreground">
+                      {filteredHistory.length} resultado{filteredHistory.length !== 1 ? "s" : ""} • Página {currentPage} de {totalPages}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button variant="glass" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)}>
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button variant="glass" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <p className="text-sm text-foreground/70 line-clamp-2">{record.original_text}</p>
-                    <p className="text-sm text-success/80 line-clamp-2">→ {record.corrected_text}</p>
-                  </motion.div>
-                ))}
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
         ) : (
