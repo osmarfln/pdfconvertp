@@ -194,6 +194,7 @@ export function AIPage() {
 
       setCorrected(data.correctedText);
       await saveToHistory(text, data.correctedText, "typed");
+      addNotification({ title: "Correção concluída", message: "Texto corrigido com IA", type: "correction" });
       toast.success("Texto corrigido com sucesso!");
     } catch (err: any) {
       console.error("Correction error:", err);
