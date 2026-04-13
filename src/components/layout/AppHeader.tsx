@@ -1,7 +1,18 @@
-import { Bell, Search, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, Search, User, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppHeader() {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const dateStr = now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+
   return (
     <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-background/80 backdrop-blur-xl sticky top-0 z-30">
       <div className="flex items-center gap-3 flex-1 max-w-md">
@@ -15,10 +26,14 @@ export function AppHeader() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 text-sm">
+          <Clock className="w-4 h-4 text-primary" />
+          <span className="font-mono text-foreground font-medium">{timeStr}</span>
+          <span className="text-muted-foreground text-xs hidden md:inline">· {dateStr}</span>
+        </div>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-4.5 h-4.5 text-muted-foreground" />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
         </Button>
         <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
           <User className="w-4 h-4 text-primary" />

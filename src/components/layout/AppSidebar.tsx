@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Crown,
   ShieldCheck,
 } from "lucide-react";
 
@@ -79,20 +78,6 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           );
         })}
       </nav>
-
-      {/* Plan badge */}
-      {!collapsed && (
-        <div className="mx-3 mb-4 p-3 rounded-lg bg-secondary border border-border">
-          <div className="flex items-center gap-2 mb-1">
-            <Crown className="w-4 h-4 text-warning" />
-            <span className="text-xs font-semibold text-foreground">Plano Free</span>
-          </div>
-          <p className="text-xs text-muted-foreground mb-2">3 de 5 conversões usadas</p>
-          <div className="w-full h-1.5 rounded-full bg-muted">
-            <div className="h-full w-3/5 rounded-full bg-primary" />
-          </div>
-        </div>
-      )}
 
       {/* Collapse toggle */}
       <button

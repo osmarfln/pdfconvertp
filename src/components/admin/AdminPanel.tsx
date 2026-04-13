@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   XCircle,
   Settings,
-  BarChart3,
   Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,78 +31,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data
-const mockUsers = [
-  {
-    id: "1",
-    name: "Osmar",
-    email: "osmarfln@gmail.com",
-    role: "admin",
-    plan: "business",
-    status: "active",
-    conversions: 142,
-    lastLogin: "2026-04-13",
-    createdAt: "2026-01-15",
-  },
-  {
-    id: "2",
-    name: "João Silva",
-    email: "joao@email.com",
-    role: "user",
-    plan: "pro",
-    status: "active",
-    conversions: 87,
-    lastLogin: "2026-04-12",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: "3",
-    name: "Maria Santos",
-    email: "maria@email.com",
-    role: "user",
-    plan: "free",
-    status: "active",
-    conversions: 4,
-    lastLogin: "2026-04-10",
-    createdAt: "2026-03-01",
-  },
-  {
-    id: "4",
-    name: "Carlos Pereira",
-    email: "carlos@email.com",
-    role: "user",
-    plan: "free",
-    status: "blocked",
-    conversions: 0,
-    lastLogin: "2026-03-15",
-    createdAt: "2026-03-10",
-  },
-  {
-    id: "5",
-    name: "Ana Costa",
-    email: "ana@email.com",
-    role: "moderator",
-    plan: "pro",
-    status: "active",
-    conversions: 56,
-    lastLogin: "2026-04-11",
-    createdAt: "2026-02-05",
-  },
-];
-
-const systemStats = [
-  { label: "Total de Usuários", value: "1.247", icon: Users, color: "text-primary" },
-  { label: "Usuários Ativos", value: "892", icon: Activity, color: "text-success" },
-  { label: "Conversões Hoje", value: "342", icon: BarChart3, color: "text-warning" },
-  { label: "Bloqueados", value: "12", icon: Ban, color: "text-destructive" },
-];
-
-const planColors: Record<string, string> = {
-  free: "bg-muted text-muted-foreground",
-  pro: "bg-primary/20 text-primary",
-  business: "bg-warning/20 text-warning",
-};
+interface UserProfile {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  email: string | null;
+  is_blocked: boolean;
+  conversions_used: number;
+  created_at: string;
+  updated_at: string;
+  role?: string;
+}
 
 const roleColors: Record<string, string> = {
   admin: "bg-destructive/20 text-destructive",
@@ -113,31 +54,75 @@ const roleColors: Record<string, string> = {
 
 export function AdminPanel() {
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({ title: "Erro ao carregar usuários", description: error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    // Fetch roles for each user
+    const { data: roles } = await supabase.from("user_roles").select("*");
+
+    const usersWithRoles = (profiles || []).map((p) => {
+      const userRole = roles?.find((r) => r.user_id === p.user_id);
+      return { ...p, role: userRole?.role || "user" };
+    });
+
+    setUsers(usersWithRoles);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const filtered = users.filter(
     (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+      (u.display_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleBlock = (id: string) => {
+  const toggleBlock = async (userId: string, currentlyBlocked: boolean) => {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_blocked: !currentlyBlocked })
+      .eq("user_id", userId);
+
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+
     setUsers((prev) =>
       prev.map((u) =>
-        u.id === id
-          ? { ...u, status: u.status === "blocked" ? "active" : "blocked" }
-          : u
+        u.user_id === userId ? { ...u, is_blocked: !currentlyBlocked } : u
       )
     );
+    toast({ title: currentlyBlocked ? "Usuário desbloqueado" : "Usuário bloqueado" });
   };
 
-  const changeRole = (id: string, role: string) => {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
-  };
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => !u.is_blocked).length;
+  const blockedUsers = users.filter((u) => u.is_blocked).length;
+  const totalConversions = users.reduce((sum, u) => sum + u.conversions_used, 0);
 
-  const changePlan = (id: string, plan: string) => {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, plan } : u)));
-  };
+  const systemStats = [
+    { label: "Total de Usuários", value: String(totalUsers), icon: Users, color: "text-primary" },
+    { label: "Usuários Ativos", value: String(activeUsers), icon: Activity, color: "text-success" },
+    { label: "Conversões Total", value: String(totalConversions), icon: CheckCircle2, color: "text-warning" },
+    { label: "Bloqueados", value: String(blockedUsers), icon: Ban, color: "text-destructive" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -201,111 +186,99 @@ export function AdminPanel() {
                 className="pl-9 bg-secondary border-border"
               />
             </div>
+            <Button variant="glass" size="sm" onClick={fetchUsers}>
+              Atualizar
+            </Button>
           </div>
 
           <div className="glass rounded-xl overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Papel</TableHead>
-                  <TableHead>Plano</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Conversões</TableHead>
-                  <TableHead>Último Login</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((user) => (
-                  <TableRow key={user.id} className="border-border">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                          {user.role === "admin" ? (
-                            <Crown className="w-4 h-4 text-warning" />
-                          ) : (
-                            <span className="text-xs font-medium text-foreground">
-                              {user.name[0]}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-foreground text-sm">{user.name}</div>
-                          <div className="text-xs text-muted-foreground">{user.email}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={roleColors[user.role]}>
-                        {user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={planColors[user.plan]}>
-                        {user.plan}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        {user.status === "active" ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-                        ) : (
-                          <XCircle className="w-3.5 h-3.5 text-destructive" />
-                        )}
-                        <span className={`text-xs ${user.status === "active" ? "text-success" : "text-destructive"}`}>
-                          {user.status === "active" ? "Ativo" : "Bloqueado"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {user.conversions}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {user.lastLogin}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-card border-border">
-                          <DropdownMenuItem onClick={() => changeRole(user.id, "admin")}>
-                            <Shield className="w-4 h-4 mr-2" /> Tornar Admin
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => changeRole(user.id, "moderator")}>
-                            <Shield className="w-4 h-4 mr-2" /> Tornar Moderador
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => changeRole(user.id, "user")}>
-                            <Users className="w-4 h-4 mr-2" /> Tornar Usuário
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => changePlan(user.id, "free")}>
-                            Plano Free
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => changePlan(user.id, "pro")}>
-                            Plano Pro
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => changePlan(user.id, "business")}>
-                            Plano Business
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => toggleBlock(user.id)}
-                            className={user.status === "blocked" ? "text-success" : "text-destructive"}
-                          >
-                            <Ban className="w-4 h-4 mr-2" />
-                            {user.status === "blocked" ? "Desbloquear" : "Bloquear"}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <p className="text-muted-foreground">Carregando usuários...</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2">
+                <Users className="w-10 h-10 text-muted-foreground/30" />
+                <p className="text-muted-foreground">Nenhum usuário encontrado</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Papel</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Conversões</TableHead>
+                    <TableHead>Cadastro</TableHead>
+                    <TableHead className="w-12"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((user) => (
+                    <TableRow key={user.id} className="border-border">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                            {user.role === "admin" ? (
+                              <Crown className="w-4 h-4 text-warning" />
+                            ) : (
+                              <span className="text-xs font-medium text-foreground">
+                                {(user.display_name || user.email || "U")[0].toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-foreground text-sm">{user.display_name || "Sem nome"}</div>
+                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={roleColors[user.role || "user"]}>
+                          {user.role || "user"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {!user.is_blocked ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5 text-destructive" />
+                          )}
+                          <span className={`text-xs ${!user.is_blocked ? "text-success" : "text-destructive"}`}>
+                            {!user.is_blocked ? "Ativo" : "Bloqueado"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {user.conversions_used}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(user.created_at).toLocaleDateString("pt-BR")}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-card border-border">
+                            <DropdownMenuItem
+                              onClick={() => toggleBlock(user.user_id, user.is_blocked)}
+                              className={user.is_blocked ? "text-success" : "text-destructive"}
+                            >
+                              <Ban className="w-4 h-4 mr-2" />
+                              {user.is_blocked ? "Desbloquear" : "Bloquear"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </TabsContent>
 
@@ -318,7 +291,7 @@ export function AdminPanel() {
                 color: "text-destructive",
                 permissions: [
                   "Gerenciar todos os usuários",
-                  "Alterar planos e permissões",
+                  "Alterar permissões",
                   "Bloquear/desbloquear contas",
                   "Visualizar relatórios do sistema",
                   "Configurar integrações",
@@ -339,7 +312,7 @@ export function AdminPanel() {
                 role: "Usuário",
                 color: "text-muted-foreground",
                 permissions: [
-                  "Upload de arquivos (conforme plano)",
+                  "Upload de arquivos",
                   "Conversão de documentos",
                   "Correção com IA",
                   "Download de arquivos",
@@ -373,14 +346,6 @@ export function AdminPanel() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               {
-                title: "Limites por Plano",
-                items: [
-                  { label: "Free: conversões/mês", value: "5" },
-                  { label: "Pro: conversões/mês", value: "100" },
-                  { label: "Business: conversões/mês", value: "Ilimitado" },
-                ],
-              },
-              {
                 title: "Segurança",
                 items: [
                   { label: "Exclusão automática de arquivos", value: "24h" },
@@ -391,17 +356,9 @@ export function AdminPanel() {
               {
                 title: "Processamento",
                 items: [
-                  { label: "Workers ativos", value: "4" },
-                  { label: "Fila de processamento", value: "Redis" },
-                  { label: "Timeout", value: "120s" },
-                ],
-              },
-              {
-                title: "Integrações",
-                items: [
-                  { label: "iLovePDF API", value: "Ativo ✅" },
-                  { label: "Modelo de IA", value: "GPT-4o" },
                   { label: "OCR Engine", value: "Tesseract" },
+                  { label: "Timeout", value: "120s" },
+                  { label: "Formatos suportados", value: "PDF, DOCX, XLSX, JPG, PNG" },
                 ],
               },
             ].map((section) => (
