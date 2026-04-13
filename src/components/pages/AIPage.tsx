@@ -201,7 +201,9 @@ export function AIPage() {
   };
 
   const handleOCR = async (file: File) => {
+    if (!user) return;
     setIsOcrProcessing(true);
+    setOcrProgress(`Preparando extração de ${file.name}...`);
     try {
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -213,20 +215,38 @@ export function AIPage() {
         reader.readAsDataURL(file);
       });
 
-      const { data, error } = await supabase.functions.invoke("ai-correct", {
-        body: { action: "ocr", imageBase64: base64, mimeType: file.type },
+      // Create job in database
+      const { data: jobData, error: jobError } = await supabase
+        .from("extraction_jobs")
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_type: file.type,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (jobError) throw jobError;
+      const jobId = (jobData as any).id;
+      setActiveJobId(jobId);
+
+      // Invoke background processing
+      const { error } = await supabase.functions.invoke("ai-correct", {
+        body: { action: "ocr-background", imageBase64: base64, mimeType: file.type, jobId },
       });
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Erro no OCR");
 
-      setText(data.extractedText);
-      toast.success("Texto extraído com sucesso!");
+      setOcrProgress(`Extraindo texto de ${file.name}...`);
+      toast.info("Extração iniciada em segundo plano. Você pode navegar para outras páginas.");
+      startPolling(jobId);
     } catch (err: any) {
       console.error("OCR error:", err);
       toast.error(err.message || "Erro ao extrair texto");
-    } finally {
       setIsOcrProcessing(false);
+      setActiveJobId(null);
+      setOcrProgress("");
     }
   };
 
