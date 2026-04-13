@@ -271,6 +271,17 @@ export function AIPage() {
               ))}
             </div>
 
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar no histórico..."
+                className="pl-9 bg-secondary border-border"
+              />
+            </div>
+
             {loadingHistory ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -281,8 +292,8 @@ export function AIPage() {
                 <p>Nenhuma correção encontrada.</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                {filteredHistory.map((record) => (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                {paginatedHistory.map((record) => (
                   <motion.div
                     key={record.id}
                     initial={{ opacity: 0 }}
