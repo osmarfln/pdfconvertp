@@ -117,8 +117,11 @@ export function useFileConversions() {
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Conversion failed");
 
-      toast.success("Conversão concluída!");
+      toast.success("Conversão concluída! Vá em Meus Arquivos para baixar o PDF.", {
+        duration: 6000,
+      });
     } catch (err: any) {
+      console.error("[Convert] Error:", err);
       await supabase
         .from("file_conversions")
         .update({ status: "error", error_message: err.message })
