@@ -7,6 +7,69 @@ const corsHeaders = {
 
 const ILOVEPDF_API = "https://api.ilovepdf.com/v1";
 
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const sanitizeSecret = (value: string | undefined | null) =>
+  value?.trim().replace(/^['\"]+|['\"]+$/g, "") ?? "";
+
+async function parseJsonResponse(response: Response) {
+  const text = await response.text();
+
+  if (!text) {
+    return { text: "", json: null as Record<string, any> | null };
+  }
+
+  try {
+    return { text, json: JSON.parse(text) as Record<string, any> };
+  } catch {
+    return { text, json: null as Record<string, any> | null };
+  }
+}
+
+async function authenticateWithILovePDF(publicKey: string) {
+  try {
+    console.log("Authenticating with iLovePDF...");
+
+    const authRes = await fetch(`${ILOVEPDF_API}/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ public_key: publicKey }),
+    });
+
+    const { text, json } = await parseJsonResponse(authRes);
+    console.log("iLovePDF auth status:", authRes.status, text.slice(0, 200));
+
+    if (authRes.ok && json?.token) {
+      return { token: json.token as string, retryable: false, error: null };
+    }
+
+    const providerMessage =
+      (json?.error && typeof json.error === "object" && "message" in json.error
+        ? String(json.error.message)
+        : null) ||
+      text ||
+      "Unknown authentication error";
+
+    const retryable = authRes.status >= 500;
+    const error = retryable
+      ? "iLovePDF indisponível no momento ou chave pública inválida. Atualize a chave do projeto e tente novamente em alguns minutos."
+      : `Falha ao autenticar com iLovePDF: ${providerMessage}`;
+
+    return { token: null, retryable, error };
+  } catch (error) {
+    console.error("iLovePDF auth request failed:", error);
+    return {
+      token: null,
+      retryable: true,
+      error: "Não foi possível conectar ao iLovePDF no momento. Tente novamente em alguns minutos.",
+    };
+  }
+}
+
 const TOOL_MAP: Record<string, string> = {
   "docx-pdf": "officepdf",
   "xlsx-pdf": "officepdf",
@@ -30,10 +93,7 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const supabase = createClient(
@@ -44,39 +104,27 @@ Deno.serve(async (req: Request) => {
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
     const userId = user.id;
 
     const { action, conversionId, filePath, targetFormat, filePaths } = await req.json();
 
-    const ILOVEPDF_KEY = Deno.env.get("ILOVEPDF_PUBLIC_KEY");
+    const ILOVEPDF_KEY = sanitizeSecret(Deno.env.get("ILOVEPDF_PUBLIC_KEY"));
     if (!ILOVEPDF_KEY) {
-      return new Response(JSON.stringify({ error: "iLovePDF key not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "iLovePDF key not configured" }, 500);
     }
 
-    // Authenticate with iLovePDF
-    console.log("Authenticating with iLovePDF...");
-    const authRes = await fetch(`${ILOVEPDF_API}/auth`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ public_key: ILOVEPDF_KEY }),
-    });
-    const authBody = await authRes.json();
-    console.log("iLovePDF auth status:", authRes.status, JSON.stringify(authBody).slice(0, 200));
-    const iToken = authBody.token;
-    if (!iToken) {
-      return new Response(JSON.stringify({ success: false, error: "Failed to authenticate with iLovePDF: " + JSON.stringify(authBody) }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const authResult = await authenticateWithILovePDF(ILOVEPDF_KEY);
+    if (!authResult.token) {
+      return jsonResponse({
+        success: false,
+        error: authResult.error,
+        provider: "iLovePDF",
+        retryable: authResult.retryable,
       });
     }
+    const iToken = authResult.token;
 
     // Admin client for storage operations
     const adminSupabase = createClient(
@@ -90,10 +138,7 @@ Deno.serve(async (req: Request) => {
       const tool = TOOL_MAP[toolKey];
       console.log("Convert:", ext, "→", targetFormat, "tool:", tool, "filePath:", filePath);
       if (!tool) {
-        return new Response(JSON.stringify({ success: false, error: `Conversão ${ext} → ${targetFormat} não suportada` }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ success: false, error: `Conversão ${ext} → ${targetFormat} não suportada` });
       }
 
       // Start task
@@ -105,10 +150,7 @@ Deno.serve(async (req: Request) => {
       const { server, task } = startBody;
 
       if (!server || !task) {
-        return new Response(JSON.stringify({ success: false, error: "iLovePDF start failed: " + JSON.stringify(startBody) }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ success: false, error: "iLovePDF start failed: " + JSON.stringify(startBody) });
       }
 
       // Get signed URL for the file
@@ -119,10 +161,7 @@ Deno.serve(async (req: Request) => {
       console.log("Signed URL:", signedData?.signedUrl ? "OK" : "FAILED", signedError?.message);
 
       if (!signedData?.signedUrl) {
-        return new Response(JSON.stringify({ success: false, error: "Could not generate file URL: " + (signedError?.message || "unknown") }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ success: false, error: "Could not generate file URL: " + (signedError?.message || "unknown") });
       }
 
       // Upload to iLovePDF by URL
@@ -140,10 +179,7 @@ Deno.serve(async (req: Request) => {
       const server_filename = uploadBody.server_filename;
 
       if (!server_filename) {
-        return new Response(JSON.stringify({ success: false, error: "iLovePDF upload failed: " + JSON.stringify(uploadBody) }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ success: false, error: "iLovePDF upload failed: " + JSON.stringify(uploadBody) });
       }
 
       // Process
@@ -169,10 +205,7 @@ Deno.serve(async (req: Request) => {
       console.log("Process result:", processRes.status, processText.slice(0, 200));
 
       if (!processRes.ok) {
-        return new Response(JSON.stringify({ success: false, error: "iLovePDF process failed: " + processText.slice(0, 300) }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ success: false, error: "iLovePDF process failed: " + processText.slice(0, 300) });
       }
 
       // Download result
@@ -199,9 +232,7 @@ Deno.serve(async (req: Request) => {
           .eq("id", conversionId);
       }
 
-      return new Response(JSON.stringify({ success: true, convertedPath }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: true, convertedPath });
 
     } else if (action === "merge") {
       const startRes = await fetch(`${ILOVEPDF_API}/start/merge`, {
@@ -238,9 +269,7 @@ Deno.serve(async (req: Request) => {
         contentType: "application/pdf",
       });
 
-      return new Response(JSON.stringify({ success: true, convertedPath: mergedPath }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: true, convertedPath: mergedPath });
 
     } else if (action === "compress") {
       const startRes = await fetch(`${ILOVEPDF_API}/start/compress`, {
@@ -250,9 +279,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: sd } = await adminSupabase.storage.from("documents").createSignedUrl(filePath, 3600);
       if (!sd?.signedUrl) {
-        return new Response(JSON.stringify({ error: "File URL error" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "File URL error" }, 500);
       }
 
       const upRes = await fetch(`https://${server}/v1/upload`, {
@@ -278,9 +305,7 @@ Deno.serve(async (req: Request) => {
         contentType: "application/pdf",
       });
 
-      return new Response(JSON.stringify({ success: true, convertedPath: compressedPath }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: true, convertedPath: compressedPath });
 
     } else if (action === "split") {
       const startRes = await fetch(`${ILOVEPDF_API}/start/split`, {
@@ -290,9 +315,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: sd } = await adminSupabase.storage.from("documents").createSignedUrl(filePath, 3600);
       if (!sd?.signedUrl) {
-        return new Response(JSON.stringify({ error: "File URL error" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "File URL error" }, 500);
       }
 
       const upRes = await fetch(`https://${server}/v1/upload`, {
@@ -318,21 +341,13 @@ Deno.serve(async (req: Request) => {
         contentType: "application/zip",
       });
 
-      return new Response(JSON.stringify({ success: true, convertedPath: splitPath }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: true, convertedPath: splitPath });
     }
 
-    return new Response(JSON.stringify({ error: "Invalid action" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Invalid action" }, 400);
 
   } catch (err) {
     console.error("convert-file error:", err);
-    return new Response(JSON.stringify({ success: false, error: err instanceof Error ? err.message : "Unknown error" }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ success: false, error: err instanceof Error ? err.message : "Unknown error" });
   }
 });
