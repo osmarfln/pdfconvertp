@@ -341,6 +341,23 @@ export function AIPage() {
                   </motion.div>
                 ))}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-xs text-muted-foreground">
+                    {filteredHistory.length} resultado{filteredHistory.length !== 1 ? "s" : ""} • Página {currentPage} de {totalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="glass" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)}>
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button variant="glass" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             )}
           </motion.div>
         ) : (
