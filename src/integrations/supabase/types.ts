@@ -47,6 +47,42 @@ export type Database = {
         }
         Relationships: []
       }
+      extraction_jobs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          extracted_text: string | null
+          file_name: string | null
+          file_type: string | null
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          extracted_text?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          extracted_text?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       file_conversions: {
         Row: {
           converted_path: string | null
