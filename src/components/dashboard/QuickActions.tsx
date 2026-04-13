@@ -120,7 +120,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
             className="flex items-center gap-1.5 text-xs text-warning hover:text-warning/80 transition-colors"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Serviço de conversão indisponível</span>
+            <span>Serviço CloudConvert indisponível</span>
           </button>
         )}
       </div>
