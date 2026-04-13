@@ -72,6 +72,13 @@ export function FilesPage() {
       .createSignedUrl(filePath, 3600);
 
     if (error || !data?.signedUrl) return;
+
+    // Open PDFs in a new tab to avoid Chrome iframe blocking
+    if (format === "pdf") {
+      window.open(data.signedUrl, "_blank");
+      return;
+    }
+
     setPreviewUrl(data.signedUrl);
     setPreviewName(name);
     setPreviewFormat(format);
@@ -169,8 +176,9 @@ export function FilesPage() {
           {filtered.map((file, i) => {
             const Icon = typeIcons[file.original_format] || FileText;
             const targets = conversionTargets[file.original_format] || [];
-            const canPreview = previewableFormats.includes(file.original_format) || 
-              (file.converted_path && previewableFormats.includes(file.target_format));
+            const isConverted = file.status === "completed" && !!file.converted_path;
+            const displayFormat = isConverted ? file.target_format : file.original_format;
+            const canPreview = previewableFormats.includes(displayFormat);
             return (
               <motion.div
                 key={file.id}
@@ -185,9 +193,10 @@ export function FilesPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{file.original_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatSize(file.file_size)} · {file.original_format.toUpperCase()}
-                    {file.status === "completed" && file.converted_path && (
-                      <span className="text-success ml-2">→ {file.target_format.toUpperCase()}</span>
+                    {formatSize(file.file_size)} · {isConverted ? (
+                      <span className="text-success font-medium">{file.target_format.toUpperCase()} ✓</span>
+                    ) : (
+                      file.original_format.toUpperCase()
                     )}
                   </p>
                 </div>
@@ -199,13 +208,8 @@ export function FilesPage() {
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => {
-                      const path = file.converted_path && previewableFormats.includes(file.target_format)
-                        ? file.converted_path
-                        : file.original_path!;
-                      const fmt = file.converted_path && previewableFormats.includes(file.target_format)
-                        ? file.target_format
-                        : file.original_format;
-                      handlePreview(path, file.original_name, fmt);
+                      const path = isConverted ? file.converted_path! : file.original_path!;
+                      handlePreview(path, file.original_name, displayFormat);
                     }}
                   >
                     <Eye className="w-4 h-4 text-primary" />
