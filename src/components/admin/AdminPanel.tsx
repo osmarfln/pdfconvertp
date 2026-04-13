@@ -116,6 +116,20 @@ export function AdminPanel() {
     toast({ title: currentlyBlocked ? "Usuário desbloqueado" : "Usuário bloqueado" });
   };
 
+  const deleteUser = async (userId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+    const { error } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("user_id", userId);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+      return;
+    }
+    setUsers((prev) => prev.filter((u) => u.user_id !== userId));
+    toast({ title: "Usuário excluído" });
+  };
+
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => !u.is_blocked).length;
   const blockedUsers = users.filter((u) => u.is_blocked).length;
