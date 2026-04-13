@@ -1,37 +1,43 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { FileText, CheckCircle2, Zap, TrendingUp } from "lucide-react";
+import { useFileConversions } from "@/hooks/useFileConversions";
 
 export function StatsCards() {
+  const { conversions } = useFileConversions();
+
+  const total = conversions.length;
+  const completed = conversions.filter((c) => c.status === "completed").length;
+  const processing = conversions.filter((c) => c.status === "processing").length;
+
   const stats = [
     {
       label: "Total de Arquivos",
-      value: "0",
-      change: "Faça upload para começar",
+      value: String(total),
+      change: total === 0 ? "Faça upload para começar" : `${processing} processando`,
       icon: FileText,
       color: "text-primary",
       bg: "bg-primary/10",
     },
     {
       label: "Processados",
-      value: "0",
-      change: "Nenhum processado",
+      value: String(completed),
+      change: completed === 0 ? "Nenhum processado" : "Concluídos",
       icon: CheckCircle2,
       color: "text-success",
       bg: "bg-success/10",
     },
     {
-      label: "Correções IA",
-      value: "0",
-      change: "Envie textos para corrigir",
+      label: "Conversões",
+      value: String(conversions.filter((c) => c.target_format !== c.original_format).length),
+      change: "Conversões realizadas",
       icon: Zap,
       color: "text-warning",
       bg: "bg-warning/10",
     },
     {
-      label: "Melhoria",
-      value: "0%",
-      change: "vs. originais",
+      label: "Taxa de Sucesso",
+      value: total > 0 ? `${Math.round((completed / total) * 100)}%` : "0%",
+      change: "dos processamentos",
       icon: TrendingUp,
       color: "text-primary",
       bg: "bg-primary/10",
