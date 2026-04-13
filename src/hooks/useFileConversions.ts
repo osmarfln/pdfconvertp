@@ -145,6 +145,22 @@ export function useFileConversions() {
     }
   }, [fetchConversions]);
 
+  const splitFile = useCallback(async (filePath: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("convert-file", {
+        body: { action: "split", filePath },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Split failed");
+      toast.success("PDF dividido com sucesso!");
+      await fetchConversions();
+      return data.convertedPath;
+    } catch (err: any) {
+      toast.error("Erro ao dividir: " + err.message);
+      return null;
+    }
+  }, [fetchConversions]);
+
   const downloadFile = useCallback(async (filePath: string, fileName: string) => {
     const { data, error } = await supabase.storage
       .from("documents")
