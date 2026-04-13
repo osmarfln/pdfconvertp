@@ -241,6 +241,7 @@ export function AIPage() {
     if (!user) return;
     setIsOcrProcessing(true);
     setOcrProgress(`Preparando extração de ${file.name}...`);
+    startProgressSimulation(85);
     try {
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
