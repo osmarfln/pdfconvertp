@@ -59,6 +59,7 @@ export function AdminPanel() {
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const { toast } = useToast();
 
   const fetchUsers = async () => {
