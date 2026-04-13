@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { AppFooter } from "@/components/layout/AppFooter";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { FileList } from "@/components/dashboard/FileList";
 import { UploadZone } from "@/components/dashboard/UploadZone";
@@ -154,6 +155,7 @@ export default function Index() {
               <SettingsPage />
             </motion.div>
           )}
+          <AppFooter />
         </main>
       </div>
 
