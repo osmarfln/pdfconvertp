@@ -44,7 +44,10 @@ export function AIPage() {
   const [tone, setTone] = useState("profissional");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [ocrProgress, setOcrProgress] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // History state
   const [history, setHistory] = useState<CorrectionRecord[]>([]);
