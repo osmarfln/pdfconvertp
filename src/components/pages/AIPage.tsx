@@ -521,6 +521,35 @@ export function AIPage() {
               </Button>
             </div>
 
+            {/* Progress Bar */}
+            {(progressPercent > 0 || progressComplete) && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass rounded-xl p-4 space-y-3 border border-primary/20"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">
+                    {progressComplete ? "Concluído com sucesso!" : "Processando..."}
+                  </span>
+                  <span className={`text-sm font-bold ${progressComplete ? "text-success" : "text-primary"}`}>
+                    {progressPercent}%
+                  </span>
+                </div>
+                <Progress value={progressPercent} className="h-3" />
+                {progressComplete && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-2 text-success"
+                  >
+                    <PartyPopper className="w-4 h-4" />
+                    <span className="text-sm font-medium">Concluído com sucesso!</span>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+
             {/* OCR Background Progress Banner */}
             {isOcrProcessing && ocrProgress && (
               <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl p-4 flex items-center gap-3 border border-primary/20">
