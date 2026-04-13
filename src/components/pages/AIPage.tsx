@@ -40,6 +40,7 @@ interface CorrectionRecord {
 
 export function AIPage() {
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
   const [text, setText] = useState("");
   const [corrected, setCorrected] = useState("");
   const [tone, setTone] = useState("profissional");
@@ -126,6 +127,7 @@ export function AIPage() {
         setIsOcrProcessing(false);
         setActiveJobId(null);
         setOcrProgress("");
+        addNotification({ title: "Extração concluída", message: `Texto extraído de ${job.file_name || "arquivo"}`, type: "extraction" });
         toast.success("Texto extraído com sucesso!");
       } else if (job.status === "failed") {
         clearInterval(pollIntervalRef.current!);
