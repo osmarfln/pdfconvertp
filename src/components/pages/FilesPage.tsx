@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { FileText, Image, FileSpreadsheet, Search, Download, Trash2, MoreVertical, ArrowRightLeft, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { FileText, Image, FileSpreadsheet, Search, Download, Trash2, MoreVertical, ArrowRightLeft, Loader2, Eye, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useFileConversions } from "@/hooks/useFileConversions";
+import { supabase } from "@/integrations/supabase/client";
 
 const typeIcons: Record<string, typeof FileText> = {
   pdf: FileText,
@@ -38,11 +39,16 @@ const conversionTargets: Record<string, string[]> = {
   png: ["pdf"],
 };
 
+const previewableFormats = ["pdf", "jpg", "jpeg", "png"];
+
 export function FilesPage() {
   const { conversions, loading, downloadFile, deleteConversion, convertFile } = useFileConversions();
   const [search, setSearch] = useState("");
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<Record<string, string>>({});
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState("");
+  const [previewFormat, setPreviewFormat] = useState("");
 
   const filtered = conversions.filter((f) =>
     f.original_name.toLowerCase().includes(search.toLowerCase())
@@ -58,6 +64,23 @@ export function FilesPage() {
     setConvertingId(id);
     await convertFile(id, filePath, targetFormat);
     setConvertingId(null);
+  };
+
+  const handlePreview = async (filePath: string, name: string, format: string) => {
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(filePath, 3600);
+
+    if (error || !data?.signedUrl) return;
+    setPreviewUrl(data.signedUrl);
+    setPreviewName(name);
+    setPreviewFormat(format);
+  };
+
+  const closePreview = () => {
+    setPreviewUrl(null);
+    setPreviewName("");
+    setPreviewFormat("");
   };
 
   return (
@@ -79,6 +102,58 @@ export function FilesPage() {
         </div>
       </div>
 
+      {/* Preview Modal */}
+      <AnimatePresence>
+        {previewUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+            onClick={closePreview}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-4xl h-[80vh] glass rounded-2xl overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/50">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">{previewName}</span>
+                </div>
+                <button onClick={closePreview} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {previewFormat === "pdf" ? (
+                  <iframe
+                    src={`${previewUrl}#toolbar=1&navpanes=0`}
+                    className="w-full h-full border-0"
+                    title={previewName}
+                  />
+                ) : ["jpg", "jpeg", "png"].includes(previewFormat) ? (
+                  <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
+                    <img
+                      src={previewUrl}
+                      alt={previewName}
+                      className="max-w-full max-h-full object-contain rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">Preview não disponível para este formato.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -94,6 +169,8 @@ export function FilesPage() {
           {filtered.map((file, i) => {
             const Icon = typeIcons[file.original_format] || FileText;
             const targets = conversionTargets[file.original_format] || [];
+            const canPreview = previewableFormats.includes(file.original_format) || 
+              (file.converted_path && previewableFormats.includes(file.target_format));
             return (
               <motion.div
                 key={file.id}
@@ -114,6 +191,27 @@ export function FilesPage() {
                     )}
                   </p>
                 </div>
+
+                {/* Preview button */}
+                {canPreview && file.original_path && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      const path = file.converted_path && previewableFormats.includes(file.target_format)
+                        ? file.converted_path
+                        : file.original_path!;
+                      const fmt = file.converted_path && previewableFormats.includes(file.target_format)
+                        ? file.target_format
+                        : file.original_format;
+                      handlePreview(path, file.original_name, fmt);
+                    }}
+                  >
+                    <Eye className="w-4 h-4 text-primary" />
+                  </Button>
+                )}
+
                 {targets.length > 0 && file.original_path && (
                   <div className="flex items-center gap-2">
                     <Select
