@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import logoBg from "@/assets/logo-bg.png";
 import {
   LayoutDashboard,
   Upload,
@@ -44,8 +45,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-6 border-b border-sidebar-border">
-        <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <Sparkles className="w-5 h-5 text-primary-foreground" />
+        <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0">
+          <img src={logoBg} alt="PDF Convert Pro" className="w-full h-full object-cover" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">

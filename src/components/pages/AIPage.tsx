@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -39,6 +40,7 @@ interface CorrectionRecord {
 
 export function AIPage() {
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
   const [text, setText] = useState("");
   const [corrected, setCorrected] = useState("");
   const [tone, setTone] = useState("profissional");
@@ -125,6 +127,7 @@ export function AIPage() {
         setIsOcrProcessing(false);
         setActiveJobId(null);
         setOcrProgress("");
+        addNotification({ title: "Extração concluída", message: `Texto extraído de ${job.file_name || "arquivo"}`, type: "extraction" });
         toast.success("Texto extraído com sucesso!");
       } else if (job.status === "failed") {
         clearInterval(pollIntervalRef.current!);
@@ -191,6 +194,7 @@ export function AIPage() {
 
       setCorrected(data.correctedText);
       await saveToHistory(text, data.correctedText, "typed");
+      addNotification({ title: "Correção concluída", message: "Texto corrigido com IA", type: "correction" });
       toast.success("Texto corrigido com sucesso!");
     } catch (err: any) {
       console.error("Correction error:", err);
