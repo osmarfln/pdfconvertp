@@ -453,6 +453,9 @@ export function AdminPanel() {
                 <div>
                   <p className="font-semibold text-foreground">{selectedUser.display_name || "Sem nome"}</p>
                   <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    📱 {(selectedUser as any).phone || "Sem telefone"}
+                  </p>
                 </div>
               </div>
 
