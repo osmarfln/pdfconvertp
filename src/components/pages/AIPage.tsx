@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter } from "lucide-react";
+import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -50,6 +51,9 @@ export function AIPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState("all");
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const fetchHistory = async () => {
     if (!user) return;
@@ -193,16 +197,26 @@ export function AIPage() {
     }
   };
 
-  const filteredHistory = historyFilter === "all"
-    ? history
-    : history.filter((h) => {
-        if (historyFilter === "typed") return h.source_type === "typed";
-        if (historyFilter === "ocr") return h.source_type === "ocr";
-        if (historyFilter === "doc") return h.file_format && ["doc", "docx"].includes(h.file_format);
-        if (historyFilter === "pdf") return h.file_format === "pdf";
-        if (historyFilter === "excel") return h.file_format && ["xls", "xlsx"].includes(h.file_format);
-        return true;
-      });
+  const filteredHistory = history
+    .filter((h) => {
+      if (historyFilter === "typed") return h.source_type === "typed";
+      if (historyFilter === "ocr") return h.source_type === "ocr";
+      if (historyFilter === "doc") return h.file_format && ["doc", "docx"].includes(h.file_format);
+      if (historyFilter === "pdf") return h.file_format === "pdf";
+      if (historyFilter === "excel") return h.file_format && ["xls", "xlsx"].includes(h.file_format);
+      return historyFilter === "all";
+    })
+    .filter((h) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return h.original_text.toLowerCase().includes(q) || h.corrected_text.toLowerCase().includes(q);
+    });
+
+  const totalPages = Math.max(1, Math.ceil(filteredHistory.length / ITEMS_PER_PAGE));
+  const paginatedHistory = filteredHistory.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [historyFilter, searchQuery]);
 
   const toneLabels: Record<string, string> = {
     profissional: "Profissional",
