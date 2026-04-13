@@ -47,7 +47,7 @@ export function InstallPWAFloating() {
         transition={{ type: "spring", stiffness: 260, damping: 20 }}
         className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
       >
-        <div className="relative glass rounded-2xl p-6 shadow-2xl border border-primary/30 backdrop-blur-xl max-w-sm w-full mx-4 pointer-events-auto">
+        <div className="relative glass rounded-2xl p-4 sm:p-6 shadow-2xl border border-primary/30 backdrop-blur-xl max-w-xs sm:max-w-sm w-full mx-4 pointer-events-auto">
           <button
             onClick={handleDismiss}
             className="absolute top-3 right-3 w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors"
