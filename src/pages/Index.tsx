@@ -186,6 +186,7 @@ export default function Index() {
       </div>
 
       <AIChatWidget />
+      <InstallPWAFloating />
     </div>
   );
 }
