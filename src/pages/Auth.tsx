@@ -67,17 +67,22 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+      {/* Background image */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${logoBg})` }}
+      />
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10"
       >
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-primary-foreground" />
-          </div>
+          <img src={logoBg} alt="PDF Convert Pro" className="w-16 h-16 rounded-xl object-cover" />
           <div>
             <h1 className="font-display font-bold text-2xl text-foreground">PDF Convert Pro</h1>
             <p className="text-xs text-muted-foreground">Processamento inteligente de documentos</p>
