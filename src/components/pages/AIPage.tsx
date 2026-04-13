@@ -183,10 +183,36 @@ export function AIPage() {
     toast.success("Correção carregada do histórico!");
   };
 
+  const startProgressSimulation = (maxPercent = 90) => {
+    setProgressPercent(0);
+    setProgressComplete(false);
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    let current = 0;
+    progressIntervalRef.current = setInterval(() => {
+      current += Math.random() * 8 + 2;
+      if (current >= maxPercent) {
+        current = maxPercent;
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      }
+      setProgressPercent(Math.round(current));
+    }, 300);
+  };
+
+  const finishProgress = () => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    setProgressPercent(100);
+    setProgressComplete(true);
+    setTimeout(() => {
+      setProgressPercent(0);
+      setProgressComplete(false);
+    }, 3000);
+  };
+
   const handleCorrect = async () => {
     if (!text.trim()) return;
     setIsProcessing(true);
     setCorrected("");
+    startProgressSimulation(90);
 
     try {
       const { data, error } = await supabase.functions.invoke("ai-correct", {
@@ -199,10 +225,13 @@ export function AIPage() {
       setCorrected(data.correctedText);
       await saveToHistory(text, data.correctedText, "typed");
       addNotification({ title: "Correção concluída", message: "Texto corrigido com IA", type: "correction" });
+      finishProgress();
       toast.success("Texto corrigido com sucesso!");
     } catch (err: any) {
       console.error("Correction error:", err);
       toast.error(err.message || "Erro ao corrigir texto");
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      setProgressPercent(0);
     } finally {
       setIsProcessing(false);
     }
