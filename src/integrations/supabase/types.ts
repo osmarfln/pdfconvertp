@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      file_conversions: {
+        Row: {
+          converted_path: string | null
+          created_at: string
+          error_message: string | null
+          file_size: number | null
+          id: string
+          original_format: string
+          original_name: string
+          original_path: string | null
+          status: string
+          target_format: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          converted_path?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size?: number | null
+          id?: string
+          original_format: string
+          original_name: string
+          original_path?: string | null
+          status?: string
+          target_format: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          converted_path?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size?: number | null
+          id?: string
+          original_format?: string
+          original_name?: string
+          original_path?: string | null
+          status?: string
+          target_format?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
