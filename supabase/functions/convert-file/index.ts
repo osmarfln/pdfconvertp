@@ -62,15 +62,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Authenticate with iLovePDF
+    console.log("Authenticating with iLovePDF...");
     const authRes = await fetch(`${ILOVEPDF_API}/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ public_key: ILOVEPDF_KEY }),
     });
-    const { token: iToken } = await authRes.json();
+    const authBody = await authRes.json();
+    console.log("iLovePDF auth status:", authRes.status, JSON.stringify(authBody).slice(0, 200));
+    const iToken = authBody.token;
     if (!iToken) {
-      return new Response(JSON.stringify({ error: "Failed to authenticate with iLovePDF" }), {
-        status: 500,
+      return new Response(JSON.stringify({ success: false, error: "Failed to authenticate with iLovePDF: " + JSON.stringify(authBody) }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
