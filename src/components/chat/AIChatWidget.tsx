@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot, User, Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   id: string;
@@ -58,9 +58,7 @@ export function AIChatWidget() {
         }),
       });
 
-      if (!resp.ok || !resp.body) {
-        throw new Error("Falha ao conectar com IA");
-      }
+      if (!resp.ok || !resp.body) throw new Error("Falha ao conectar com IA");
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -75,14 +73,11 @@ export function AIChatWidget() {
         while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
           let line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
-
           if (line.endsWith("\r")) line = line.slice(0, -1);
           if (line.startsWith(":") || line.trim() === "") continue;
           if (!line.startsWith("data: ")) continue;
-
           const jsonStr = line.slice(6).trim();
           if (jsonStr === "[DONE]") break;
-
           try {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content as string | undefined;
@@ -135,11 +130,8 @@ export function AIChatWidget() {
       <AnimatePresence>
         {!isOpen && (
           <motion.button
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+            whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
             className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary flex items-center justify-center glow z-50 shadow-2xl"
           >
@@ -208,7 +200,13 @@ export function AIChatWidget() {
                     </div>
                   )}
                   <div className={`rounded-xl px-3.5 py-2.5 max-w-[80%] ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-secondary text-foreground rounded-tl-sm"}`}>
-                    <p className="text-sm whitespace-pre-line">{msg.content}</p>
+                    {msg.role === "assistant" ? (
+                      <div className="text-sm prose prose-sm prose-invert max-w-none [&_p]:mb-1 [&_ul]:mb-1 [&_ol]:mb-1 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_code]:bg-background/30 [&_code]:px-1 [&_code]:rounded">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-line">{msg.content}</p>
+                    )}
                   </div>
                   {msg.role === "user" && (
                     <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center shrink-0 mt-0.5">
@@ -238,8 +236,7 @@ export function AIChatWidget() {
             <div className="p-3 border-t border-border">
               <div className="flex gap-2">
                 <input
-                  type="text"
-                  value={input}
+                  type="text" value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   placeholder="Digite sua mensagem..."
