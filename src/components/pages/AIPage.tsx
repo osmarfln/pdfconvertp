@@ -81,6 +81,64 @@ export function AIPage() {
     fetchHistory();
   }, [user]);
 
+  // Check for pending extraction jobs on mount
+  useEffect(() => {
+    if (!user) return;
+    const checkPendingJobs = async () => {
+      const { data } = await supabase
+        .from("extraction_jobs")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("status", ["pending", "processing"])
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        const job = data[0] as any;
+        setActiveJobId(job.id);
+        setIsOcrProcessing(true);
+        setOcrProgress(`Retomando extração de ${job.file_name || "arquivo"}...`);
+        startPolling(job.id);
+      }
+    };
+    checkPendingJobs();
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [user]);
+
+  const startPolling = (jobId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from("extraction_jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+      if (!data) return;
+      const job = data as any;
+
+      if (job.status === "completed") {
+        clearInterval(pollIntervalRef.current!);
+        pollIntervalRef.current = null;
+        setText(job.extracted_text || "");
+        setIsOcrProcessing(false);
+        setActiveJobId(null);
+        setOcrProgress("");
+        toast.success("Texto extraído com sucesso!");
+      } else if (job.status === "failed") {
+        clearInterval(pollIntervalRef.current!);
+        pollIntervalRef.current = null;
+        setIsOcrProcessing(false);
+        setActiveJobId(null);
+        setOcrProgress("");
+        toast.error(job.error_message || "Erro ao extrair texto");
+      } else {
+        setOcrProgress(`Extraindo texto de ${job.file_name || "arquivo"}...`);
+      }
+    }, 2000);
+  };
+
   const saveToHistory = async (original: string, correctedText: string, sourceType: string, fileFormat?: string) => {
     if (!user) return;
     try {
