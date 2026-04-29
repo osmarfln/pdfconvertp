@@ -6,14 +6,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { toast } from "sonner";
 import { TextDiff } from "./TextDiff";
+import { downloadFromStorage, triggerBlobDownload } from "@/lib/download";
 
 type AttachmentMsg = {
   kind: "attachment";
   fileName: string;
   status: "uploading" | "uploaded" | "converting" | "done" | "error";
+  progress?: number; // 0-100 individual progress
   targetFormat?: string;
+  sourceFormat?: string;
+  originalPath?: string;
   convertedPath?: string;
   downloadName?: string;
+  originalDownloadName?: string;
   error?: string;
 };
 type CorrectionMsg = {
@@ -39,7 +44,7 @@ function getGreeting(): string {
 }
 
 const suggestions = [
-  "📎 Anexe um PDF ou DOCX para converter",
+  "📎 Anexe um ou mais PDFs/DOCX para converter",
   "✨ Cole um texto para correção ortográfica",
   "Como usar o OCR para extrair texto?",
   "O que o assistente pode fazer?",
@@ -208,57 +213,94 @@ export function AIChatWidget() {
     }
   };
 
-  const handleFile = async (file: File) => {
-    if (!isPdf(file.name) && !isDoc(file.name)) {
-      toast.error("Envie um PDF, DOCX, XLSX ou PPTX.");
-      return;
+  const handleFiles = async (files: File[]) => {
+    const valid = files.filter((f) => isPdf(f.name) || isDoc(f.name));
+    const invalid = files.length - valid.length;
+    if (invalid > 0) {
+      toast.error(`${invalid} arquivo(s) ignorado(s). Envie apenas PDF, DOCX, XLSX ou PPTX.`);
     }
-    const target = isPdf(file.name) ? "docx" : "pdf";
-    const baseName = file.name.replace(/\.[^.]+$/, "");
-    const downloadName = `${baseName}.${target}`;
+    if (!valid.length) return;
 
-    const msgId = Date.now().toString();
+    // Create one message per file (so each has its own progress card)
+    const queued = valid.map((file) => {
+      const target = isPdf(file.name) ? "docx" : "pdf";
+      const source = isPdf(file.name) ? "pdf" : file.name.split(".").pop()!.toLowerCase();
+      const baseName = file.name.replace(/\.[^.]+$/, "");
+      const downloadName = `${baseName}.${target}`;
+      const originalDownloadName = file.name;
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      return { id, file, target, source, downloadName, originalDownloadName };
+    });
+
     setMessages((prev) => [
       ...prev,
-      {
-        id: msgId,
-        role: "user",
+      ...queued.map((q) => ({
+        id: q.id,
+        role: "user" as const,
         content: "",
-        rich: { kind: "attachment", fileName: file.name, status: "uploading", targetFormat: target, downloadName },
-      },
+        rich: {
+          kind: "attachment" as const,
+          fileName: q.file.name,
+          status: "uploading" as const,
+          progress: 0,
+          targetFormat: q.target,
+          sourceFormat: q.source,
+          downloadName: q.downloadName,
+          originalDownloadName: q.originalDownloadName,
+        },
+      })),
     ]);
 
-    try {
-      const conv = await uploadFile(file);
-      if (!conv) throw new Error("Falha no upload");
+    // Process sequentially to avoid hammering the conversion API but keep individual progress
+    for (const q of queued) {
+      try {
+        updateMsg(q.id, (m) => ({
+          rich: { ...(m.rich as AttachmentMsg), status: "uploading", progress: 10 },
+        }));
+        const conv = await uploadFile(q.file);
+        if (!conv) throw new Error("Falha no upload");
 
-      updateMsg(msgId, (m) => ({ rich: { ...(m.rich as AttachmentMsg), status: "converting" } }));
+        updateMsg(q.id, (m) => ({
+          rich: {
+            ...(m.rich as AttachmentMsg),
+            status: "converting",
+            progress: 40,
+            originalPath: conv.original_path ?? undefined,
+          },
+        }));
 
-      const convertedPath = await convertFile(conv.id, conv.original_path!, target);
-      if (!convertedPath) throw new Error("Falha na conversão");
+        // Smooth progress simulation while waiting for the conversion
+        let cur = 40;
+        const interval = window.setInterval(() => {
+          cur = Math.min(cur + Math.random() * 6, 88);
+          updateMsg(q.id, (m) => ({
+            rich: { ...(m.rich as AttachmentMsg), progress: cur },
+          }));
+        }, 600);
 
-      updateMsg(msgId, (m) => ({
-        rich: { ...(m.rich as AttachmentMsg), status: "done", convertedPath },
-      }));
-    } catch (err: any) {
-      updateMsg(msgId, (m) => ({
-        rich: { ...(m.rich as AttachmentMsg), status: "error", error: err.message },
-      }));
+        const convertedPath = await convertFile(conv.id, conv.original_path!, q.target);
+        window.clearInterval(interval);
+        if (!convertedPath) throw new Error("Falha na conversão");
+
+        updateMsg(q.id, (m) => ({
+          rich: {
+            ...(m.rich as AttachmentMsg),
+            status: "done",
+            progress: 100,
+            convertedPath,
+          },
+        }));
+      } catch (err: any) {
+        updateMsg(q.id, (m) => ({
+          rich: { ...(m.rich as AttachmentMsg), status: "error", error: err.message },
+        }));
+      }
     }
   };
 
   const downloadConverted = async (path: string, name: string) => {
-    const { data } = await supabase.storage.from("documents").download(path);
-    if (!data) {
-      toast.error("Erro ao baixar.");
-      return;
-    }
-    const url = URL.createObjectURL(data);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
+    const ok = await downloadFromStorage(path, name);
+    if (ok) toast.success(`${name} baixado!`);
   };
 
   const renderRich = (msg: Message) => {
@@ -266,28 +308,49 @@ export function AIChatWidget() {
 
     if (msg.rich.kind === "attachment") {
       const a = msg.rich;
+      const progress = Math.round(a.progress ?? 0);
+      const inProgress = a.status === "uploading" || a.status === "converting";
+      // When source is PDF -> converted is DOCX, original is PDF
+      // When source is DOCX/etc -> converted is PDF, original is the source format
+      const convertedExt = (a.targetFormat || "").toUpperCase();
+      const originalExt = (a.sourceFormat || "").toUpperCase();
       return (
-        <div className="rounded-xl bg-secondary border border-border p-3 max-w-[85%] space-y-2">
+        <div className="rounded-xl bg-secondary border border-border p-3 max-w-[85%] space-y-2 w-full">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{a.fileName}</span>
           </div>
           <div className="text-xs text-muted-foreground">
-            {a.status === "uploading" && "📤 Enviando..."}
-            {a.status === "converting" && `🔄 Convertendo para ${a.targetFormat?.toUpperCase()}...`}
-            {a.status === "done" && `✅ Convertido para ${a.targetFormat?.toUpperCase()}`}
+            {a.status === "uploading" && `📤 Enviando... ${progress}%`}
+            {a.status === "converting" && `🔄 Convertendo para ${convertedExt}... ${progress}%`}
+            {a.status === "done" && `✅ Pronto — escolha o formato para baixar`}
             {a.status === "error" && `❌ ${a.error || "Erro"}`}
           </div>
-          {(a.status === "uploading" || a.status === "converting") && (
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          {inProgress && (
+            <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.max(5, progress)}%` }}
+              />
+            </div>
           )}
           {a.status === "done" && a.convertedPath && (
-            <button
-              onClick={() => downloadConverted(a.convertedPath!, a.downloadName!)}
-              className="flex items-center gap-2 w-full justify-center px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-            >
-              <Download className="w-4 h-4" /> Baixar {a.downloadName}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => downloadConverted(a.convertedPath!, a.downloadName!)}
+                className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90"
+              >
+                <Download className="w-3.5 h-3.5" /> Baixar {convertedExt}
+              </button>
+              {a.originalPath && a.originalDownloadName && (
+                <button
+                  onClick={() => downloadConverted(a.originalPath!, a.originalDownloadName!)}
+                  className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-secondary border border-border text-foreground text-xs font-medium hover:bg-muted"
+                >
+                  <Download className="w-3.5 h-3.5" /> Baixar {originalExt}
+                </button>
+              )}
+            </div>
           )}
         </div>
       );
@@ -342,10 +405,11 @@ export function AIChatWidget() {
         ref={fileInputRef}
         type="file"
         accept=".pdf,.docx,.xlsx,.pptx"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFile(f);
+          const list = e.target.files;
+          if (list && list.length > 0) handleFiles(Array.from(list));
           e.target.value = "";
         }}
       />
@@ -475,7 +539,7 @@ export function AIChatWidget() {
               <div className="flex gap-2 items-end">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  title="Anexar PDF/DOCX para converter"
+                  title="Anexar PDF/DOCX (vários arquivos suportados)"
                   className="h-10 w-10 rounded-lg bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
                 >
                   <Paperclip className="w-4 h-4" />
