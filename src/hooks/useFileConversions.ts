@@ -100,9 +100,8 @@ export function useFileConversions() {
 
   const convertFile = useCallback(async (conversionId: string, filePath: string, targetFormat: string) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) return null;
 
-    // Update status to processing
     await supabase
       .from("file_conversions")
       .update({ status: "processing", target_format: targetFormat })
@@ -117,9 +116,30 @@ export function useFileConversions() {
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Conversion failed");
 
-      toast.success("Conversão concluída! Vá em Meus Arquivos para baixar o PDF.", {
-        duration: 6000,
-      });
+      const convertedPath: string | undefined = data.convertedPath;
+
+      // Auto-download the converted file
+      if (convertedPath) {
+        const { data: blob } = await supabase.storage.from("documents").download(convertedPath);
+        if (blob) {
+          const baseName = filePath.split("/").pop()?.replace(/\.[^.]+$/, "") || "converted";
+          const downloadName = `${baseName}.${targetFormat}`;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = downloadName;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success(`${downloadName} baixado automaticamente!`, { duration: 5000 });
+        } else {
+          toast.success("Conversão concluída! Acesse Meus Arquivos para baixar.", { duration: 6000 });
+        }
+      } else {
+        toast.success("Conversão concluída!", { duration: 5000 });
+      }
+
+      await fetchConversions();
+      return convertedPath ?? null;
     } catch (err: any) {
       console.error("[Convert] Error:", err);
       await supabase
@@ -127,8 +147,9 @@ export function useFileConversions() {
         .update({ status: "error", error_message: err.message })
         .eq("id", conversionId);
       toast.error("Erro na conversão: " + err.message);
+      await fetchConversions();
+      return null;
     }
-    await fetchConversions();
   }, [fetchConversions]);
 
   const mergeFiles = useCallback(async (filePaths: string[]) => {
