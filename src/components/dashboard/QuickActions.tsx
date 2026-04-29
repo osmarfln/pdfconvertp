@@ -196,7 +196,23 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       }
       setProcessingAction(label);
       const file = pdfFiles[0];
-      await convertFile(file.id, file.original_path!, "jpg");
+      await runConversionWithProgress("PDF → JPG", file.original_name, async () => {
+        await convertFile(file.id, file.original_path!, "jpg");
+      }, file.file_size, file.original_format, file.original_path);
+      setProcessingAction(null);
+      return;
+    }
+
+    if (label === "JPG → PDF") {
+      if (imageFiles.length === 0) {
+        toast.info("Envie uma imagem JPG ou PNG primeiro.");
+        return;
+      }
+      setProcessingAction(label);
+      const file = imageFiles[0];
+      await runConversionWithProgress("JPG → PDF", file.original_name, async () => {
+        await convertFile(file.id, file.original_path!, "pdf");
+      }, file.file_size, file.original_format, file.original_path);
       setProcessingAction(null);
       return;
     }
