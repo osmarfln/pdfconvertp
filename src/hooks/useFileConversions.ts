@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { triggerBlobDownload } from "@/lib/download";
+import { downloadFromStorage } from "@/lib/download";
 
 export interface FileConversion {
   id: string;
@@ -119,14 +119,13 @@ export function useFileConversions() {
 
       const convertedPath: string | undefined = data.convertedPath;
 
-      // Auto-download the converted file (mobile-friendly)
+      // Auto-download the converted file (mobile + desktop friendly via signed URL)
       if (convertedPath) {
-        const { data: blob } = await supabase.storage.from("documents").download(convertedPath);
-        if (blob) {
-          const baseName = filePath.split("/").pop()?.replace(/\.[^.]+$/, "") || "converted";
-          const downloadName = `${baseName}.${targetFormat}`;
-          triggerBlobDownload(blob, downloadName);
-          toast.success(`${downloadName} pronto!`, { duration: 5000 });
+        const baseName = filePath.split("/").pop()?.replace(/\.[^.]+$/, "") || "converted";
+        const downloadName = `${baseName}.${targetFormat}`;
+        const ok = await downloadFromStorage(convertedPath, downloadName);
+        if (ok) {
+          toast.success(`${downloadName} baixado automaticamente!`, { duration: 5000 });
         } else {
           toast.success("Conversão concluída! Acesse Meus Arquivos para baixar.", { duration: 6000 });
         }
