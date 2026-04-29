@@ -196,16 +196,7 @@ export function useFileConversions() {
   }, [fetchConversions]);
 
   const downloadFile = useCallback(async (filePath: string, fileName: string) => {
-    const { data, error } = await supabase.storage
-      .from("documents")
-      .download(filePath);
-
-    if (error || !data) {
-      toast.error("Erro ao baixar arquivo.");
-      return;
-    }
-
-    triggerBlobDownload(data, fileName);
+    await downloadFromStorage(filePath, fileName);
   }, []);
 
   const deleteConversion = useCallback(async (id: string, originalPath?: string | null, convertedPath?: string | null) => {
