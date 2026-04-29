@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { motion } from "framer-motion";
-import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X, Clock, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +13,15 @@ import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+type PageStatus = "pending" | "processing" | "done" | "error";
+interface PageProgress {
+  index: number;
+  status: PageStatus;
+  durationMs?: number;
+  questionsFound?: number;
+  error?: string;
+}
 
 interface QuestionResult {
   number: number;
