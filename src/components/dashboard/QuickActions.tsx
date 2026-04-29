@@ -169,7 +169,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       const file = docFiles[0];
       await runConversionWithProgress("Word → PDF", file.original_name, async () => {
         await convertFile(file.id, file.original_path!, "pdf");
-      }, file.file_size);
+      }, file.file_size, file.original_format, file.original_path);
       setProcessingAction(null);
       return;
     }
@@ -183,7 +183,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       const file = pdfFiles[0];
       await runConversionWithProgress("PDF → Word", file.original_name, async () => {
         await convertFile(file.id, file.original_path!, "docx");
-      }, file.file_size);
+      }, file.file_size, file.original_format, file.original_path);
       setProcessingAction(null);
       return;
     }
