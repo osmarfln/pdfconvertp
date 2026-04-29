@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { motion } from "framer-motion";
-import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X, Clock, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +13,15 @@ import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+type PageStatus = "pending" | "processing" | "done" | "error";
+interface PageProgress {
+  index: number;
+  status: PageStatus;
+  durationMs?: number;
+  questionsFound?: number;
+  error?: string;
+}
 
 interface QuestionResult {
   number: number;
@@ -211,10 +220,20 @@ export function ExamGrader() {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState("");
   const [result, setResult] = useState<GradingResult | null>(null);
+  // Per-page progress tracking
+  const [pageProgress, setPageProgress] = useState<PageProgress[]>([]);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [, forceTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const tickRef = useRef<number | null>(null);
 
   const reset = () => {
-    setFiles([]); setResult(null); setProgress(0); setStage("");
+    setFiles([]);
+    setResult(null);
+    setProgress(0);
+    setStage("");
+    setPageProgress([]);
+    setStartedAt(null);
   };
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,61 +246,164 @@ export function ExamGrader() {
     e.target.value = "";
   };
 
+  const startTicker = () => {
+    if (tickRef.current) window.clearInterval(tickRef.current);
+    tickRef.current = window.setInterval(() => forceTick((t) => t + 1), 500);
+  };
+  const stopTicker = () => {
+    if (tickRef.current) {
+      window.clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  };
+
   const handleGrade = async () => {
     if (!files.length) return;
     setIsProcessing(true);
     setResult(null);
-    setProgress(5);
+    setProgress(0);
+    setPageProgress([]);
     setStage("Preparando páginas...");
+    setStartedAt(Date.now());
+    startTicker();
 
     try {
+      // ===== Stage 1: Convert files to images (client-side) =====
       const pages: { base64: string; mime: string }[] = [];
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
-        setStage(`Processando ${f.name}...`);
+        setStage(`Preparando ${f.name}...`);
         if (/\.pdf$/i.test(f.name)) {
           const imgs = await pdfToImages(f);
           pages.push(...imgs);
         } else {
           pages.push({ base64: await fileToBase64(f), mime: f.type || "image/png" });
         }
-        setProgress(5 + Math.round(((i + 1) / files.length) * 30));
+        setProgress(Math.round(((i + 1) / files.length) * 20));
       }
 
       if (pages.length > 12) {
         toast.error("Máximo 12 páginas. Reduza o número de arquivos.");
-        setIsProcessing(false); setProgress(0); setStage(""); return;
+        setIsProcessing(false);
+        setProgress(0);
+        setStage("");
+        stopTicker();
+        return;
       }
 
+      // Initialize per-page progress list
+      setPageProgress(pages.map((_, i) => ({ index: i, status: "pending" })));
       setStage(`IA corrigindo ${pages.length} página(s)...`);
-      setProgress(45);
-      const tick = setInterval(() => setProgress((p) => Math.min(90, p + 2)), 800);
+      setProgress(20);
 
-      const { data, error } = await supabase.functions.invoke("grade-exam", {
-        body: {
+      // ===== Stage 2: Stream per-page grading via SSE =====
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grade-exam`;
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          stream: true,
           imagesBase64: pages.map((p) => p.base64),
           mimeTypes: pages.map((p) => p.mime),
           subject,
           studentName: studentName || undefined,
           examTitle: examTitle || undefined,
-        },
+        }),
       });
 
-      clearInterval(tick);
+      if (!resp.ok || !resp.body) {
+        let msg = `Falha na correção (${resp.status})`;
+        try { const j = await resp.json(); msg = j.error || msg; } catch {}
+        throw new Error(msg);
+      }
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Falha na correção");
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalGrading: GradingResult | null = null;
 
-      setProgress(100);
-      setStage("Correção concluída!");
-      setResult(data.grading as GradingResult);
-      toast.success(`Nota: ${(data.grading as GradingResult).grade.toFixed(1)} / 10`);
+      const handleEvent = (event: string, data: any) => {
+        if (event === "start") {
+          // total pages confirmed
+        } else if (event === "page_start") {
+          setPageProgress((prev) => prev.map((p) => (p.index === data.index ? { ...p, status: "processing" } : p)));
+          setStage(`Corrigindo página ${data.index + 1} de ${data.total}...`);
+        } else if (event === "page_done") {
+          setPageProgress((prev) =>
+            prev.map((p) =>
+              p.index === data.index
+                ? { ...p, status: "done", durationMs: data.durationMs, questionsFound: data.questionsFound }
+                : p,
+            ),
+          );
+          // Progress: 20% (prep) + up to 70% across pages + 10% aggregation
+          const frac = (data.index + 1) / data.total;
+          setProgress(20 + Math.round(frac * 70));
+        } else if (event === "page_error") {
+          setPageProgress((prev) =>
+            prev.map((p) =>
+              p.index === data.index
+                ? { ...p, status: "error", durationMs: data.durationMs, error: data.error }
+                : p,
+            ),
+          );
+        } else if (event === "aggregating") {
+          setStage("Consolidando resultado...");
+          setProgress(92);
+        } else if (event === "overall_feedback_start") {
+          setStage("Gerando comentário geral...");
+          setProgress(96);
+        } else if (event === "done") {
+          finalGrading = data.grading as GradingResult;
+          setProgress(100);
+          setStage("Correção concluída!");
+        } else if (event === "error") {
+          throw new Error(data.error || "Erro no streaming");
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // Parse SSE blocks separated by \n\n
+        let sep: number;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const block = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          let event = "message";
+          let dataStr = "";
+          for (const line of block.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+          }
+          if (!dataStr) continue;
+          try {
+            const data = JSON.parse(dataStr);
+            handleEvent(event, data);
+          } catch (e) {
+            console.warn("SSE parse error", e, dataStr.slice(0, 120));
+          }
+        }
+      }
+
+      if (!finalGrading) throw new Error("A correção não foi finalizada");
+      setResult(finalGrading);
+      toast.success(`Nota: ${finalGrading.grade.toFixed(1)} / 10`);
     } catch (err: any) {
       console.error("Grade error:", err);
       toast.error(err.message || "Erro ao corrigir prova");
       setProgress(0);
       setStage("");
     } finally {
+      stopTicker();
       setIsProcessing(false);
     }
   };
@@ -387,12 +509,93 @@ export function ExamGrader() {
       </div>
 
       {(isProcessing || progress > 0) && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-xl p-4 space-y-2">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{stage || "Processando..."}</span>
             <span className="text-primary font-medium">{progress}%</span>
           </div>
           <Progress value={progress} />
+
+          {/* Real-time metrics from backend timings */}
+          {pageProgress.length > 0 && (() => {
+            const donePages = pageProgress.filter((p) => p.status === "done");
+            const errPages = pageProgress.filter((p) => p.status === "error");
+            const totalPages = pageProgress.length;
+            const doneCount = donePages.length + errPages.length;
+            const totalDoneMs = [...donePages, ...errPages].reduce((s, p) => s + (p.durationMs || 0), 0);
+            const avgPageMs = doneCount > 0 ? totalDoneMs / doneCount : 0;
+            const remainingPages = totalPages - doneCount;
+            const remainingMs = remainingPages * avgPageMs;
+            const elapsed = startedAt ? (Date.now() - startedAt) / 1000 : 0;
+            const pagesPerSec = totalDoneMs > 0 ? doneCount / (totalDoneMs / 1000) : 0;
+            const fmt = (s: number) => {
+              if (!isFinite(s) || s <= 0) return "—";
+              if (s < 60) return `${Math.ceil(s)}s`;
+              return `${Math.floor(s / 60)}m ${Math.ceil(s % 60)}s`;
+            };
+            return (
+              <>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1 border-t border-border/40">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    Decorrido: <span className="text-foreground font-medium">{fmt(elapsed)}</span>
+                  </span>
+                  {remainingPages > 0 && avgPageMs > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      Restante: <span className="text-foreground font-medium">{fmt(remainingMs / 1000)}</span>
+                    </span>
+                  )}
+                  {pagesPerSec > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5" />
+                      <span className="text-foreground font-medium">{pagesPerSec.toFixed(2)} pág/s</span>
+                    </span>
+                  )}
+                  <span className="ml-auto">
+                    {doneCount}/{totalPages} páginas
+                  </span>
+                </div>
+
+                {/* Per-page list */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-2">
+                  <AnimatePresence initial={false}>
+                    {pageProgress.map((p) => (
+                      <motion.div
+                        key={p.index}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex items-center gap-2 text-xs rounded-lg border px-2.5 py-1.5 ${
+                          p.status === "done"
+                            ? "border-success/30 bg-success/5"
+                            : p.status === "error"
+                            ? "border-destructive/30 bg-destructive/5"
+                            : p.status === "processing"
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-border bg-secondary/30"
+                        }`}
+                      >
+                        {p.status === "done" && <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />}
+                        {p.status === "error" && <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />}
+                        {p.status === "processing" && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />}
+                        {p.status === "pending" && <span className="w-3.5 h-3.5 rounded-full border border-muted-foreground/40 shrink-0" />}
+                        <span className="text-foreground font-medium">Página {p.index + 1}</span>
+                        <span className="text-muted-foreground truncate">
+                          {p.status === "processing" && "extraindo questões..."}
+                          {p.status === "done" && `${p.questionsFound ?? 0} questão(ões)`}
+                          {p.status === "error" && (p.error || "erro")}
+                          {p.status === "pending" && "aguardando"}
+                        </span>
+                        {p.durationMs !== undefined && (
+                          <span className="ml-auto text-muted-foreground">{(p.durationMs / 1000).toFixed(1)}s</span>
+                        )}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </>
+            );
+          })()}
         </motion.div>
       )}
 

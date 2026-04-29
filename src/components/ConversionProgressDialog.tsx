@@ -15,7 +15,12 @@ export interface ConversionProgressState {
   message?: string;
   error?: string;
   startedAt?: number; // ms timestamp
-  pages?: number;     // total pages (estimated)
+  pages?: number;     // total pages (real if available)
+  pagesSource?: "real" | "estimated";
+  // Real per-stage durations (ms) — keyed by stage name; only set as each stage finishes
+  stageDurations?: Partial<Record<ConversionStage, number>>;
+  // Timestamp when current stage started (used to derive live durations)
+  stageStartedAt?: number;
 }
 
 const STAGES: { key: ConversionStage; label: string; range: [number, number] }[] = [
@@ -55,13 +60,38 @@ export function ConversionProgressDialog({ state, onClose }: Props) {
     return () => clearInterval(id);
   }, [state.open, isDone, isError]);
 
-  // Compute ETA + speed
+  // Compute ETA + speed using REAL backend timings when possible
   const elapsed = state.startedAt ? (Date.now() - state.startedAt) / 1000 : 0;
+  const stageDurations = state.stageDurations || {};
+  const realProcessingMs = stageDurations.processing;
+  const realUploadingMs = stageDurations.uploading;
+  const realPreparingMs = stageDurations.preparing;
+  const stageElapsedSec = state.stageStartedAt ? (Date.now() - state.stageStartedAt) / 1000 : 0;
+
+  // Prefer ETA derived from completed real stages + current stage live elapsed
+  const completedRealMs =
+    (realPreparingMs || 0) + (realUploadingMs || 0) + (realProcessingMs || 0) + (stageDurations.downloading || 0);
   const progressFrac = Math.max(0.01, state.progress / 100);
-  const totalEstimated = elapsed > 0 && progressFrac > 0.02 ? elapsed / progressFrac : 0;
-  const remaining = Math.max(0, totalEstimated - elapsed);
-  const pagesDone = state.pages ? state.pages * progressFrac : 0;
-  const pagesPerSec = elapsed > 0 ? pagesDone / elapsed : 0;
+  let remaining: number;
+  if (completedRealMs > 0 && progressFrac > 0.05) {
+    const totalEstimatedSec = (completedRealMs / 1000) / progressFrac;
+    remaining = Math.max(0, totalEstimatedSec - elapsed);
+  } else {
+    const totalEstimated = elapsed > 0 && progressFrac > 0.02 ? elapsed / progressFrac : 0;
+    remaining = Math.max(0, totalEstimated - elapsed);
+  }
+
+  // Pages/sec: use the processing-stage real duration if completed; otherwise
+  // derive from current stage if we're processing.
+  let pagesPerSec = 0;
+  if (state.pages) {
+    if (realProcessingMs && realProcessingMs > 0) {
+      pagesPerSec = state.pages / (realProcessingMs / 1000);
+    } else if (state.stage === "processing" && stageElapsedSec > 0) {
+      const pagesDone = state.pages * Math.min(1, (state.progress - 35) / 50);
+      if (pagesDone > 0) pagesPerSec = pagesDone / stageElapsedSec;
+    }
+  }
 
   return (
     <Dialog open={state.open} onOpenChange={(o) => !o && (isDone || isError) && onClose()}>
@@ -91,7 +121,12 @@ export function ConversionProgressDialog({ state, onClose }: Props) {
                 <span className="flex items-center gap-1.5">
                   <Gauge className="w-3.5 h-3.5" />
                   {state.pages
-                    ? <>Velocidade: <span className="text-foreground font-medium">{pagesPerSec.toFixed(1)} pág/s</span></>
+                    ? <>
+                        <span className="text-foreground font-medium">{pagesPerSec > 0 ? pagesPerSec.toFixed(1) : "—"} pág/s</span>
+                        <span className="text-muted-foreground/70">
+                          ({state.pages} pág{state.pagesSource === "estimated" ? " ~" : ""})
+                        </span>
+                      </>
                     : <>Decorrido: <span className="text-foreground font-medium">{formatTime(elapsed)}</span></>}
                 </span>
               </div>
@@ -128,6 +163,17 @@ export function ConversionProgressDialog({ state, onClose }: Props) {
                   }>
                     {s.label}
                   </span>
+                  {/* Real duration once stage finished, or live for active */}
+                  {(() => {
+                    const realMs = stageDurations[s.key];
+                    if (realMs !== undefined) {
+                      return <span className="ml-auto text-xs text-muted-foreground tabular-nums">{(realMs / 1000).toFixed(1)}s</span>;
+                    }
+                    if (active && stageElapsedSec > 0) {
+                      return <span className="ml-auto text-xs text-primary/80 tabular-nums">{stageElapsedSec.toFixed(1)}s</span>;
+                    }
+                    return null;
+                  })()}
                 </motion.div>
               );
             })}
