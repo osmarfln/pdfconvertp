@@ -82,6 +82,20 @@ export function ConversionProgressDialog({ state, onClose }: Props) {
               <span className="text-sm font-medium text-foreground">{Math.round(state.progress)}%</span>
             </div>
             <Progress value={state.progress} className={isError ? "[&>div]:bg-destructive" : isDone ? "[&>div]:bg-success" : ""} />
+            {!isError && !isDone && state.startedAt && (
+              <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  Restante: <span className="text-foreground font-medium">{formatTime(remaining)}</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Gauge className="w-3.5 h-3.5" />
+                  {state.pages
+                    ? <>Velocidade: <span className="text-foreground font-medium">{pagesPerSec.toFixed(1)} pág/s</span></>
+                    : <>Decorrido: <span className="text-foreground font-medium">{formatTime(elapsed)}</span></>}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
