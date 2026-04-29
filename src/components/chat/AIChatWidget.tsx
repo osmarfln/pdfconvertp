@@ -6,14 +6,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { toast } from "sonner";
 import { TextDiff } from "./TextDiff";
+import { downloadFromStorage, triggerBlobDownload } from "@/lib/download";
 
 type AttachmentMsg = {
   kind: "attachment";
   fileName: string;
   status: "uploading" | "uploaded" | "converting" | "done" | "error";
+  progress?: number; // 0-100 individual progress
   targetFormat?: string;
+  sourceFormat?: string;
+  originalPath?: string;
   convertedPath?: string;
   downloadName?: string;
+  originalDownloadName?: string;
   error?: string;
 };
 type CorrectionMsg = {
