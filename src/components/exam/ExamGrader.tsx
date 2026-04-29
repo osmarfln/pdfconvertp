@@ -509,12 +509,93 @@ export function ExamGrader() {
       </div>
 
       {(isProcessing || progress > 0) && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-xl p-4 space-y-2">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{stage || "Processando..."}</span>
             <span className="text-primary font-medium">{progress}%</span>
           </div>
           <Progress value={progress} />
+
+          {/* Real-time metrics from backend timings */}
+          {pageProgress.length > 0 && (() => {
+            const donePages = pageProgress.filter((p) => p.status === "done");
+            const errPages = pageProgress.filter((p) => p.status === "error");
+            const totalPages = pageProgress.length;
+            const doneCount = donePages.length + errPages.length;
+            const totalDoneMs = [...donePages, ...errPages].reduce((s, p) => s + (p.durationMs || 0), 0);
+            const avgPageMs = doneCount > 0 ? totalDoneMs / doneCount : 0;
+            const remainingPages = totalPages - doneCount;
+            const remainingMs = remainingPages * avgPageMs;
+            const elapsed = startedAt ? (Date.now() - startedAt) / 1000 : 0;
+            const pagesPerSec = totalDoneMs > 0 ? doneCount / (totalDoneMs / 1000) : 0;
+            const fmt = (s: number) => {
+              if (!isFinite(s) || s <= 0) return "—";
+              if (s < 60) return `${Math.ceil(s)}s`;
+              return `${Math.floor(s / 60)}m ${Math.ceil(s % 60)}s`;
+            };
+            return (
+              <>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1 border-t border-border/40">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    Decorrido: <span className="text-foreground font-medium">{fmt(elapsed)}</span>
+                  </span>
+                  {remainingPages > 0 && avgPageMs > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      Restante: <span className="text-foreground font-medium">{fmt(remainingMs / 1000)}</span>
+                    </span>
+                  )}
+                  {pagesPerSec > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5" />
+                      <span className="text-foreground font-medium">{pagesPerSec.toFixed(2)} pág/s</span>
+                    </span>
+                  )}
+                  <span className="ml-auto">
+                    {doneCount}/{totalPages} páginas
+                  </span>
+                </div>
+
+                {/* Per-page list */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-2">
+                  <AnimatePresence initial={false}>
+                    {pageProgress.map((p) => (
+                      <motion.div
+                        key={p.index}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex items-center gap-2 text-xs rounded-lg border px-2.5 py-1.5 ${
+                          p.status === "done"
+                            ? "border-success/30 bg-success/5"
+                            : p.status === "error"
+                            ? "border-destructive/30 bg-destructive/5"
+                            : p.status === "processing"
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-border bg-secondary/30"
+                        }`}
+                      >
+                        {p.status === "done" && <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />}
+                        {p.status === "error" && <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />}
+                        {p.status === "processing" && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />}
+                        {p.status === "pending" && <span className="w-3.5 h-3.5 rounded-full border border-muted-foreground/40 shrink-0" />}
+                        <span className="text-foreground font-medium">Página {p.index + 1}</span>
+                        <span className="text-muted-foreground truncate">
+                          {p.status === "processing" && "extraindo questões..."}
+                          {p.status === "done" && `${p.questionsFound ?? 0} questão(ões)`}
+                          {p.status === "error" && (p.error || "erro")}
+                          {p.status === "pending" && "aguardando"}
+                        </span>
+                        {p.durationMs !== undefined && (
+                          <span className="ml-auto text-muted-foreground">{(p.durationMs / 1000).toFixed(1)}s</span>
+                        )}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </>
+            );
+          })()}
         </motion.div>
       )}
 
