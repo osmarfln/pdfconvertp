@@ -220,10 +220,20 @@ export function ExamGrader() {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState("");
   const [result, setResult] = useState<GradingResult | null>(null);
+  // Per-page progress tracking
+  const [pageProgress, setPageProgress] = useState<PageProgress[]>([]);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [, forceTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const tickRef = useRef<number | null>(null);
 
   const reset = () => {
-    setFiles([]); setResult(null); setProgress(0); setStage("");
+    setFiles([]);
+    setResult(null);
+    setProgress(0);
+    setStage("");
+    setPageProgress([]);
+    setStartedAt(null);
   };
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,61 +246,164 @@ export function ExamGrader() {
     e.target.value = "";
   };
 
+  const startTicker = () => {
+    if (tickRef.current) window.clearInterval(tickRef.current);
+    tickRef.current = window.setInterval(() => forceTick((t) => t + 1), 500);
+  };
+  const stopTicker = () => {
+    if (tickRef.current) {
+      window.clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  };
+
   const handleGrade = async () => {
     if (!files.length) return;
     setIsProcessing(true);
     setResult(null);
-    setProgress(5);
+    setProgress(0);
+    setPageProgress([]);
     setStage("Preparando páginas...");
+    setStartedAt(Date.now());
+    startTicker();
 
     try {
+      // ===== Stage 1: Convert files to images (client-side) =====
       const pages: { base64: string; mime: string }[] = [];
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
-        setStage(`Processando ${f.name}...`);
+        setStage(`Preparando ${f.name}...`);
         if (/\.pdf$/i.test(f.name)) {
           const imgs = await pdfToImages(f);
           pages.push(...imgs);
         } else {
           pages.push({ base64: await fileToBase64(f), mime: f.type || "image/png" });
         }
-        setProgress(5 + Math.round(((i + 1) / files.length) * 30));
+        setProgress(Math.round(((i + 1) / files.length) * 20));
       }
 
       if (pages.length > 12) {
         toast.error("Máximo 12 páginas. Reduza o número de arquivos.");
-        setIsProcessing(false); setProgress(0); setStage(""); return;
+        setIsProcessing(false);
+        setProgress(0);
+        setStage("");
+        stopTicker();
+        return;
       }
 
+      // Initialize per-page progress list
+      setPageProgress(pages.map((_, i) => ({ index: i, status: "pending" })));
       setStage(`IA corrigindo ${pages.length} página(s)...`);
-      setProgress(45);
-      const tick = setInterval(() => setProgress((p) => Math.min(90, p + 2)), 800);
+      setProgress(20);
 
-      const { data, error } = await supabase.functions.invoke("grade-exam", {
-        body: {
+      // ===== Stage 2: Stream per-page grading via SSE =====
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grade-exam`;
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          stream: true,
           imagesBase64: pages.map((p) => p.base64),
           mimeTypes: pages.map((p) => p.mime),
           subject,
           studentName: studentName || undefined,
           examTitle: examTitle || undefined,
-        },
+        }),
       });
 
-      clearInterval(tick);
+      if (!resp.ok || !resp.body) {
+        let msg = `Falha na correção (${resp.status})`;
+        try { const j = await resp.json(); msg = j.error || msg; } catch {}
+        throw new Error(msg);
+      }
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Falha na correção");
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalGrading: GradingResult | null = null;
 
-      setProgress(100);
-      setStage("Correção concluída!");
-      setResult(data.grading as GradingResult);
-      toast.success(`Nota: ${(data.grading as GradingResult).grade.toFixed(1)} / 10`);
+      const handleEvent = (event: string, data: any) => {
+        if (event === "start") {
+          // total pages confirmed
+        } else if (event === "page_start") {
+          setPageProgress((prev) => prev.map((p) => (p.index === data.index ? { ...p, status: "processing" } : p)));
+          setStage(`Corrigindo página ${data.index + 1} de ${data.total}...`);
+        } else if (event === "page_done") {
+          setPageProgress((prev) =>
+            prev.map((p) =>
+              p.index === data.index
+                ? { ...p, status: "done", durationMs: data.durationMs, questionsFound: data.questionsFound }
+                : p,
+            ),
+          );
+          // Progress: 20% (prep) + up to 70% across pages + 10% aggregation
+          const frac = (data.index + 1) / data.total;
+          setProgress(20 + Math.round(frac * 70));
+        } else if (event === "page_error") {
+          setPageProgress((prev) =>
+            prev.map((p) =>
+              p.index === data.index
+                ? { ...p, status: "error", durationMs: data.durationMs, error: data.error }
+                : p,
+            ),
+          );
+        } else if (event === "aggregating") {
+          setStage("Consolidando resultado...");
+          setProgress(92);
+        } else if (event === "overall_feedback_start") {
+          setStage("Gerando comentário geral...");
+          setProgress(96);
+        } else if (event === "done") {
+          finalGrading = data.grading as GradingResult;
+          setProgress(100);
+          setStage("Correção concluída!");
+        } else if (event === "error") {
+          throw new Error(data.error || "Erro no streaming");
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // Parse SSE blocks separated by \n\n
+        let sep: number;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const block = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          let event = "message";
+          let dataStr = "";
+          for (const line of block.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+          }
+          if (!dataStr) continue;
+          try {
+            const data = JSON.parse(dataStr);
+            handleEvent(event, data);
+          } catch (e) {
+            console.warn("SSE parse error", e, dataStr.slice(0, 120));
+          }
+        }
+      }
+
+      if (!finalGrading) throw new Error("A correção não foi finalizada");
+      setResult(finalGrading);
+      toast.success(`Nota: ${finalGrading.grade.toFixed(1)} / 10`);
     } catch (err: any) {
       console.error("Grade error:", err);
       toast.error(err.message || "Erro ao corrigir prova");
       setProgress(0);
       setStage("");
     } finally {
+      stopTicker();
       setIsProcessing(false);
     }
   };
