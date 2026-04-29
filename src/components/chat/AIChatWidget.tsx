@@ -213,57 +213,94 @@ export function AIChatWidget() {
     }
   };
 
-  const handleFile = async (file: File) => {
-    if (!isPdf(file.name) && !isDoc(file.name)) {
-      toast.error("Envie um PDF, DOCX, XLSX ou PPTX.");
-      return;
+  const handleFiles = async (files: File[]) => {
+    const valid = files.filter((f) => isPdf(f.name) || isDoc(f.name));
+    const invalid = files.length - valid.length;
+    if (invalid > 0) {
+      toast.error(`${invalid} arquivo(s) ignorado(s). Envie apenas PDF, DOCX, XLSX ou PPTX.`);
     }
-    const target = isPdf(file.name) ? "docx" : "pdf";
-    const baseName = file.name.replace(/\.[^.]+$/, "");
-    const downloadName = `${baseName}.${target}`;
+    if (!valid.length) return;
 
-    const msgId = Date.now().toString();
+    // Create one message per file (so each has its own progress card)
+    const queued = valid.map((file) => {
+      const target = isPdf(file.name) ? "docx" : "pdf";
+      const source = isPdf(file.name) ? "pdf" : file.name.split(".").pop()!.toLowerCase();
+      const baseName = file.name.replace(/\.[^.]+$/, "");
+      const downloadName = `${baseName}.${target}`;
+      const originalDownloadName = file.name;
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      return { id, file, target, source, downloadName, originalDownloadName };
+    });
+
     setMessages((prev) => [
       ...prev,
-      {
-        id: msgId,
-        role: "user",
+      ...queued.map((q) => ({
+        id: q.id,
+        role: "user" as const,
         content: "",
-        rich: { kind: "attachment", fileName: file.name, status: "uploading", targetFormat: target, downloadName },
-      },
+        rich: {
+          kind: "attachment" as const,
+          fileName: q.file.name,
+          status: "uploading" as const,
+          progress: 0,
+          targetFormat: q.target,
+          sourceFormat: q.source,
+          downloadName: q.downloadName,
+          originalDownloadName: q.originalDownloadName,
+        },
+      })),
     ]);
 
-    try {
-      const conv = await uploadFile(file);
-      if (!conv) throw new Error("Falha no upload");
+    // Process sequentially to avoid hammering the conversion API but keep individual progress
+    for (const q of queued) {
+      try {
+        updateMsg(q.id, (m) => ({
+          rich: { ...(m.rich as AttachmentMsg), status: "uploading", progress: 10 },
+        }));
+        const conv = await uploadFile(q.file);
+        if (!conv) throw new Error("Falha no upload");
 
-      updateMsg(msgId, (m) => ({ rich: { ...(m.rich as AttachmentMsg), status: "converting" } }));
+        updateMsg(q.id, (m) => ({
+          rich: {
+            ...(m.rich as AttachmentMsg),
+            status: "converting",
+            progress: 40,
+            originalPath: conv.original_path ?? undefined,
+          },
+        }));
 
-      const convertedPath = await convertFile(conv.id, conv.original_path!, target);
-      if (!convertedPath) throw new Error("Falha na conversão");
+        // Smooth progress simulation while waiting for the conversion
+        let cur = 40;
+        const interval = window.setInterval(() => {
+          cur = Math.min(cur + Math.random() * 6, 88);
+          updateMsg(q.id, (m) => ({
+            rich: { ...(m.rich as AttachmentMsg), progress: cur },
+          }));
+        }, 600);
 
-      updateMsg(msgId, (m) => ({
-        rich: { ...(m.rich as AttachmentMsg), status: "done", convertedPath },
-      }));
-    } catch (err: any) {
-      updateMsg(msgId, (m) => ({
-        rich: { ...(m.rich as AttachmentMsg), status: "error", error: err.message },
-      }));
+        const convertedPath = await convertFile(conv.id, conv.original_path!, q.target);
+        window.clearInterval(interval);
+        if (!convertedPath) throw new Error("Falha na conversão");
+
+        updateMsg(q.id, (m) => ({
+          rich: {
+            ...(m.rich as AttachmentMsg),
+            status: "done",
+            progress: 100,
+            convertedPath,
+          },
+        }));
+      } catch (err: any) {
+        updateMsg(q.id, (m) => ({
+          rich: { ...(m.rich as AttachmentMsg), status: "error", error: err.message },
+        }));
+      }
     }
   };
 
   const downloadConverted = async (path: string, name: string) => {
-    const { data } = await supabase.storage.from("documents").download(path);
-    if (!data) {
-      toast.error("Erro ao baixar.");
-      return;
-    }
-    const url = URL.createObjectURL(data);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
+    const ok = await downloadFromStorage(path, name);
+    if (ok) toast.success(`${name} baixado!`);
   };
 
   const renderRich = (msg: Message) => {
