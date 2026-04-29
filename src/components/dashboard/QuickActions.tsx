@@ -265,6 +265,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
     { icon: Merge, label: "Mesclar PDF", desc: "Unir arquivos", color: "bg-primary/10 text-primary" },
     { icon: Split, label: "Dividir PDF", desc: "Separar páginas", color: "bg-destructive/10 text-destructive" },
     { icon: ImageDown, label: "PDF → JPG", desc: "Exportar imagens", color: "bg-success/10 text-success" },
+    { icon: ImageIcon, label: "JPG → PDF", desc: "Imagem para PDF", color: "bg-primary/10 text-primary" },
     { icon: Minimize2, label: "Comprimir", desc: "Reduzir tamanho", color: "bg-warning/10 text-warning" },
   ];
 
