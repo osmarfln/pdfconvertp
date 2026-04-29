@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2, AlertTriangle } from "lucide-react";
+import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Image as ImageIcon, Minimize2, Loader2, AlertTriangle } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
