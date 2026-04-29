@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Loader2, XCircle, Circle } from "lucide-react";
+import { CheckCircle2, Loader2, XCircle, Circle, Clock, Gauge } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 export type ConversionStage = "idle" | "preparing" | "uploading" | "processing" | "downloading" | "completed" | "error";
 
@@ -13,6 +14,8 @@ export interface ConversionProgressState {
   progress: number; // 0-100
   message?: string;
   error?: string;
+  startedAt?: number; // ms timestamp
+  pages?: number;     // total pages (estimated)
 }
 
 const STAGES: { key: ConversionStage; label: string; range: [number, number] }[] = [
@@ -26,6 +29,14 @@ function stageIndex(s: ConversionStage) {
   return STAGES.findIndex((x) => x.key === s);
 }
 
+function formatTime(secs: number) {
+  if (!isFinite(secs) || secs <= 0) return "—";
+  if (secs < 60) return `${Math.ceil(secs)}s`;
+  const m = Math.floor(secs / 60);
+  const s = Math.ceil(secs % 60);
+  return `${m}m ${s}s`;
+}
+
 interface Props {
   state: ConversionProgressState;
   onClose: () => void;
@@ -35,6 +46,22 @@ export function ConversionProgressDialog({ state, onClose }: Props) {
   const isError = state.stage === "error";
   const isDone = state.stage === "completed";
   const activeIdx = stageIndex(state.stage);
+
+  // Tick every 500ms to refresh ETA/speed
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!state.open || isDone || isError) return;
+    const id = setInterval(() => setTick((t) => t + 1), 500);
+    return () => clearInterval(id);
+  }, [state.open, isDone, isError]);
+
+  // Compute ETA + speed
+  const elapsed = state.startedAt ? (Date.now() - state.startedAt) / 1000 : 0;
+  const progressFrac = Math.max(0.01, state.progress / 100);
+  const totalEstimated = elapsed > 0 && progressFrac > 0.02 ? elapsed / progressFrac : 0;
+  const remaining = Math.max(0, totalEstimated - elapsed);
+  const pagesDone = state.pages ? state.pages * progressFrac : 0;
+  const pagesPerSec = elapsed > 0 ? pagesDone / elapsed : 0;
 
   return (
     <Dialog open={state.open} onOpenChange={(o) => !o && (isDone || isError) && onClose()}>
