@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight, PartyPopper } from "lucide-react";
+import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight, PartyPopper, GraduationCap } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ExamGrader } from "@/components/exam/ExamGrader";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -485,6 +487,21 @@ export function AIPage() {
           </motion.div>
         ) : (
           <motion.div key="editor" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+            <Tabs defaultValue="text" className="w-full">
+              <TabsList className="bg-secondary border border-border">
+                <TabsTrigger value="text" className="gap-1.5">
+                  <Wand2 className="w-4 h-4" /> Correção de Texto
+                </TabsTrigger>
+                <TabsTrigger value="exam" className="gap-1.5">
+                  <GraduationCap className="w-4 h-4" /> Correção de Prova
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="exam" className="mt-5">
+                <ExamGrader />
+              </TabsContent>
+
+              <TabsContent value="text" className="mt-5 space-y-6">
             <div className="flex flex-wrap items-center gap-3">
               <Select value={tone} onValueChange={setTone}>
                 <SelectTrigger className="w-48 bg-secondary border-border">
@@ -602,6 +619,8 @@ export function AIPage() {
                 {corrected && <p className="text-xs text-muted-foreground">{corrected.length} caracteres</p>}
               </motion.div>
             </div>
+              </TabsContent>
+            </Tabs>
           </motion.div>
         )}
       </AnimatePresence>
