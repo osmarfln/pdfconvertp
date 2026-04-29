@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { FileOutput, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2, AlertTriangle } from "lucide-react";
+import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2, AlertTriangle } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,6 +44,18 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       setProcessingAction(label);
       const file = docFiles[0];
       await convertFile(file.id, file.original_path!, "pdf");
+      setProcessingAction(null);
+      return;
+    }
+
+    if (label === "PDF → Word") {
+      if (pdfFiles.length === 0) {
+        toast.info("Envie um PDF primeiro.");
+        return;
+      }
+      setProcessingAction(label);
+      const file = pdfFiles[0];
+      await convertFile(file.id, file.original_path!, "docx");
       setProcessingAction(null);
       return;
     }
@@ -102,6 +114,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
 
   const actions = [
     { icon: FileOutput, label: "Word → PDF", desc: "Converter documentos", color: "bg-primary/10 text-primary" },
+    { icon: FileText, label: "PDF → Word", desc: "PDF para DOCX", color: "bg-primary/10 text-primary" },
     { icon: ScanText, label: "OCR", desc: "Extrair texto", color: "bg-success/10 text-success" },
     { icon: Wand2, label: "Corrigir com IA", desc: "Ortografia e gramática", color: "bg-warning/10 text-warning" },
     { icon: Merge, label: "Mesclar PDF", desc: "Unir arquivos", color: "bg-primary/10 text-primary" },
