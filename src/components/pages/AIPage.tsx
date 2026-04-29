@@ -619,6 +619,8 @@ export function AIPage() {
                 {corrected && <p className="text-xs text-muted-foreground">{corrected.length} caracteres</p>}
               </motion.div>
             </div>
+              </TabsContent>
+            </Tabs>
           </motion.div>
         )}
       </AnimatePresence>
