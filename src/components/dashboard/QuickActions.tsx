@@ -141,6 +141,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
 
   const pdfFiles = conversions.filter((c) => c.original_format === "pdf" && c.original_path);
   const docFiles = conversions.filter((c) => ["docx", "xlsx", "pptx"].includes(c.original_format) && c.original_path);
+  const imageFiles = conversions.filter((c) => ["jpg", "jpeg", "png"].includes(c.original_format) && c.original_path);
 
   const handleAction = async (label: string) => {
     if (label === "Corrigir com IA") {
