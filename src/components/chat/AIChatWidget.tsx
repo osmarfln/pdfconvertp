@@ -1,12 +1,34 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, User, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User, Sparkles, Paperclip, Wand2, Download, FileText, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { supabase } from "@/integrations/supabase/client";
+import { useFileConversions } from "@/hooks/useFileConversions";
+import { toast } from "sonner";
+import { TextDiff } from "./TextDiff";
+
+type AttachmentMsg = {
+  kind: "attachment";
+  fileName: string;
+  status: "uploading" | "uploaded" | "converting" | "done" | "error";
+  targetFormat?: string;
+  convertedPath?: string;
+  downloadName?: string;
+  error?: string;
+};
+type CorrectionMsg = {
+  kind: "correction";
+  original: string;
+  corrected?: string;
+  status: "loading" | "done" | "error";
+  error?: string;
+};
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  rich?: AttachmentMsg | CorrectionMsg;
 }
 
 function getGreeting(): string {
@@ -17,30 +39,42 @@ function getGreeting(): string {
 }
 
 const suggestions = [
-  "Como converter um PDF para Word?",
-  "Quero corrigir a ortografia de um texto",
+  "📎 Anexe um PDF ou DOCX para converter",
+  "✨ Cole um texto para correção ortográfica",
   "Como usar o OCR para extrair texto?",
   "O que o assistente pode fazer?",
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
+const isPdf = (name: string) => /\.pdf$/i.test(name);
+const isDoc = (name: string) => /\.(docx|xlsx|pptx)$/i.test(name);
+
 export function AIChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [correctMode, setCorrectMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile, convertFile } = useFileConversions();
 
   const greeting = useMemo(() => getGreeting(), []);
   const welcomeMessage = useMemo(
-    () => `${greeting} Sou o assistente do PDF Convert Pro! 🚀\n\nComo posso ajudar você hoje?`,
+    () => `${greeting} Sou o assistente do PDF Convert Pro! 🚀\n\n• 📎 Anexe um arquivo para **converter PDF↔Word**\n• ✨ Use o botão **Corrigir** para revisar ortografia/gramática com comparação **antes/depois**\n• Ou faça uma pergunta!`,
     [greeting]
   );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const updateMsg = (id: string, patch: Partial<Message> | ((m: Message) => Partial<Message>)) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m))
+    );
+  };
 
   const streamChat = async (allMessages: Message[]) => {
     setIsTyping(true);
@@ -54,7 +88,9 @@ export function AIChatWidget() {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+          messages: allMessages
+            .filter((m) => !m.rich)
+            .map((m) => ({ role: m.role, content: m.content })),
         }),
       });
 
@@ -85,8 +121,8 @@ export function AIChatWidget() {
               assistantContent += content;
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantContent } : m);
+                if (last?.role === "assistant" && !last.rich) {
+                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantContent } : m));
                 }
                 return [...prev, { id: Date.now().toString(), role: "assistant", content: assistantContent }];
               });
@@ -110,14 +146,31 @@ export function AIChatWidget() {
 
   const handleSend = () => {
     if (!input.trim() || isTyping) return;
-    const userMessage: Message = { id: Date.now().toString(), role: "user", content: input.trim() };
+    const text = input.trim();
+    setInput("");
+
+    if (correctMode) {
+      runCorrection(text);
+      setCorrectMode(false);
+      return;
+    }
+
+    const userMessage: Message = { id: Date.now().toString(), role: "user", content: text };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    setInput("");
     streamChat(newMessages);
   };
 
   const handleSuggestion = (text: string) => {
+    if (text.startsWith("📎")) {
+      fileInputRef.current?.click();
+      return;
+    }
+    if (text.startsWith("✨")) {
+      setCorrectMode(true);
+      setTimeout(() => document.getElementById("chat-input")?.focus(), 50);
+      return;
+    }
     if (isTyping) return;
     const userMessage: Message = { id: Date.now().toString(), role: "user", content: text };
     const newMessages = [...messages, userMessage];
@@ -125,8 +178,177 @@ export function AIChatWidget() {
     streamChat(newMessages);
   };
 
+  const runCorrection = async (text: string) => {
+    const userMsgId = Date.now().toString();
+    const aiMsgId = (Date.now() + 1).toString();
+    setMessages((prev) => [
+      ...prev,
+      { id: userMsgId, role: "user", content: `✨ Corrigir texto:\n\n${text}` },
+      {
+        id: aiMsgId,
+        role: "assistant",
+        content: "",
+        rich: { kind: "correction", original: text, status: "loading" },
+      },
+    ]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-correct", {
+        body: { action: "correct", text, tone: "profissional" },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Falha na correção");
+      updateMsg(aiMsgId, {
+        rich: { kind: "correction", original: text, corrected: data.correctedText, status: "done" },
+      });
+    } catch (err: any) {
+      updateMsg(aiMsgId, {
+        rich: { kind: "correction", original: text, status: "error", error: err.message },
+      });
+    }
+  };
+
+  const handleFile = async (file: File) => {
+    if (!isPdf(file.name) && !isDoc(file.name)) {
+      toast.error("Envie um PDF, DOCX, XLSX ou PPTX.");
+      return;
+    }
+    const target = isPdf(file.name) ? "docx" : "pdf";
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    const downloadName = `${baseName}.${target}`;
+
+    const msgId = Date.now().toString();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: msgId,
+        role: "user",
+        content: "",
+        rich: { kind: "attachment", fileName: file.name, status: "uploading", targetFormat: target, downloadName },
+      },
+    ]);
+
+    try {
+      const conv = await uploadFile(file);
+      if (!conv) throw new Error("Falha no upload");
+
+      updateMsg(msgId, (m) => ({ rich: { ...(m.rich as AttachmentMsg), status: "converting" } }));
+
+      const convertedPath = await convertFile(conv.id, conv.original_path!, target);
+      if (!convertedPath) throw new Error("Falha na conversão");
+
+      updateMsg(msgId, (m) => ({
+        rich: { ...(m.rich as AttachmentMsg), status: "done", convertedPath },
+      }));
+    } catch (err: any) {
+      updateMsg(msgId, (m) => ({
+        rich: { ...(m.rich as AttachmentMsg), status: "error", error: err.message },
+      }));
+    }
+  };
+
+  const downloadConverted = async (path: string, name: string) => {
+    const { data } = await supabase.storage.from("documents").download(path);
+    if (!data) {
+      toast.error("Erro ao baixar.");
+      return;
+    }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const renderRich = (msg: Message) => {
+    if (!msg.rich) return null;
+
+    if (msg.rich.kind === "attachment") {
+      const a = msg.rich;
+      return (
+        <div className="rounded-xl bg-secondary border border-border p-3 max-w-[85%] space-y-2">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-sm font-medium text-foreground truncate">{a.fileName}</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {a.status === "uploading" && "📤 Enviando..."}
+            {a.status === "converting" && `🔄 Convertendo para ${a.targetFormat?.toUpperCase()}...`}
+            {a.status === "done" && `✅ Convertido para ${a.targetFormat?.toUpperCase()}`}
+            {a.status === "error" && `❌ ${a.error || "Erro"}`}
+          </div>
+          {(a.status === "uploading" || a.status === "converting") && (
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          )}
+          {a.status === "done" && a.convertedPath && (
+            <button
+              onClick={() => downloadConverted(a.convertedPath!, a.downloadName!)}
+              className="flex items-center gap-2 w-full justify-center px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+            >
+              <Download className="w-4 h-4" /> Baixar {a.downloadName}
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    if (msg.rich.kind === "correction") {
+      const c = msg.rich;
+      return (
+        <div className="rounded-xl bg-secondary border border-border p-3 max-w-[90%] space-y-3 w-full">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Wand2 className="w-4 h-4 text-warning" />
+            Correção ortográfica e gramatical
+          </div>
+          {c.status === "loading" && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Analisando texto...
+            </div>
+          )}
+          {c.status === "error" && <div className="text-xs text-destructive">{c.error}</div>}
+          {c.status === "done" && c.corrected && (
+            <>
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-muted-foreground">Comparação antes / depois:</div>
+                <TextDiff original={c.original} corrected={c.corrected} />
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-muted-foreground">Texto corrigido:</div>
+                <div className="rounded-lg bg-background/40 border border-border/60 p-3 text-sm whitespace-pre-wrap break-words">
+                  {c.corrected}
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(c.corrected!);
+                    toast.success("Texto copiado!");
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  📋 Copiar texto corrigido
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.xlsx,.pptx"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          e.target.value = "";
+        }}
+      />
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -147,7 +369,7 @@ export function AIChatWidget() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-x-0 bottom-0 mx-auto w-full h-full sm:bottom-6 sm:right-6 sm:left-auto sm:mx-0 sm:w-[380px] sm:h-[520px] sm:rounded-2xl glass border border-border shadow-2xl flex flex-col z-50 overflow-hidden"
+            className="fixed inset-x-0 bottom-0 mx-auto w-full h-full sm:bottom-6 sm:right-6 sm:left-auto sm:mx-0 sm:w-[420px] sm:h-[600px] sm:rounded-2xl glass border border-border shadow-2xl flex flex-col z-50 overflow-hidden"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
               <div className="flex items-center gap-2">
@@ -175,7 +397,9 @@ export function AIChatWidget() {
                       <Bot className="w-4 h-4 text-primary" />
                     </div>
                     <div className="bg-secondary rounded-xl rounded-tl-sm px-3.5 py-2.5 max-w-[85%]">
-                      <p className="text-sm text-foreground whitespace-pre-line">{welcomeMessage}</p>
+                      <div className="text-sm text-foreground prose prose-sm prose-invert max-w-none">
+                        <ReactMarkdown>{welcomeMessage}</ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-2 pl-9">
@@ -193,22 +417,26 @@ export function AIChatWidget() {
               )}
 
               {messages.map((msg) => (
-                <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : ""}`}>
+                <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" && !msg.rich ? "justify-end" : ""}`}>
                   {msg.role === "assistant" && (
                     <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
                       <Bot className="w-4 h-4 text-primary" />
                     </div>
                   )}
-                  <div className={`rounded-xl px-3.5 py-2.5 max-w-[80%] ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-secondary text-foreground rounded-tl-sm"}`}>
-                    {msg.role === "assistant" ? (
-                      <div className="text-sm prose prose-sm prose-invert max-w-none [&_p]:mb-1 [&_ul]:mb-1 [&_ol]:mb-1 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_code]:bg-background/30 [&_code]:px-1 [&_code]:rounded">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-line">{msg.content}</p>
-                    )}
-                  </div>
-                  {msg.role === "user" && (
+                  {msg.rich ? (
+                    renderRich(msg)
+                  ) : (
+                    <div className={`rounded-xl px-3.5 py-2.5 max-w-[80%] ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-secondary text-foreground rounded-tl-sm"}`}>
+                      {msg.role === "assistant" ? (
+                        <div className="text-sm prose prose-sm prose-invert max-w-none [&_p]:mb-1 [&_ul]:mb-1 [&_ol]:mb-1 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_code]:bg-background/30 [&_code]:px-1 [&_code]:rounded">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-line">{msg.content}</p>
+                      )}
+                    </div>
+                  )}
+                  {msg.role === "user" && !msg.rich && (
                     <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center shrink-0 mt-0.5">
                       <User className="w-4 h-4 text-muted-foreground" />
                     </div>
@@ -233,20 +461,53 @@ export function AIChatWidget() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-3 border-t border-border">
-              <div className="flex gap-2">
-                <input
-                  type="text" value={input}
+            <div className="p-3 border-t border-border space-y-2">
+              {correctMode && (
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/30 text-xs">
+                  <span className="text-warning flex items-center gap-1.5">
+                    <Wand2 className="w-3.5 h-3.5" /> Modo correção: cole o texto e envie
+                  </span>
+                  <button onClick={() => setCorrectMode(false)} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2 items-end">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Anexar PDF/DOCX para converter"
+                  className="h-10 w-10 rounded-lg bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setCorrectMode((v) => !v)}
+                  title="Corrigir texto"
+                  className={`h-10 w-10 rounded-lg border flex items-center justify-center transition-colors shrink-0 ${
+                    correctMode ? "bg-warning/20 border-warning text-warning" : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Wand2 className="w-4 h-4" />
+                </button>
+                <textarea
+                  id="chat-input"
+                  value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Digite sua mensagem..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder={correctMode ? "Cole o texto a corrigir..." : "Digite sua mensagem..."}
                   disabled={isTyping}
-                  className="flex-1 h-10 px-3.5 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  rows={correctMode ? 3 : 1}
+                  className="flex-1 px-3.5 py-2 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none min-h-[40px] max-h-32"
                 />
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || isTyping}
-                  className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                  className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </button>
