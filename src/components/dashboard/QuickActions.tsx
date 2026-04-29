@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2, AlertTriangle } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useILovePDFHealth } from "@/hooks/useILovePDFHealth";
+import { ConversionProgressDialog, ConversionProgressState, initialProgressState, ConversionStage } from "@/components/ConversionProgressDialog";
 
 interface QuickActionsProps {
   onNavigate?: (tab: string) => void;
@@ -14,6 +15,70 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const { conversions, convertFile, compressFile } = useFileConversions();
   const [processingAction, setProcessingAction] = useState<string | null>(null);
   const { healthy, reason, checking, recheck } = useILovePDFHealth();
+  const [progress, setProgress] = useState<ConversionProgressState>(initialProgressState);
+  const progressTimer = useRef<number | null>(null);
+
+  const stopProgressTimer = () => {
+    if (progressTimer.current) {
+      window.clearInterval(progressTimer.current);
+      progressTimer.current = null;
+    }
+  };
+
+  const setStage = (stage: ConversionStage, message?: string, jumpTo?: number) => {
+    setProgress((p) => ({
+      ...p,
+      stage,
+      message,
+      progress: jumpTo !== undefined ? jumpTo : p.progress,
+    }));
+  };
+
+  const startSimulatedProgress = (from: number, to: number, durationMs: number) => {
+    stopProgressTimer();
+    const steps = 30;
+    const stepMs = durationMs / steps;
+    const stepInc = (to - from) / steps;
+    let current = from;
+    setProgress((p) => ({ ...p, progress: from }));
+    progressTimer.current = window.setInterval(() => {
+      current += stepInc;
+      if (current >= to) {
+        current = to;
+        stopProgressTimer();
+      }
+      setProgress((p) => ({ ...p, progress: current }));
+    }, stepMs);
+  };
+
+  const runConversionWithProgress = async (
+    title: string,
+    fileName: string,
+    fn: () => Promise<void>
+  ) => {
+    setProgress({ open: true, title, fileName, stage: "preparing", progress: 0, message: "Preparando arquivo..." });
+    await new Promise((r) => setTimeout(r, 400));
+
+    setStage("uploading", "Enviando para o servidor...", 15);
+    startSimulatedProgress(15, 35, 1200);
+    await new Promise((r) => setTimeout(r, 1200));
+
+    setStage("processing", "Convertendo documento...", 35);
+    startSimulatedProgress(35, 85, 12000);
+
+    try {
+      await fn();
+      stopProgressTimer();
+      setStage("downloading", "Finalizando e salvando...", 85);
+      startSimulatedProgress(85, 100, 800);
+      await new Promise((r) => setTimeout(r, 900));
+      stopProgressTimer();
+      setProgress((p) => ({ ...p, stage: "completed", progress: 100, message: "Concluído!" }));
+    } catch (err: any) {
+      stopProgressTimer();
+      setProgress((p) => ({ ...p, stage: "error", error: err?.message || "Erro desconhecido" }));
+    }
+  };
 
   const pdfFiles = conversions.filter((c) => c.original_format === "pdf" && c.original_path);
   const docFiles = conversions.filter((c) => ["docx", "xlsx", "pptx"].includes(c.original_format) && c.original_path);
@@ -43,7 +108,9 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       }
       setProcessingAction(label);
       const file = docFiles[0];
-      await convertFile(file.id, file.original_path!, "pdf");
+      await runConversionWithProgress("Word → PDF", file.original_name, () =>
+        convertFile(file.id, file.original_path!, "pdf")
+      );
       setProcessingAction(null);
       return;
     }
@@ -55,7 +122,9 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       }
       setProcessingAction(label);
       const file = pdfFiles[0];
-      await convertFile(file.id, file.original_path!, "docx");
+      await runConversionWithProgress("PDF → Word", file.original_name, () =>
+        convertFile(file.id, file.original_path!, "docx")
+      );
       setProcessingAction(null);
       return;
     }
@@ -162,6 +231,10 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
           </motion.button>
         ))}
       </div>
+      <ConversionProgressDialog
+        state={progress}
+        onClose={() => setProgress(initialProgressState)}
+      />
     </div>
   );
 }
