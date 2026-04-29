@@ -308,28 +308,49 @@ export function AIChatWidget() {
 
     if (msg.rich.kind === "attachment") {
       const a = msg.rich;
+      const progress = Math.round(a.progress ?? 0);
+      const inProgress = a.status === "uploading" || a.status === "converting";
+      // When source is PDF -> converted is DOCX, original is PDF
+      // When source is DOCX/etc -> converted is PDF, original is the source format
+      const convertedExt = (a.targetFormat || "").toUpperCase();
+      const originalExt = (a.sourceFormat || "").toUpperCase();
       return (
-        <div className="rounded-xl bg-secondary border border-border p-3 max-w-[85%] space-y-2">
+        <div className="rounded-xl bg-secondary border border-border p-3 max-w-[85%] space-y-2 w-full">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{a.fileName}</span>
           </div>
           <div className="text-xs text-muted-foreground">
-            {a.status === "uploading" && "📤 Enviando..."}
-            {a.status === "converting" && `🔄 Convertendo para ${a.targetFormat?.toUpperCase()}...`}
-            {a.status === "done" && `✅ Convertido para ${a.targetFormat?.toUpperCase()}`}
+            {a.status === "uploading" && `📤 Enviando... ${progress}%`}
+            {a.status === "converting" && `🔄 Convertendo para ${convertedExt}... ${progress}%`}
+            {a.status === "done" && `✅ Pronto — escolha o formato para baixar`}
             {a.status === "error" && `❌ ${a.error || "Erro"}`}
           </div>
-          {(a.status === "uploading" || a.status === "converting") && (
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          {inProgress && (
+            <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.max(5, progress)}%` }}
+              />
+            </div>
           )}
           {a.status === "done" && a.convertedPath && (
-            <button
-              onClick={() => downloadConverted(a.convertedPath!, a.downloadName!)}
-              className="flex items-center gap-2 w-full justify-center px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-            >
-              <Download className="w-4 h-4" /> Baixar {a.downloadName}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => downloadConverted(a.convertedPath!, a.downloadName!)}
+                className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90"
+              >
+                <Download className="w-3.5 h-3.5" /> Baixar {convertedExt}
+              </button>
+              {a.originalPath && a.originalDownloadName && (
+                <button
+                  onClick={() => downloadConverted(a.originalPath!, a.originalDownloadName!)}
+                  className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-secondary border border-border text-foreground text-xs font-medium hover:bg-muted"
+                >
+                  <Download className="w-3.5 h-3.5" /> Baixar {originalExt}
+                </button>
+              )}
+            </div>
           )}
         </div>
       );
@@ -384,10 +405,11 @@ export function AIChatWidget() {
         ref={fileInputRef}
         type="file"
         accept=".pdf,.docx,.xlsx,.pptx"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFile(f);
+          const list = e.target.files;
+          if (list && list.length > 0) handleFiles(Array.from(list));
           e.target.value = "";
         }}
       />
