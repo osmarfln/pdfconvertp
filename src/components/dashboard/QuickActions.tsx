@@ -54,9 +54,19 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const runConversionWithProgress = async (
     title: string,
     fileName: string,
-    fn: () => Promise<void>
+    fn: () => Promise<void>,
+    fileSize?: number | null,
   ) => {
-    setProgress({ open: true, title, fileName, stage: "preparing", progress: 0, message: "Preparando arquivo..." });
+    // Estimate pages: roughly 100KB/page for PDF/DOCX
+    const estimatedPages = fileSize ? Math.max(1, Math.round(fileSize / (100 * 1024))) : undefined;
+    const startedAt = Date.now();
+
+    setProgress({
+      open: true, title, fileName,
+      stage: "preparing", progress: 0,
+      message: "Preparando arquivo...",
+      startedAt, pages: estimatedPages,
+    });
     await new Promise((r) => setTimeout(r, 400));
 
     setStage("uploading", "Enviando para o servidor...", 15);
