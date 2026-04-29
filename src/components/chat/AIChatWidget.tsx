@@ -44,7 +44,7 @@ function getGreeting(): string {
 }
 
 const suggestions = [
-  "📎 Anexe um PDF ou DOCX para converter",
+  "📎 Anexe um ou mais PDFs/DOCX para converter",
   "✨ Cole um texto para correção ortográfica",
   "Como usar o OCR para extrair texto?",
   "O que o assistente pode fazer?",
@@ -539,7 +539,7 @@ export function AIChatWidget() {
               <div className="flex gap-2 items-end">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  title="Anexar PDF/DOCX para converter"
+                  title="Anexar PDF/DOCX (vários arquivos suportados)"
                   className="h-10 w-10 rounded-lg bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
                 >
                   <Paperclip className="w-4 h-4" />
