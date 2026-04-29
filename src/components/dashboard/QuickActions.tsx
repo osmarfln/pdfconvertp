@@ -231,6 +231,10 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
           </motion.button>
         ))}
       </div>
+      <ConversionProgressDialog
+        state={progress}
+        onClose={() => setProgress(initialProgressState)}
+      />
     </div>
   );
 }
