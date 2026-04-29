@@ -15,7 +15,12 @@ export interface ConversionProgressState {
   message?: string;
   error?: string;
   startedAt?: number; // ms timestamp
-  pages?: number;     // total pages (estimated)
+  pages?: number;     // total pages (real if available)
+  pagesSource?: "real" | "estimated";
+  // Real per-stage durations (ms) — keyed by stage name; only set as each stage finishes
+  stageDurations?: Partial<Record<ConversionStage, number>>;
+  // Timestamp when current stage started (used to derive live durations)
+  stageStartedAt?: number;
 }
 
 const STAGES: { key: ConversionStage; label: string; range: [number, number] }[] = [
