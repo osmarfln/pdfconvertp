@@ -26,13 +26,27 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
     }
   };
 
-  const setStage = (stage: ConversionStage, message?: string, jumpTo?: number) => {
-    setProgress((p) => ({
-      ...p,
-      stage,
-      message,
-      progress: jumpTo !== undefined ? jumpTo : p.progress,
-    }));
+  const stageStartRef = useRef<number>(0);
+  const stageDurationsRef = useRef<Partial<Record<ConversionStage, number>>>({});
+
+  const enterStage = (stage: ConversionStage, message: string, jumpTo?: number) => {
+    const now = Date.now();
+    setProgress((p) => {
+      // Record duration of the previous stage if it had a startedAt
+      const prevStage = p.stage;
+      if (p.stageStartedAt && prevStage && prevStage !== "idle" && prevStage !== "completed" && prevStage !== "error") {
+        stageDurationsRef.current[prevStage] = now - p.stageStartedAt;
+      }
+      stageStartRef.current = now;
+      return {
+        ...p,
+        stage,
+        message,
+        progress: jumpTo !== undefined ? jumpTo : p.progress,
+        stageStartedAt: now,
+        stageDurations: { ...stageDurationsRef.current },
+      };
+    });
   };
 
   const startSimulatedProgress = (from: number, to: number, durationMs: number) => {
@@ -57,34 +71,68 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
     fileName: string,
     fn: () => Promise<void>,
     fileSize?: number | null,
+    sourceFormat?: string | null,
+    sourcePath?: string | null,
   ) => {
-    // Estimate pages: roughly 100KB/page for PDF/DOCX
-    const estimatedPages = fileSize ? Math.max(1, Math.round(fileSize / (100 * 1024))) : undefined;
     const startedAt = Date.now();
+    stageDurationsRef.current = {};
 
+    // Initial state — we'll detect real page count in the preparing stage
+    const fallbackPages = fileSize ? Math.max(1, Math.round(fileSize / (100 * 1024))) : undefined;
     setProgress({
-      open: true, title, fileName,
-      stage: "preparing", progress: 0,
-      message: "Preparando arquivo...",
-      startedAt, pages: estimatedPages,
+      open: true,
+      title,
+      fileName,
+      stage: "preparing",
+      progress: 0,
+      message: "Preparando arquivo (contando páginas)...",
+      startedAt,
+      stageStartedAt: startedAt,
+      pages: fallbackPages,
+      pagesSource: fallbackPages ? "estimated" : undefined,
+      stageDurations: {},
     });
-    await new Promise((r) => setTimeout(r, 400));
+    stageStartRef.current = startedAt;
 
-    setStage("uploading", "Enviando para o servidor...", 15);
+    // Real page detection (PDF only — non-blocking but awaited briefly)
+    try {
+      const realPages = await detectPageCount(sourceFormat, sourcePath, fileSize);
+      if (realPages) {
+        const isReal = sourceFormat === "pdf" && !!sourcePath;
+        setProgress((p) => ({
+          ...p,
+          pages: realPages,
+          pagesSource: isReal ? "real" : "estimated",
+        }));
+      }
+    } catch {
+      // ignore — keep fallback
+    }
+
+    enterStage("uploading", "Enviando para o servidor...", 15);
     startSimulatedProgress(15, 35, 1200);
     await new Promise((r) => setTimeout(r, 1200));
 
-    setStage("processing", "Convertendo documento...", 35);
+    enterStage("processing", "Convertendo documento...", 35);
     startSimulatedProgress(35, 85, 12000);
 
     try {
       await fn();
       stopProgressTimer();
-      setStage("downloading", "Finalizando e salvando...", 85);
+      enterStage("downloading", "Finalizando e salvando...", 85);
       startSimulatedProgress(85, 100, 800);
       await new Promise((r) => setTimeout(r, 900));
       stopProgressTimer();
-      setProgress((p) => ({ ...p, stage: "completed", progress: 100, message: "Concluído!" }));
+      // Record final stage duration
+      const now = Date.now();
+      stageDurationsRef.current.downloading = now - stageStartRef.current;
+      setProgress((p) => ({
+        ...p,
+        stage: "completed",
+        progress: 100,
+        message: "Concluído!",
+        stageDurations: { ...stageDurationsRef.current },
+      }));
     } catch (err: any) {
       stopProgressTimer();
       setProgress((p) => ({ ...p, stage: "error", error: err?.message || "Erro desconhecido" }));
