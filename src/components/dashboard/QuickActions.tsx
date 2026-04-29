@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Minimize2, Loader2, AlertTriangle } from "lucide-react";
+import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Image as ImageIcon, Minimize2, Loader2, AlertTriangle } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -141,6 +141,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
 
   const pdfFiles = conversions.filter((c) => c.original_format === "pdf" && c.original_path);
   const docFiles = conversions.filter((c) => ["docx", "xlsx", "pptx"].includes(c.original_format) && c.original_path);
+  const imageFiles = conversions.filter((c) => ["jpg", "jpeg", "png"].includes(c.original_format) && c.original_path);
 
   const handleAction = async (label: string) => {
     if (label === "Corrigir com IA") {
@@ -195,7 +196,23 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       }
       setProcessingAction(label);
       const file = pdfFiles[0];
-      await convertFile(file.id, file.original_path!, "jpg");
+      await runConversionWithProgress("PDF → JPG", file.original_name, async () => {
+        await convertFile(file.id, file.original_path!, "jpg");
+      }, file.file_size, file.original_format, file.original_path);
+      setProcessingAction(null);
+      return;
+    }
+
+    if (label === "JPG → PDF") {
+      if (imageFiles.length === 0) {
+        toast.info("Envie uma imagem JPG ou PNG primeiro.");
+        return;
+      }
+      setProcessingAction(label);
+      const file = imageFiles[0];
+      await runConversionWithProgress("JPG → PDF", file.original_name, async () => {
+        await convertFile(file.id, file.original_path!, "pdf");
+      }, file.file_size, file.original_format, file.original_path);
       setProcessingAction(null);
       return;
     }
@@ -248,6 +265,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
     { icon: Merge, label: "Mesclar PDF", desc: "Unir arquivos", color: "bg-primary/10 text-primary" },
     { icon: Split, label: "Dividir PDF", desc: "Separar páginas", color: "bg-destructive/10 text-destructive" },
     { icon: ImageDown, label: "PDF → JPG", desc: "Exportar imagens", color: "bg-success/10 text-success" },
+    { icon: ImageIcon, label: "JPG → PDF", desc: "Imagem para PDF", color: "bg-primary/10 text-primary" },
     { icon: Minimize2, label: "Comprimir", desc: "Reduzir tamanho", color: "bg-warning/10 text-warning" },
   ];
 
