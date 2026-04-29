@@ -163,6 +163,17 @@ export function ConversionProgressDialog({ state, onClose }: Props) {
                   }>
                     {s.label}
                   </span>
+                  {/* Real duration once stage finished, or live for active */}
+                  {(() => {
+                    const realMs = stageDurations[s.key];
+                    if (realMs !== undefined) {
+                      return <span className="ml-auto text-xs text-muted-foreground tabular-nums">{(realMs / 1000).toFixed(1)}s</span>;
+                    }
+                    if (active && stageElapsedSec > 0) {
+                      return <span className="ml-auto text-xs text-primary/80 tabular-nums">{stageElapsedSec.toFixed(1)}s</span>;
+                    }
+                    return null;
+                  })()}
                 </motion.div>
               );
             })}
