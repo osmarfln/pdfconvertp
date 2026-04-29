@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useILovePDFHealth } from "@/hooks/useILovePDFHealth";
 import { ConversionProgressDialog, ConversionProgressState, initialProgressState, ConversionStage } from "@/components/ConversionProgressDialog";
+import { detectPageCount } from "@/lib/pdfUtils";
 
 interface QuickActionsProps {
   onNavigate?: (tab: string) => void;
