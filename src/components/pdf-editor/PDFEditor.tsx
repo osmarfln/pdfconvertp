@@ -1673,6 +1673,64 @@ export function PDFEditor() {
         </div>
       </div>
 
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-6xl w-[95vw] h-[92vh] flex flex-col p-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              <Eye className="w-5 h-5 text-primary" />
+              Pré-visualização do PDF editado
+              <span className="ml-auto flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowPreview(false)}>
+                  Voltar e editar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="glow"
+                  onClick={downloadPreviewPDF}
+                  disabled={!previewBytes || previewLoading}
+                  className="gap-2"
+                >
+                  <Download className="w-4 h-4" /> Baixar PDF
+                </Button>
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Esta é a aparência final, sem marcações de edição. Confira antes de baixar.
+          </p>
+          <div className="flex-1 overflow-auto bg-muted/40 rounded-lg p-4">
+            {previewLoading ? (
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                Gerando pré-visualização...
+              </div>
+            ) : previewPages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                Nenhuma página para exibir.
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                {previewPages.map((p) => (
+                  <div
+                    key={p.page}
+                    className="bg-white shadow-lg rounded-md overflow-hidden ring-1 ring-border"
+                    style={{ width: p.width, maxWidth: "100%" }}
+                  >
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-2 py-1 bg-muted/60">
+                      Página {p.page + 1}
+                    </div>
+                    <img
+                      src={p.img}
+                      alt={`Pré-visualização página ${p.page + 1}`}
+                      style={{ width: p.width, height: p.height, display: "block" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={showCompare}
         onOpenChange={(o) => {
