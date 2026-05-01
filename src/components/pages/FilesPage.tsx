@@ -52,8 +52,16 @@ export function FilesPage() {
   const [previewName, setPreviewName] = useState("");
   const [previewFormat, setPreviewFormat] = useState("");
 
-  const filtered = conversions.filter((f) =>
-    f.original_name.toLowerCase().includes(search.toLowerCase())
+  const matchesSearch = (f: typeof conversions[number]) =>
+    f.original_name.toLowerCase().includes(search.toLowerCase());
+
+  const activeFiles = useMemo(
+    () => conversions.filter((f) => !f.is_backup).filter(matchesSearch),
+    [conversions, search],
+  );
+  const backupFiles = useMemo(
+    () => conversions.filter((f) => f.is_backup).filter(matchesSearch),
+    [conversions, search],
   );
 
   const formatSize = (bytes: number | null) => {
