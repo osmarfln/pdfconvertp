@@ -268,6 +268,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const actions = [
     { icon: FileOutput, label: "Word → PDF", desc: "Converter documentos", color: "bg-primary/10 text-primary" },
     { icon: FileText, label: "PDF → Word", desc: "PDF para DOCX", color: "bg-primary/10 text-primary" },
+    { icon: Pencil, label: "Editar PDF", desc: "Abrir no editor", color: "bg-primary/10 text-primary" },
     { icon: ScanText, label: "OCR", desc: "Extrair texto", color: "bg-success/10 text-success" },
     { icon: Wand2, label: "Corrigir com IA", desc: "Ortografia e gramática", color: "bg-warning/10 text-warning" },
     { icon: Merge, label: "Mesclar PDF", desc: "Unir arquivos", color: "bg-primary/10 text-primary" },
