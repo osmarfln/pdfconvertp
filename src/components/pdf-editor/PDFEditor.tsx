@@ -1117,35 +1117,169 @@ export function PDFEditor() {
                             )}
                           >
                             {isEditing ? (
-                              <input
-                                autoFocus
-                                value={value}
-                                onChange={(e) => updateTextEdit(t.id, e.target.value)}
-                                onBlur={() => setEditingExtractedId(null)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") setEditingExtractedId(null);
-                                  if (e.key === "Escape") {
-                                    updateTextEdit(t.id, t.originalText);
-                                    setEditingExtractedId(null);
-                                  }
-                                }}
-                                style={{
-                                  fontSize: t.overlayFontSize,
-                                  lineHeight: 1,
-                                  width: "100%",
-                                  height: "100%",
-                                  background: "white",
-                                  color: "black",
-                                  border: "1px solid hsl(var(--primary))",
-                                  outline: "none",
-                                  padding: "0 2px",
-                                  fontFamily: t.fontName.toLowerCase().includes("times")
-                                    ? "Times, serif"
-                                    : t.fontName.toLowerCase().includes("courier")
-                                      ? "Courier, monospace"
-                                      : "Helvetica, Arial, sans-serif",
-                                }}
-                              />
+                              <>
+                                <input
+                                  autoFocus
+                                  value={value}
+                                  onChange={(e) => updateTextEdit(t.id, { newText: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") setEditingExtractedId(null);
+                                    if (e.key === "Escape") {
+                                      resetTextEdit(t.id);
+                                      setEditingExtractedId(null);
+                                    }
+                                  }}
+                                  style={{
+                                    fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
+                                    lineHeight: 1,
+                                    width: "100%",
+                                    height: "100%",
+                                    background: "white",
+                                    color: edit?.colorOverride || "black",
+                                    border: "1px solid hsl(var(--primary))",
+                                    outline: "none",
+                                    padding: "0 2px",
+                                    fontFamily: (() => {
+                                      const fk = edit?.fontKeyOverride;
+                                      if (fk?.startsWith("Times")) return "Times, serif";
+                                      if (fk?.startsWith("Courier")) return "Courier, monospace";
+                                      if (fk?.startsWith("Helvetica")) return "Helvetica, Arial, sans-serif";
+                                      return t.fontName.toLowerCase().includes("times")
+                                        ? "Times, serif"
+                                        : t.fontName.toLowerCase().includes("courier")
+                                          ? "Courier, monospace"
+                                          : "Helvetica, Arial, sans-serif";
+                                    })(),
+                                    fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
+                                    fontStyle:
+                                      edit?.fontKeyOverride?.includes("Oblique") ||
+                                      edit?.fontKeyOverride?.includes("Italic")
+                                        ? "italic"
+                                        : "normal",
+                                  }}
+                                />
+                                {/* Floating style panel */}
+                                <div
+                                  className="absolute z-20 left-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                >
+                                  <Select
+                                    value={edit?.fontKeyOverride ?? "__auto__"}
+                                    onValueChange={(v) =>
+                                      updateTextEdit(t.id, {
+                                        fontKeyOverride: v === "__auto__" ? undefined : (v as FontKey),
+                                      })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 w-[130px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__auto__">Auto ({t.fontName.slice(0, 14)})</SelectItem>
+                                      {FONT_OPTIONS.map((f) => (
+                                        <SelectItem key={f.key} value={f.key}>
+                                          {f.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    type="number"
+                                    min={4}
+                                    max={144}
+                                    step={0.5}
+                                    value={Number((edit?.fontSizeOverride ?? t.fontSize).toFixed(1))}
+                                    onChange={(e) => {
+                                      const n = parseFloat(e.target.value);
+                                      updateTextEdit(t.id, {
+                                        fontSizeOverride: isNaN(n) ? undefined : n,
+                                      });
+                                    }}
+                                    className="h-7 w-16 text-xs"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const cur = edit?.fontKeyOverride ?? "Helvetica";
+                                      const next = cur.includes("Bold")
+                                        ? (cur.replace("Bold", "") as FontKey)
+                                        : (cur === "Helvetica"
+                                            ? "HelveticaBold"
+                                            : cur === "TimesRoman"
+                                              ? "TimesRomanBold"
+                                              : cur === "Courier"
+                                                ? "CourierBold"
+                                                : cur === "HelveticaOblique"
+                                                  ? "HelveticaBold"
+                                                  : cur === "TimesRomanItalic"
+                                                    ? "TimesRomanBold"
+                                                    : cur) as FontKey;
+                                      updateTextEdit(t.id, { fontKeyOverride: next });
+                                    }}
+                                    className={cn(
+                                      "h-7 w-7 rounded border flex items-center justify-center",
+                                      edit?.fontKeyOverride?.includes("Bold")
+                                        ? "bg-primary/15 border-primary/50 text-primary"
+                                        : "bg-secondary/50 border-border",
+                                    )}
+                                    title="Negrito"
+                                  >
+                                    <Bold className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const cur = edit?.fontKeyOverride ?? "Helvetica";
+                                      const isItalic = cur.includes("Oblique") || cur.includes("Italic");
+                                      let next: FontKey = cur;
+                                      if (isItalic) {
+                                        next = (cur.includes("Helvetica") ? "Helvetica" : cur.includes("Times") ? "TimesRoman" : cur) as FontKey;
+                                      } else {
+                                        next = cur.startsWith("Times") ? "TimesRomanItalic" : "HelveticaOblique";
+                                      }
+                                      updateTextEdit(t.id, { fontKeyOverride: next });
+                                    }}
+                                    className={cn(
+                                      "h-7 w-7 rounded border flex items-center justify-center",
+                                      (edit?.fontKeyOverride?.includes("Oblique") || edit?.fontKeyOverride?.includes("Italic"))
+                                        ? "bg-primary/15 border-primary/50 text-primary"
+                                        : "bg-secondary/50 border-border",
+                                    )}
+                                    title="Itálico"
+                                  >
+                                    <Italic className="w-3.5 h-3.5" />
+                                  </button>
+                                  <input
+                                    type="color"
+                                    value={edit?.colorOverride || "#000000"}
+                                    onChange={(e) =>
+                                      updateTextEdit(t.id, { colorOverride: e.target.value })
+                                    }
+                                    className="h-7 w-7 rounded border border-border cursor-pointer bg-transparent"
+                                    title="Cor"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => {
+                                      resetTextEdit(t.id);
+                                      setEditingExtractedId(null);
+                                    }}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => setEditingExtractedId(null)}
+                                  >
+                                    OK
+                                  </Button>
+                                </div>
+                              </>
+
                             ) : (
                               <button
                                 onClick={() => setEditingExtractedId(t.id)}
