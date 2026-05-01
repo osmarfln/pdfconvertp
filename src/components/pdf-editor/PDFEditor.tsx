@@ -478,11 +478,11 @@ export function PDFEditor() {
     if (tool === "edit-text") {
       const point = getOverlayPoint(e);
       if (!point) return;
-      const target = findTextAtPoint(point.x, point.y);
+      const target = findTextAtPoint(point.x, point.y) ?? findErasedTextAtPoint(point.x, point.y);
       if (target) {
         e.preventDefault();
         e.stopPropagation();
-        updateTextEdit(target.id, { newText: textEdits[target.id]?.newText ?? target.originalText });
+        updateTextEdit(target.id, { newText: textEdits[target.id]?.newText ?? "" });
         setEditingExtractedId(target.id);
       } else {
         setEditingExtractedId(null);
@@ -722,6 +722,42 @@ export function PDFEditor() {
         .sort((a, b) => a.distance - b.distance)[0]?.text;
     },
     [extractedTexts, pageIndex],
+  );
+
+  const findErasedTextAtPoint = useCallback(
+    (x: number, y: number) => {
+      const erasers = annotations.filter(
+        (ann): ann is EraseAnnotation =>
+          ann.page === pageIndex &&
+          ann.type === "erase" &&
+          x >= ann.x &&
+          x <= ann.x + ann.width &&
+          y >= ann.y &&
+          y <= ann.y + ann.height,
+      );
+      if (!erasers.length) return undefined;
+
+      return extractedTexts
+        .filter(
+          (t) =>
+            t.page === pageIndex &&
+            erasers.some((eraser) =>
+              rectanglesIntersect(eraser, {
+                x: t.overlayX - 4,
+                y: t.overlayY - 4,
+                width: t.overlayWidth + 8,
+                height: t.overlayHeight + 10,
+              }),
+            ),
+        )
+        .map((t) => {
+          const centerX = t.overlayX + t.overlayWidth / 2;
+          const centerY = t.overlayY + t.overlayHeight / 2;
+          return { text: t, distance: Math.hypot(x - centerX, y - centerY) };
+        })
+        .sort((a, b) => a.distance - b.distance)[0]?.text;
+    },
+    [annotations, extractedTexts, pageIndex],
   );
 
   const rotatePage = () => {
