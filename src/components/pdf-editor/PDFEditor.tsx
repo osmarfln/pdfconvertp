@@ -1926,13 +1926,17 @@ export function PDFEditor() {
                   {tool === "edit-text" &&
                     annotations
                       .filter((ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex)
-                      .map((ann) => {
-                        const isHovered = hoveredEraseId === ann.id;
-                        const hasText = !!Object.values(textEdits).find(
-                          (te) => te.extractedId === `tv-${ann.page}-${ann.id}` && te.newText,
-                        );
-                        // Hide the hint completely once the user has typed something here.
-                        if (hasText && !isHovered) return null;
+                       .map((ann) => {
+                         const isHovered = hoveredEraseId === ann.id;
+                         const virtualId = `tv-${ann.page}-${ann.id}`;
+                         const hasText = !!Object.values(textEdits).find(
+                           (te) => te.extractedId === virtualId && te.newText,
+                         );
+                         const isBeingEdited = editingExtractedId === virtualId;
+                         // Hide the hint while editing or after typing — avoids the
+                         // half-blue / half-white divided look around the input.
+                         if (isBeingEdited) return null;
+                         if (hasText && !isHovered) return null;
                         return (
                           <div
                             key={`erase-hint-${ann.id}`}
