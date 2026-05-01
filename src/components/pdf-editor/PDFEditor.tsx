@@ -2078,7 +2078,7 @@ function AnnotationView({
           width: ann.width,
           height: ann.height,
           background: "white",
-          border: "1px dashed rgba(0,0,0,0.2)",
+          border: selectable ? "1px dashed rgba(0,0,0,0.2)" : "none",
         }}
         className="group"
       >
