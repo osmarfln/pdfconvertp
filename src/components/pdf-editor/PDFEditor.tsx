@@ -567,21 +567,23 @@ export function PDFEditor() {
       });
 
       const c = hexToRgb01(edit.colorOverride || "#000000");
-      page.drawText(edit.newText, {
-        x: original.pdfX,
-        y: original.pdfY,
-        size: fontSize,
-        font,
-        color: rgb(c.r, c.g, c.b),
-      });
+      if (edit.newText.trim()) {
+        page.drawText(edit.newText, {
+          x: original.pdfX,
+          y: original.pdfY,
+          size: fontSize,
+          font,
+          color: rgb(c.r, c.g, c.b),
+        });
+      }
     }
 
     for (const ann of annotations) {
       const page = pages[ann.page];
       if (!page) continue;
       const { width: pw, height: ph } = page.getSize();
-      const sx = pw / pageDims.width;
-      const sy = ph / pageDims.height;
+      const sx = pw / (ann.pageWidth || pageDims.width || pw);
+      const sy = ph / (ann.pageHeight || pageDims.height || ph);
       const c = hexToRgb01(ann.color || "#000000");
 
       if (ann.type === "text") {
