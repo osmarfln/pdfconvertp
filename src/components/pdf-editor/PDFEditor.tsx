@@ -758,6 +758,38 @@ export function PDFEditor() {
     [extractedTexts, pageIndex],
   );
 
+  const findEraseAtPoint = useCallback(
+    (x: number, y: number) =>
+      annotations
+        .filter(
+          (ann): ann is EraseAnnotation =>
+            ann.page === pageIndex &&
+            ann.type === "erase" &&
+            x >= ann.x &&
+            x <= ann.x + ann.width &&
+            y >= ann.y &&
+            y <= ann.y + ann.height,
+        )
+        .at(-1),
+    [annotations, pageIndex],
+  );
+
+  const isExtractedTextErased = useCallback(
+    (text: ExtractedText) =>
+      annotations.some(
+        (ann): ann is EraseAnnotation =>
+          ann.type === "erase" &&
+          ann.page === text.page &&
+          rectanglesIntersect(ann, {
+            x: text.overlayX - 4,
+            y: text.overlayY - 4,
+            width: text.overlayWidth + 8,
+            height: text.overlayHeight + 10,
+          }),
+      ),
+    [annotations],
+  );
+
   const findErasedTextAtPoint = useCallback(
     (x: number, y: number) => {
       const erasers = annotations.filter(
