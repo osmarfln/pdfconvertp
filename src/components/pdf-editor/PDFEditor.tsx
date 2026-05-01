@@ -1130,6 +1130,69 @@ export function PDFEditor() {
           </ScrollArea>
         </div>
       </div>
+
+      <Dialog
+        open={showCompare}
+        onOpenChange={(o) => {
+          setShowCompare(o);
+          if (!o) {
+            if (compareUrls.before) URL.revokeObjectURL(compareUrls.before);
+            if (compareUrls.after) URL.revokeObjectURL(compareUrls.after);
+            setCompareUrls({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitCompare className="w-5 h-5 text-primary" />
+              Comparar — Antes e Depois
+              {Object.keys(textEdits).length > 0 && (
+                <span className="ml-2 text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-full">
+                  {Object.keys(textEdits).length} alteração(ões) de texto
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {Object.keys(textEdits).length > 0 && (
+            <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1.5 max-h-32 overflow-auto">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Alterações:</p>
+              {Object.values(textEdits).map((edit) => {
+                const orig = extractedTexts.find((t) => t.id === edit.extractedId);
+                if (!orig) return null;
+                return (
+                  <div key={edit.extractedId} className="text-xs flex flex-wrap items-center gap-1.5">
+                    <span className="text-muted-foreground">pág {edit.page + 1}:</span>
+                    <span className="line-through text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">
+                      {orig.originalText}
+                    </span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className="text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      {edit.newText}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0">
+            <div className="flex flex-col min-h-0">
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Antes (original)</p>
+              {compareUrls.before && (
+                <iframe src={compareUrls.before} className="flex-1 w-full rounded-lg border border-border bg-white" title="Antes" />
+              )}
+            </div>
+            <div className="flex flex-col min-h-0">
+              <p className="text-xs font-semibold text-primary mb-1.5">Depois (editado)</p>
+              {compareUrls.after && (
+                <iframe src={compareUrls.after} className="flex-1 w-full rounded-lg border border-primary/40 bg-white" title="Depois" />
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
