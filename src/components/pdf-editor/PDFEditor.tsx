@@ -212,6 +212,25 @@ export function PDFEditor() {
   const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [compareUrls, setCompareUrls] = useState<{ before?: string; after?: string }>({});
+  const [comparePages, setComparePages] = useState<
+    {
+      page: number;
+      width: number;
+      height: number;
+      beforeImg: string;
+      afterImg: string;
+      edits: {
+        id: string;
+        overlayX: number;
+        overlayY: number;
+        overlayWidth: number;
+        overlayHeight: number;
+        originalText: string;
+        newText: string;
+      }[];
+    }[]
+  >([]);
+  const [compareLoading, setCompareLoading] = useState(false);
   const [history, setHistory] = useState<Annotation[][]>([]);
   const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
