@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Image, FileSpreadsheet, Search, Download, Trash2, MoreVertical, ArrowRightLeft, Loader2, Eye, X } from "lucide-react";
+import { FileText, Image, FileSpreadsheet, Search, Download, Trash2, MoreVertical, ArrowRightLeft, Loader2, Eye, X, Archive } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
