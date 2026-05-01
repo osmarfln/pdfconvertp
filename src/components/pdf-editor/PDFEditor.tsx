@@ -266,9 +266,20 @@ export function PDFEditor() {
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const moveTextRef = useRef<{
+    extractedId: string;
+    eraseArea: EraseAnnotation;
+    startClientX: number;
+    startClientY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+    boxWidth: number;
+    boxHeight: number;
+  } | null>(null);
   const drawingRef = useRef<{ startX: number; startY: number; current?: Annotation } | null>(null);
   const [drawingPreview, setDrawingPreview] = useState<Annotation | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [isMovingText, setIsMovingText] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
