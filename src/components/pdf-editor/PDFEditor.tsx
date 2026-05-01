@@ -233,6 +233,10 @@ export function PDFEditor() {
     }[]
   >([]);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewPages, setPreviewPages] = useState<{ page: number; img: string; width: number; height: number }[]>([]);
+  const [previewBytes, setPreviewBytes] = useState<Uint8Array | null>(null);
   const [history, setHistory] = useState<Annotation[][]>([]);
   const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -809,6 +813,55 @@ export function PDFEditor() {
     }
   };
 
+  const openPreview = async () => {
+    if (!pdfBytes) return;
+    setShowPreview(true);
+    setPreviewLoading(true);
+    setPreviewPages([]);
+    try {
+      const out = await buildEditedPdfBytes();
+      setPreviewBytes(out);
+      const doc = await pdfjsLib.getDocument({ data: (out as Uint8Array).slice(0) }).promise;
+      const built: { page: number; img: string; width: number; height: number }[] = [];
+      const RENDER_SCALE = 1.4;
+      for (let i = 0; i < doc.numPages; i++) {
+        const page = await doc.getPage(i + 1);
+        const viewport = page.getViewport({ scale: RENDER_SCALE });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        built.push({
+          page: i,
+          img: canvas.toDataURL("image/png"),
+          width: viewport.width,
+          height: viewport.height,
+        });
+      }
+      setPreviewPages(built);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao gerar pré-visualização");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const downloadPreviewPDF = () => {
+    if (!previewBytes) return;
+    const blob = new Blob([previewBytes as BlobPart], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = pdfName.replace(/\.pdf$/i, "") + "-editado.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast.success("PDF baixado");
+  };
+
   const openCompare = async () => {
     if (!pdfBytes) return;
     setCompareLoading(true);
@@ -1046,9 +1099,12 @@ export function PDFEditor() {
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             {isFullscreen ? "Sair tela cheia" : "Tela cheia"}
           </Button>
+          <Button variant="outline" size="sm" onClick={openPreview} className="gap-2">
+            <Eye className="w-4 h-4" /> Pré-visualizar
+          </Button>
           <Button variant="glow" size="sm" onClick={exportPDF} disabled={exporting} className="gap-2">
             <Download className="w-4 h-4" />
-            {exporting ? "Salvando..." : "Salvar e Baixar"}
+            {exporting ? "Salvando..." : "Baixar PDF"}
           </Button>
         </div>
       </div>
@@ -1617,6 +1673,64 @@ export function PDFEditor() {
         </div>
       </div>
 
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-6xl w-[95vw] h-[92vh] flex flex-col p-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              <Eye className="w-5 h-5 text-primary" />
+              Pré-visualização do PDF editado
+              <span className="ml-auto flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowPreview(false)}>
+                  Voltar e editar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="glow"
+                  onClick={downloadPreviewPDF}
+                  disabled={!previewBytes || previewLoading}
+                  className="gap-2"
+                >
+                  <Download className="w-4 h-4" /> Baixar PDF
+                </Button>
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Esta é a aparência final, sem marcações de edição. Confira antes de baixar.
+          </p>
+          <div className="flex-1 overflow-auto bg-muted/40 rounded-lg p-4">
+            {previewLoading ? (
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                Gerando pré-visualização...
+              </div>
+            ) : previewPages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                Nenhuma página para exibir.
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                {previewPages.map((p) => (
+                  <div
+                    key={p.page}
+                    className="bg-white shadow-lg rounded-md overflow-hidden ring-1 ring-border"
+                    style={{ width: p.width, maxWidth: "100%" }}
+                  >
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-2 py-1 bg-muted/60">
+                      Página {p.page + 1}
+                    </div>
+                    <img
+                      src={p.img}
+                      alt={`Pré-visualização página ${p.page + 1}`}
+                      style={{ width: p.width, height: p.height, display: "block" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={showCompare}
         onOpenChange={(o) => {
@@ -1964,7 +2078,7 @@ function AnnotationView({
           width: ann.width,
           height: ann.height,
           background: "white",
-          border: "1px dashed rgba(0,0,0,0.2)",
+          border: selectable ? "1px dashed rgba(0,0,0,0.2)" : "none",
         }}
         className="group"
       >
