@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { downloadFromStorage } from "@/lib/download";
+import { downloadFromStorage, shouldAutoCleanupAfterDownload } from "@/lib/download";
 
 export interface FileConversion {
   id: string;
