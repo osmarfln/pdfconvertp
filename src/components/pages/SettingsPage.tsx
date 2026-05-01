@@ -94,6 +94,7 @@ export function SettingsPage() {
       icon: Shield,
       items: [
         { label: "Excluir arquivos automaticamente após 24h", key: "auto-delete" as const },
+        { label: "Apagar PDFs gerados após o download (limpa URLs/blobs da sessão)", key: "auto-cleanup-after-download" as const },
         { label: "Autenticação em dois fatores", key: "2fa" as const },
       ],
     },
