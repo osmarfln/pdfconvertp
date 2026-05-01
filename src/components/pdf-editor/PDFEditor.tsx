@@ -1758,7 +1758,7 @@ export function PDFEditor() {
                     <span>
                       {erasedReadyCount > 0
                         ? "Clique em qualquer área apagada (destacada em amarelo) para escrever em cima com a fonte original."
-                        : "Use a Borracha para apagar um trecho — depois clique no espaço apagado para digitar o novo texto."}
+                        : "Clique em um texto do PDF para abrir uma caixa do mesmo tamanho e editar por cima."}
                     </span>
                   </>
                 )}
@@ -1950,6 +1950,7 @@ export function PDFEditor() {
                         const isEditing = editingExtractedId === t.id;
                         const textIsErased = isExtractedTextErased(t);
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
+                        const metrics = getEditBoxMetrics(t, edit);
                         return (
                           <div
                             key={t.id}
@@ -1969,8 +1970,8 @@ export function PDFEditor() {
                               position: "absolute",
                               left: t.overlayX,
                               top: t.overlayY,
-                              minWidth: Math.max(t.overlayWidth, 30),
-                              height: t.overlayHeight + 4,
+                              width: metrics.width,
+                              height: metrics.height,
                               cursor: "text",
                             }}
                             className={cn(
