@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, PDFFont, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
@@ -33,6 +33,7 @@ import {
   GitCompare,
   Maximize2,
   Minimize2,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Dialog,
