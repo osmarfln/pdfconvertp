@@ -109,7 +109,7 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
               >
-                <span className="text-foreground">Bem-vindo </span>
+                <span className="text-foreground">Seja Bem-vindos ao </span>
                 <span className="text-gradient">Convert Pro</span>
               </motion.h1>
               <motion.span
