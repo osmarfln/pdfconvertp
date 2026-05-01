@@ -324,7 +324,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   ];
 
   return (
-    <div className="glass rounded-xl p-5">
+    <div className="rounded-xl p-5 bg-transparent">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display font-semibold text-foreground">Ações Rápidas</h3>
         {healthy === false && (
@@ -348,7 +348,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
             whileTap={{ scale: 0.97 }}
             onClick={() => handleAction(action.label)}
             disabled={processingAction === action.label}
-            className="flex flex-col items-center gap-2 p-4 rounded-lg bg-secondary/50 hover:bg-secondary border border-border/50 hover:border-border transition-all disabled:opacity-50"
+            className="flex flex-col items-center gap-2 p-4 rounded-lg bg-secondary/40 backdrop-blur-md hover:bg-secondary/60 border border-border/40 hover:border-border transition-all disabled:opacity-50"
           >
             <div className={`p-2.5 rounded-lg ${action.color}`}>
               {processingAction === action.label ? (
