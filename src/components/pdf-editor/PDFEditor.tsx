@@ -1852,46 +1852,34 @@ export function PDFEditor() {
                     />
                   ))}
 
-                  {/* Highlight erased areas to indicate they are clickable for typing */}
+                  {/* Subtle highlight for erased areas — only on hover, no labels, no dashed amarelo */}
                   {tool === "edit-text" &&
                     annotations
                       .filter((ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex)
                       .map((ann) => {
                         const isHovered = hoveredEraseId === ann.id;
+                        const hasText = !!Object.values(textEdits).find(
+                          (te) => te.extractedId === `tv-${ann.page}-${ann.id}` && te.newText,
+                        );
+                        // Hide the hint completely once the user has typed something here.
+                        if (hasText && !isHovered) return null;
                         return (
                           <div
                             key={`erase-hint-${ann.id}`}
-                            className={cn(
-                              "absolute pointer-events-none rounded-sm animate-pulse",
-                              isHovered && "z-10",
-                            )}
+                            className="absolute pointer-events-none rounded-sm transition-opacity"
                             style={{
                               left: ann.x,
                               top: ann.y,
                               width: ann.width,
                               height: ann.height,
-                              border: `2.5px dashed hsl(var(${isHovered ? "--primary" : "--warning"}))`,
+                              border: isHovered
+                                ? `1.5px solid hsl(var(--primary))`
+                                : `1px dashed hsl(var(--primary) / 0.35)`,
                               background: isHovered
-                                ? "hsl(var(--primary) / 0.25)"
-                                : "hsl(var(--warning) / 0.35)",
-                              boxShadow: isHovered
-                                ? "0 0 0 3px hsl(var(--primary) / 0.4), 0 0 14px hsl(var(--primary) / 0.5)"
-                                : "0 0 0 2px hsl(var(--warning) / 0.5), 0 0 10px hsl(var(--warning) / 0.45)",
+                                ? "hsl(var(--primary) / 0.10)"
+                                : "transparent",
                             }}
-                          >
-                            {/* Always-visible label so users see exactly where to click */}
-                            <div
-                              className={cn(
-                                "absolute -top-6 left-0 flex items-center gap-1 text-[10px] font-bold rounded px-1.5 py-0.5 shadow-lg whitespace-nowrap border",
-                                isHovered
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-warning text-warning-foreground border-warning",
-                              )}
-                            >
-                              <span className="inline-block h-3 w-px bg-current animate-pulse" />
-                              {isHovered ? "Clique aqui para digitar" : "Área editável"}
-                            </div>
-                          </div>
+                          />
                         );
                       })}
 
@@ -1932,10 +1920,7 @@ export function PDFEditor() {
                               height: metrics.height,
                               cursor: "text",
                             }}
-                            className={cn(
-                              "group",
-                              changed && "ring-1 ring-primary/60 bg-white/40",
-                            )}
+                            className="group"
                           >
                             {isEditing ? (
                               <>
@@ -2129,16 +2114,10 @@ export function PDFEditor() {
                                   updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
                                   setEditingExtractedId(t.id);
                                 }}
-                                title={`Clique para editar: "${t.originalText}"`}
-                                className={cn(
-                                  "w-full h-full text-left cursor-text overflow-visible whitespace-nowrap transition-colors",
-                                  changed
-                                    ? "border border-primary/60 bg-primary/10"
-                                    : "border border-dashed border-primary/25 bg-primary/[0.03] hover:border-primary/70 hover:bg-primary/10",
-                                )}
+                                title={value ? `Clique para editar: "${value}"` : "Clique para digitar"}
+                                className="w-full h-full text-left cursor-text overflow-visible whitespace-nowrap bg-transparent border-0"
                                 style={{
-                                  background: changed && value ? "white" : undefined,
-                                  color: edit?.colorOverride || (changed ? "black" : "transparent"),
+                                  color: edit?.colorOverride || "black",
                                   fontSize: metrics.fontPx,
                                   lineHeight: `${metrics.height}px`,
                                   padding: "0 2px",
@@ -2150,7 +2129,11 @@ export function PDFEditor() {
                                       : "normal",
                                 }}
                               >
-                                {showHoverPlaceholder ? <span className="text-primary animate-pulse">| Digite aqui</span> : changed ? value : ""}
+                                {showHoverPlaceholder ? (
+                                  <span className="text-primary/70 italic">Digite aqui</span>
+                                ) : (
+                                  value || ""
+                                )}
                               </button>
                             )}
                           </div>
