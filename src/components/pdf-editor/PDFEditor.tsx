@@ -756,9 +756,12 @@ export function PDFEditor() {
               e.target.value = "";
             }}
           />
+          <Button variant="outline" size="sm" onClick={openCompare} className="gap-2">
+            <GitCompare className="w-4 h-4" /> Antes/Depois
+          </Button>
           <Button variant="glow" size="sm" onClick={exportPDF} disabled={exporting} className="gap-2">
             <Download className="w-4 h-4" />
-            {exporting ? "Exportando..." : "Baixar PDF"}
+            {exporting ? "Salvando..." : "Salvar e Baixar"}
           </Button>
         </div>
       </div>
