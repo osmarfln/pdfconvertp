@@ -1266,7 +1266,6 @@ export function PDFEditor() {
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
     { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
     { tool: "text", icon: Type, label: "Adicionar Texto" },
-    { tool: "draw", icon: Pencil, label: "Desenhar" },
     { tool: "highlight", icon: Highlighter, label: "Marca-texto" },
     { tool: "rect", icon: Square, label: "Retângulo" },
     { tool: "ellipse", icon: CircleIcon, label: "Elipse" },
