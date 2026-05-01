@@ -664,18 +664,40 @@ export function PDFEditor() {
     }
   };
 
-  const updateTextEdit = (extractedId: string, newText: string) => {
+  const updateTextEdit = (
+    extractedId: string,
+    patch: Partial<Omit<TextEdit, "extractedId" | "page">>,
+  ) => {
     const original = extractedTexts.find((t) => t.id === extractedId);
     if (!original) return;
     setTextEdits((prev) => {
-      if (newText === original.originalText) {
+      const existing = prev[extractedId];
+      const merged: TextEdit = {
+        extractedId,
+        page: original.page,
+        newText: existing?.newText ?? original.originalText,
+        fontKeyOverride: existing?.fontKeyOverride,
+        fontSizeOverride: existing?.fontSizeOverride,
+        colorOverride: existing?.colorOverride,
+        ...patch,
+      };
+      const isUnchanged =
+        merged.newText === original.originalText &&
+        !merged.fontKeyOverride &&
+        merged.fontSizeOverride === undefined &&
+        !merged.colorOverride;
+      if (isUnchanged) {
         const { [extractedId]: _, ...rest } = prev;
         return rest;
       }
-      return {
-        ...prev,
-        [extractedId]: { extractedId, page: original.page, newText },
-      };
+      return { ...prev, [extractedId]: merged };
+    });
+  };
+
+  const resetTextEdit = (extractedId: string) => {
+    setTextEdits((prev) => {
+      const { [extractedId]: _, ...rest } = prev;
+      return rest;
     });
   };
 
