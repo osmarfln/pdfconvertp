@@ -1487,19 +1487,67 @@ export function PDFEditor() {
             </div>
           </div>
 
-          {tool === "edit-text" && (
-            <div className="glass rounded-xl px-3 py-2 text-xs text-muted-foreground flex items-center gap-2 border border-primary/30">
-              <Edit3 className="w-3.5 h-3.5 text-primary shrink-0" />
-              <span>
-                Clique sobre qualquer trecho de texto do PDF para editar. As alterações ficam destacadas e são aplicadas ao salvar.
-              </span>
-              {Object.keys(textEdits).length > 0 && (
-                <span className="ml-auto bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">
-                  {Object.keys(textEdits).length} alteração(ões)
-                </span>
-              )}
-            </div>
-          )}
+          {tool === "edit-text" && (() => {
+            const erasedReadyCount = extractedTexts.filter((t) => {
+              if (t.page !== pageIndex) return false;
+              return annotations.some(
+                (ann): ann is EraseAnnotation =>
+                  ann.type === "erase" &&
+                  ann.page === pageIndex &&
+                  rectanglesIntersect(ann as EraseAnnotation, {
+                    x: t.overlayX - 4,
+                    y: t.overlayY - 4,
+                    width: t.overlayWidth + 8,
+                    height: t.overlayHeight + 10,
+                  }),
+              );
+            }).length;
+            const isTyping = editingExtractedId !== null;
+            return (
+              <div
+                className={cn(
+                  "glass rounded-xl px-3 py-2 text-xs flex items-center gap-2 border transition-colors",
+                  isTyping
+                    ? "border-success/60 bg-success/5 text-foreground"
+                    : "border-primary/30 text-muted-foreground",
+                )}
+              >
+                {isTyping ? (
+                  <>
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-success" />
+                    </span>
+                    <span className="font-semibold text-success">Modo digitação ativo</span>
+                    <span className="text-muted-foreground">
+                      — digite o novo texto. <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Enter</kbd> confirma · <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Esc</kbd> cancela
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>
+                      {erasedReadyCount > 0
+                        ? "Clique em qualquer área apagada (destacada em amarelo) para escrever em cima com a fonte original."
+                        : "Use a Borracha para apagar um trecho — depois clique no espaço apagado para digitar o novo texto."}
+                    </span>
+                  </>
+                )}
+                <div className="ml-auto flex items-center gap-2">
+                  {erasedReadyCount > 0 && !isTyping && (
+                    <span className="bg-warning/20 text-warning border border-warning/40 px-2 py-0.5 rounded-full font-medium animate-pulse">
+                      {erasedReadyCount} área(s) prontas
+                    </span>
+                  )}
+                  {Object.keys(textEdits).length > 0 && (
+                    <span className="bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">
+                      {Object.keys(textEdits).length} alteração(ões)
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {tool === "pan" && (
             <div className="glass rounded-xl px-3 py-2 text-xs text-muted-foreground flex items-center gap-2 border border-primary/30">
@@ -1570,6 +1618,26 @@ export function PDFEditor() {
                       onFinishEdit={() => setEditingTextId(null)}
                     />
                   ))}
+
+                  {/* Highlight erased areas to indicate they are clickable for typing */}
+                  {tool === "edit-text" &&
+                    annotations
+                      .filter((ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex)
+                      .map((ann) => (
+                        <div
+                          key={`erase-hint-${ann.id}`}
+                          className="absolute pointer-events-none rounded-sm animate-pulse"
+                          style={{
+                            left: ann.x,
+                            top: ann.y,
+                            width: ann.width,
+                            height: ann.height,
+                            border: "1.5px dashed hsl(var(--warning))",
+                            background: "hsl(var(--warning) / 0.12)",
+                            boxShadow: "0 0 0 1px hsl(var(--warning) / 0.3)",
+                          }}
+                        />
+                      ))}
 
                   {/* Editable extracted text overlays */}
                   {tool === "edit-text" &&
