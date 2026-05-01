@@ -19,7 +19,12 @@ import {
   RadialBarChart,
   RadialBar,
 } from "recharts";
-import { Activity, Wifi, Gauge, Users, TrendingUp, Signal } from "lucide-react";
+import { Activity, Wifi, Gauge, Users, TrendingUp, Signal, Bell, BellOff, Settings2, AlertTriangle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface UserSlim {
   is_blocked: boolean;
@@ -83,6 +88,76 @@ export function AnalyticsCharts({ users }: Props) {
   const [currentSupabase, setCurrentSupabase] = useState(0);
   const [currentInternet, setCurrentInternet] = useState(0);
 
+  // ===== Alertas configuráveis de latência =====
+  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(() => {
+    return localStorage.getItem("lat_alerts_enabled") !== "0";
+  });
+  const [browserNotif, setBrowserNotif] = useState<boolean>(() => {
+    return localStorage.getItem("lat_alerts_browser") === "1";
+  });
+  const [thresholdBackend, setThresholdBackend] = useState<number>(() => {
+    return Number(localStorage.getItem("lat_threshold_backend")) || 500;
+  });
+  const [thresholdInternet, setThresholdInternet] = useState<number>(() => {
+    return Number(localStorage.getItem("lat_threshold_internet")) || 800;
+  });
+  const [alertHistory, setAlertHistory] = useState<
+    { time: string; type: "Backend" | "Internet"; value: number; threshold: number }[]
+  >([]);
+  const lastAlertRef = useState<{ sb: number; net: number }>({ sb: 0, net: 0 })[0];
+
+  useEffect(() => {
+    localStorage.setItem("lat_alerts_enabled", alertsEnabled ? "1" : "0");
+  }, [alertsEnabled]);
+  useEffect(() => {
+    localStorage.setItem("lat_alerts_browser", browserNotif ? "1" : "0");
+    if (browserNotif && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, [browserNotif]);
+  useEffect(() => {
+    localStorage.setItem("lat_threshold_backend", String(thresholdBackend));
+  }, [thresholdBackend]);
+  useEffect(() => {
+    localStorage.setItem("lat_threshold_internet", String(thresholdInternet));
+  }, [thresholdInternet]);
+
+  const fireAlert = (type: "Backend" | "Internet", value: number, threshold: number) => {
+    const now = Date.now();
+    const key = type === "Backend" ? "sb" : "net";
+    // Deduplica: 1 alerta por tipo a cada 30s
+    if (now - (lastAlertRef as any)[key] < 30000) return;
+    (lastAlertRef as any)[key] = now;
+
+    toast.warning(`Latência alta — ${type}`, {
+      description: `${value}ms (limite ${threshold}ms). Conexão pode estar degradada.`,
+      icon: <AlertTriangle className="w-4 h-4" />,
+    });
+
+    setAlertHistory((prev) =>
+      [
+        {
+          time: new Date().toLocaleTimeString("pt-BR"),
+          type,
+          value,
+          threshold,
+        },
+        ...prev,
+      ].slice(0, 8)
+    );
+
+    if (browserNotif && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(`Latência alta — ${type}`, {
+          body: `${value}ms acima do limite (${threshold}ms)`,
+          icon: "/favicon.ico",
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     const measure = async () => {
@@ -99,6 +174,13 @@ export function AnalyticsCharts({ users }: Props) {
         const next = [...prev, { time, supabase: Math.max(sb, 0), internet: Math.max(net, 0) }];
         return next.slice(-20);
       });
+
+      if (alertsEnabled) {
+        if (sb > 0 && sb > thresholdBackend) fireAlert("Backend", sb, thresholdBackend);
+        if (net > 0 && net > thresholdInternet) fireAlert("Internet", net, thresholdInternet);
+        if (sb < 0) fireAlert("Backend", 0, thresholdBackend);
+        if (net < 0) fireAlert("Internet", 0, thresholdInternet);
+      }
     };
     measure();
     const id = setInterval(measure, 4000);
@@ -106,7 +188,7 @@ export function AnalyticsCharts({ users }: Props) {
       mounted = false;
       clearInterval(id);
     };
-  }, []);
+  }, [alertsEnabled, thresholdBackend, thresholdInternet, browserNotif]);
 
   const userStatusData = useMemo(() => {
     const active = users.filter((u) => !u.is_blocked).length;
