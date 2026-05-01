@@ -1619,6 +1619,26 @@ export function PDFEditor() {
                     />
                   ))}
 
+                  {/* Highlight erased areas to indicate they are clickable for typing */}
+                  {tool === "edit-text" &&
+                    annotations
+                      .filter((ann) => ann.type === "erase" && ann.page === pageIndex)
+                      .map((ann) => (
+                        <div
+                          key={`erase-hint-${ann.id}`}
+                          className="absolute pointer-events-none rounded-sm animate-pulse"
+                          style={{
+                            left: ann.x,
+                            top: ann.y,
+                            width: ann.width,
+                            height: ann.height,
+                            border: "1.5px dashed hsl(var(--warning))",
+                            background: "hsl(var(--warning) / 0.12)",
+                            boxShadow: "0 0 0 1px hsl(var(--warning) / 0.3)",
+                          }}
+                        />
+                      ))}
+
                   {/* Editable extracted text overlays */}
                   {tool === "edit-text" &&
                     extractedTexts
