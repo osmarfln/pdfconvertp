@@ -11,6 +11,7 @@ interface SettingsState {
   "notify-error": boolean;
   "notify-weekly": boolean;
   "auto-delete": boolean;
+  "auto-cleanup-after-download": boolean;
   "2fa": boolean;
   "dark-mode": boolean;
   "reduce-motion": boolean;
@@ -24,6 +25,7 @@ const defaultSettings: SettingsState = {
   "notify-error": true,
   "notify-weekly": false,
   "auto-delete": false,
+  "auto-cleanup-after-download": false,
   "2fa": false,
   "dark-mode": true,
   "reduce-motion": false,
@@ -92,6 +94,7 @@ export function SettingsPage() {
       icon: Shield,
       items: [
         { label: "Excluir arquivos automaticamente após 24h", key: "auto-delete" as const },
+        { label: "Apagar PDFs gerados após o download (limpa URLs/blobs da sessão)", key: "auto-cleanup-after-download" as const },
         { label: "Autenticação em dois fatores", key: "2fa" as const },
       ],
     },

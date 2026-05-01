@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { downloadFromStorage } from "@/lib/download";
+import { downloadFromStorage, shouldAutoCleanupAfterDownload } from "@/lib/download";
 
 export interface FileConversion {
   id: string;
@@ -125,7 +125,24 @@ export function useFileConversions() {
         const downloadName = `${baseName}.${targetFormat}`;
         const ok = await downloadFromStorage(convertedPath, downloadName);
         if (ok) {
-          toast.success(`${downloadName} baixado automaticamente!`, { duration: 5000 });
+          // Optional auto-cleanup: delete the generated file from storage and the
+          // conversion record so URLs/blobs don't accumulate in the session.
+          if (shouldAutoCleanupAfterDownload()) {
+            // Give the browser a moment to start the actual download stream
+            // before we revoke access to the file.
+            setTimeout(async () => {
+              try {
+                await supabase.storage.from("documents").remove([convertedPath]);
+                await supabase.from("file_conversions").delete().eq("id", conversionId);
+                await fetchConversions();
+              } catch (cleanupErr) {
+                console.warn("[Convert] Auto-cleanup failed:", cleanupErr);
+              }
+            }, 8000);
+            toast.success(`${downloadName} baixado. Removendo da sua sessão...`, { duration: 5000 });
+          } else {
+            toast.success(`${downloadName} baixado automaticamente!`, { duration: 5000 });
+          }
         } else {
           toast.success("Conversão concluída! Acesse Meus Arquivos para baixar.", { duration: 6000 });
         }
