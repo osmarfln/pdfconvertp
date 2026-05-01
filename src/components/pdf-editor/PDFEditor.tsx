@@ -496,29 +496,42 @@ export function PDFEditor() {
           newText: textEdits[target.id]?.newText ?? (erasedTarget || isExtractedTextErased(target) ? "" : target.originalText),
         });
         setEditingExtractedId(target.id);
-      } else if (findEraseAtPoint(point.x, point.y)) {
+      } else {
+        const eraseArea = findEraseAtPoint(point.x, point.y);
+        if (!eraseArea) {
+          setEditingExtractedId(null);
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
-        const ann: TextAnnotation = {
-          id: uid(),
+        const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
+        const overlayFontSize = Math.max(12, Math.min(eraseArea.height * 0.7, 48));
+        const pdfFontSize = overlayFontSize / scale;
+        const pageHeightPdf = (pageDims.height || eraseArea.height) / scale;
+        const virtual: ExtractedText = existingVirtual ?? {
+          id: `tv-${pageIndex}-${eraseArea.id}`,
           page: pageIndex,
-          type: "text",
-          x: point.x,
-          y: point.y,
-          text: "",
-          fontSize,
-          fontKey,
-          color: "#000000",
-          opacity: 1,
-          pageWidth: pageDims.width,
-          pageHeight: pageDims.height,
+          pdfX: eraseArea.x / scale,
+          pdfY: pageHeightPdf - (eraseArea.y + eraseArea.height) / scale + pdfFontSize * 0.2,
+          pdfWidth: eraseArea.width / scale,
+          pdfHeight: eraseArea.height / scale,
+          fontSize: pdfFontSize,
+          fontName: fontKey,
+          originalText: "",
+          overlayX: eraseArea.x,
+          overlayY: eraseArea.y,
+          overlayWidth: Math.max(eraseArea.width, 80),
+          overlayHeight: Math.max(eraseArea.height, overlayFontSize + 6),
+          overlayFontSize,
         };
-        pushHistory();
-        setAnnotations((a) => [...a, ann]);
-        setEditingExtractedId(null);
-        setEditingTextId(ann.id);
-      } else {
-        setEditingExtractedId(null);
+        if (!existingVirtual) {
+          setExtractedTexts((prev) => [...prev, virtual]);
+        }
+        setTextEdits((prev) => ({
+          ...prev,
+          [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
+        }));
+        setEditingExtractedId(virtual.id);
       }
       return;
     }
