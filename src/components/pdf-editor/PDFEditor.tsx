@@ -511,18 +511,6 @@ export function PDFEditor() {
     if (tool === "edit-text") {
       const point = getOverlayPoint(e);
       if (!point) return;
-      const erasedTarget = findErasedTextAtPoint(point.x, point.y);
-      const target = erasedTarget ?? findTextAtPoint(point.x, point.y);
-      if (target) {
-        e.preventDefault();
-        e.stopPropagation();
-        updateTextEdit(target.id, {
-          newText: textEdits[target.id]?.newText ?? (erasedTarget || isExtractedTextErased(target) ? "" : target.originalText),
-        });
-        setEditingExtractedId(target.id);
-        return;
-      }
-
       const eraseArea = findEraseAtPoint(point.x, point.y);
       if (eraseArea) {
         e.preventDefault();
@@ -539,36 +527,9 @@ export function PDFEditor() {
         setEditingExtractedId(virtual.id);
         return;
       }
-
-      // Fallback: escrita livre — cria caixa de texto editável no ponto clicado
       e.preventDefault();
       e.stopPropagation();
-      const overlayFontSize = Math.max(12, fontSize * scale);
-      const pdfFontSize = fontSize;
-      const pageHeightPdf = (pageDims.height || 0) / scale;
-      const directId = `tv-${pageIndex}-direct-${uid()}`;
-      const virtualDirect: ExtractedText = {
-        id: directId,
-        page: pageIndex,
-        pdfX: point.x / scale,
-        pdfY: pageHeightPdf - point.y / scale,
-        pdfWidth: 200 / scale,
-        pdfHeight: overlayFontSize / scale,
-        fontSize: pdfFontSize,
-        fontName: fontKey,
-        originalText: "",
-        overlayX: point.x,
-        overlayY: point.y - overlayFontSize / 2,
-        overlayWidth: 200,
-        overlayHeight: overlayFontSize + 6,
-        overlayFontSize,
-      };
-      setExtractedTexts((prev) => [...prev, virtualDirect]);
-      setTextEdits((prev) => ({
-        ...prev,
-        [directId]: { extractedId: directId, page: pageIndex, newText: "" },
-      }));
-      setEditingExtractedId(directId);
+      setEditingExtractedId(null);
       return;
     }
     if (tool === "pan") {
@@ -806,27 +767,6 @@ export function PDFEditor() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const findTextAtPoint = useCallback(
-    (x: number, y: number) => {
-      const padding = 10;
-      return extractedTexts
-        .filter((t) => t.page === pageIndex)
-        .map((t) => {
-          const left = t.overlayX - padding;
-          const top = t.overlayY - padding;
-          const right = t.overlayX + Math.max(t.overlayWidth, 20) + padding;
-          const bottom = t.overlayY + Math.max(t.overlayHeight, 12) + padding;
-          const inside = x >= left && x <= right && y >= top && y <= bottom;
-          const centerX = t.overlayX + t.overlayWidth / 2;
-          const centerY = t.overlayY + t.overlayHeight / 2;
-          return { text: t, inside, distance: Math.hypot(x - centerX, y - centerY) };
-        })
-        .filter((item) => item.inside)
-        .sort((a, b) => a.distance - b.distance)[0]?.text;
-    },
-    [extractedTexts, pageIndex],
-  );
-
   const findEraseAtPoint = useCallback(
     (x: number, y: number) => {
       const matches = annotations.filter(
@@ -941,7 +881,10 @@ export function PDFEditor() {
       const page = pages[edit.page];
       if (!page) continue;
 
-      const isDirectEdit = original.id.startsWith("tv-") && original.id.includes("-direct-");
+      const isEraseAreaEdit = annotations.some(
+        (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === original.page && original.id === `tv-${original.page}-${ann.id}`,
+      );
+      if (original.id.startsWith("tv-") && !isEraseAreaEdit) continue;
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
@@ -956,16 +899,14 @@ export function PDFEditor() {
       const newTextWidth = font.widthOfTextAtSize(edit.newText || " ", fontSize);
       const coverWidth = Math.max(original.pdfWidth, newTextWidth) + padX * 2;
       const coverHeight = ascent + descent + padTop + padBottom;
-      if (!isDirectEdit || edit.newText.trim()) {
-        page.drawRectangle({
-          x: original.pdfX - padX,
-          y: original.pdfY - descent - padBottom,
-          width: coverWidth,
-          height: coverHeight,
-          color: rgb(1, 1, 1),
-          opacity: 1,
-        });
-      }
+      page.drawRectangle({
+        x: original.pdfX - padX,
+        y: original.pdfY - descent - padBottom,
+        width: coverWidth,
+        height: coverHeight,
+        color: rgb(1, 1, 1),
+        opacity: 1,
+      });
 
       const c = hexToRgb01(edit.colorOverride || "#000000");
       if (edit.newText.trim()) {
@@ -1300,7 +1241,7 @@ export function PDFEditor() {
       toast.info(
         hasReadyArea
           ? "Modo Editar Texto ativo: clique na área apagada destacada para digitar."
-          : "Modo Editar Texto ativo: clique em um texto existente para editar.",
+          : "Modo Editar Texto ativo: apague uma área com a borracha antes de digitar.",
       );
     }
   };
@@ -1789,7 +1730,7 @@ export function PDFEditor() {
                     <span>
                       {erasedReadyCount > 0
                         ? "Clique em qualquer área apagada (destacada em amarelo) para escrever em cima com a fonte original."
-                        : "Clique em um texto do PDF para abrir uma caixa do mesmo tamanho e editar por cima."}
+                        : "Use a borracha para apagar uma área; depois clique na área apagada para digitar."}
                     </span>
                   </>
                 )}
@@ -1851,23 +1792,7 @@ export function PDFEditor() {
                   onDoubleClick={(e) => {
                     const point = getOverlayPoint(e);
                     if (!point) return;
-                    // Try existing extracted text first (real text on the PDF)
-                    const target =
-                      findErasedTextAtPoint(point.x, point.y) ??
-                      findTextAtPoint(point.x, point.y);
-                    if (target) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (tool !== "edit-text") setTool("edit-text");
-                      updateTextEdit(target.id, {
-                        newText:
-                          textEdits[target.id]?.newText ??
-                          (isExtractedTextErased(target) ? "" : target.originalText),
-                      });
-                      setEditingExtractedId(target.id);
-                      return;
-                    }
-                    // Fallback: existing erased area
+                    // Existing erased area only: do not create/edit text in blank areas.
                     const eraseArea = findEraseAtPoint(point.x, point.y);
                     if (eraseArea) {
                       e.preventDefault();
@@ -1975,11 +1900,13 @@ export function PDFEditor() {
                     extractedTexts
                       .filter((t) => t.page === pageIndex)
                       .map((t) => {
+                        const isEraseAreaText = t.id.startsWith(`tv-${pageIndex}-`);
+                        if (!isEraseAreaText) return null;
                         const edit = textEdits[t.id];
                         const value = edit ? edit.newText : t.originalText;
                         const changed = !!edit;
                         const isEditing = editingExtractedId === t.id;
-                        const textIsErased = isExtractedTextErased(t);
+                        const textIsErased = true;
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         const metrics = getEditBoxMetrics(t, edit);
                         return (
