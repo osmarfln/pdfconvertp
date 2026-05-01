@@ -51,6 +51,7 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +114,8 @@ interface BaseAnnotation {
   type: Tool;
   color: string;
   opacity: number;
+  pageWidth?: number;
+  pageHeight?: number;
 }
 
 interface TextAnnotation extends BaseAnnotation {
@@ -165,6 +168,18 @@ type Annotation =
   | EraseAnnotation;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+const getFontFamily = (fontKeyOrName?: string) => {
+  const name = (fontKeyOrName || "").toLowerCase();
+  if (name.includes("times") || name.includes("serif")) return "Times, serif";
+  if (name.includes("courier") || name.includes("mono")) return "Courier, monospace";
+  return "Helvetica, Arial, sans-serif";
+};
+
+const rectanglesIntersect = (
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 
 function hexToRgb01(hex: string) {
   const m = hex.replace("#", "");
