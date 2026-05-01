@@ -2044,7 +2044,8 @@ export function PDFEditor() {
                                     color: edit?.colorOverride || "black",
                                     border: "1px solid hsl(var(--primary))",
                                     outline: "none",
-                                    padding: "0 2px",
+                                    padding: "0 4px",
+                                    textAlign: edit?.align ?? "left",
                                     fontFamily: (() => {
                                       const fk = edit?.fontKeyOverride;
                                       if (fk?.startsWith("Times")) return "Times, serif";
@@ -2237,7 +2238,8 @@ export function PDFEditor() {
                                   color: edit?.colorOverride || "black",
                                   fontSize: metrics.fontPx,
                                   lineHeight: `${metrics.height}px`,
-                                  padding: "0 2px",
+                                  padding: "0 4px",
+                                  textAlign: edit?.align ?? "left",
                                   fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
                                   fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
                                   fontStyle:
