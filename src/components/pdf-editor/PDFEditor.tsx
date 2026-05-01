@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, PDFFont, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
@@ -33,6 +33,7 @@ import {
   GitCompare,
   Maximize2,
   Minimize2,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Dialog,
@@ -87,6 +88,14 @@ interface TextEdit {
   fontKeyOverride?: FontKey;
   fontSizeOverride?: number; // PDF points
   colorOverride?: string;
+}
+
+interface PdfTextItem {
+  str: string;
+  transform: number[];
+  width?: number;
+  height?: number;
+  fontName?: string;
 }
 
 type FontKey =
@@ -365,19 +374,21 @@ export function PDFEditor() {
       try {
         const textContent = await page.getTextContent();
         const items: ExtractedText[] = [];
-        textContent.items.forEach((it: any, i: number) => {
-          const str: string = it.str;
+        textContent.items.forEach((it, i: number) => {
+          if (!("str" in it)) return;
+          const textItem = it as PdfTextItem;
+          const str: string = textItem.str;
           if (!str || !str.trim()) return;
-          const tr = pdfjsLib.Util.transform(viewport.transform, it.transform);
+          const tr = pdfjsLib.Util.transform(viewport.transform, textItem.transform);
           const fontHeightPx = Math.hypot(tr[2], tr[3]);
-          const widthPx = (it.width || 0) * scale;
+          const widthPx = (textItem.width || 0) * scale;
           const overlayX = tr[4];
           const overlayY = tr[5] - fontHeightPx;
-          const pdfX = it.transform[4];
-          const pdfYBaseline = it.transform[5];
-          const pdfFontSize = Math.hypot(it.transform[2], it.transform[3]);
-          const pdfWidth = it.width || 0;
-          const pdfHeight = it.height || pdfFontSize;
+          const pdfX = textItem.transform[4];
+          const pdfYBaseline = textItem.transform[5];
+          const pdfFontSize = Math.hypot(textItem.transform[2], textItem.transform[3]);
+          const pdfWidth = textItem.width || 0;
+          const pdfHeight = textItem.height || pdfFontSize;
           items.push({
             id: `t-${pageIndex}-${i}`,
             page: pageIndex,
@@ -386,7 +397,7 @@ export function PDFEditor() {
             pdfWidth,
             pdfHeight,
             fontSize: pdfFontSize,
-            fontName: it.fontName || "Helvetica",
+            fontName: textItem.fontName || "Helvetica",
             originalText: str,
             overlayX,
             overlayY,
@@ -436,6 +447,20 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
+    if (tool === "edit-text") {
+      const point = getOverlayPoint(e);
+      if (!point) return;
+      const target = findTextAtPoint(point.x, point.y);
+      if (target) {
+        e.preventDefault();
+        e.stopPropagation();
+        updateTextEdit(target.id, { newText: textEdits[target.id]?.newText ?? target.originalText });
+        setEditingExtractedId(target.id);
+      } else {
+        setEditingExtractedId(null);
+      }
+      return;
+    }
     if (tool === "pan") {
       e.preventDefault();
       const scroller = scrollContainerRef.current;
@@ -451,10 +476,10 @@ export function PDFEditor() {
       setIsPanning(true);
       return;
     }
-    if (!pdfDoc || tool === "select" || tool === "edit-text") return;
-    const rect = overlayRef.current!.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (!pdfDoc || tool === "select") return;
+    const point = getOverlayPoint(e);
+    if (!point) return;
+    const { x, y } = point;
 
     if (tool === "text") {
       pushHistory();
@@ -505,9 +530,9 @@ export function PDFEditor() {
       return;
     }
     if (!drawingRef.current) return;
-    const rect = overlayRef.current!.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const point = getOverlayPoint(e);
+    if (!point) return;
+    const { x, y } = point;
     const { startX, startY } = drawingRef.current;
 
     if (tool === "draw" && drawingRef.current.current) {
@@ -637,13 +662,40 @@ export function PDFEditor() {
     );
   };
 
+  const getOverlayPoint = (e: React.MouseEvent) => {
+    const rect = overlayRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const findTextAtPoint = useCallback(
+    (x: number, y: number) => {
+      const padding = 10;
+      return extractedTexts
+        .filter((t) => t.page === pageIndex)
+        .map((t) => {
+          const left = t.overlayX - padding;
+          const top = t.overlayY - padding;
+          const right = t.overlayX + Math.max(t.overlayWidth, 20) + padding;
+          const bottom = t.overlayY + Math.max(t.overlayHeight, 12) + padding;
+          const inside = x >= left && x <= right && y >= top && y <= bottom;
+          const centerX = t.overlayX + t.overlayWidth / 2;
+          const centerY = t.overlayY + t.overlayHeight / 2;
+          return { text: t, inside, distance: Math.hypot(x - centerX, y - centerY) };
+        })
+        .filter((item) => item.inside)
+        .sort((a, b) => a.distance - b.distance)[0]?.text;
+    },
+    [extractedTexts, pageIndex],
+  );
+
   const rotatePage = () => {
     setPageRotation((r) => ({ ...r, [pageIndex]: ((r[pageIndex] ?? 0) + 90) % 360 }));
   };
 
   const buildEditedPdfBytes = async (): Promise<Uint8Array> => {
     const doc = await PDFDocument.load(pdfBytes!.slice(0));
-    const fontCache = new Map<FontKey, any>();
+    const fontCache = new Map<FontKey, PDFFont>();
     const getFont = async (k: FontKey) => {
       if (fontCache.has(k)) return fontCache.get(k);
       const opt = FONT_OPTIONS.find((f) => f.key === k)!;
@@ -996,7 +1048,7 @@ export function PDFEditor() {
 
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
-  const tools: { tool: Tool; icon: any; label: string }[] = [
+  const tools: { tool: Tool; icon: LucideIcon; label: string }[] = [
     { tool: "pan", icon: Hand, label: "Mão livre / mover PDF" },
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
     { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
@@ -1417,6 +1469,8 @@ export function PDFEditor() {
                         ? isPanning ? "grabbing" : "grab"
                         : tool === "select"
                         ? "default"
+                        : tool === "edit-text"
+                          ? "text"
                         : tool === "text"
                           ? "text"
                           : tool === "erase"
