@@ -27,6 +27,7 @@ import {
   Bold,
   Italic,
   Edit3,
+  Move,
   Eye,
   GitCompare,
   Maximize2,
@@ -86,6 +87,8 @@ interface TextEdit {
   fontKeyOverride?: FontKey;
   fontSizeOverride?: number; // PDF points
   colorOverride?: string;
+  xOffset?: number; // Overlay px from the original editable area
+  yOffset?: number; // Overlay px from the original editable area
 }
 
 interface PdfTextItem {
@@ -178,6 +181,8 @@ type Annotation =
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
 const getFontFamily = (fontKeyOrName?: string) => {
   const name = (fontKeyOrName || "").toLowerCase();
   if (name.includes("times") || name.includes("serif")) return "Times, serif";
@@ -261,9 +266,20 @@ export function PDFEditor() {
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const moveTextRef = useRef<{
+    extractedId: string;
+    eraseArea: EraseAnnotation;
+    startClientX: number;
+    startClientY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+    boxWidth: number;
+    boxHeight: number;
+  } | null>(null);
   const drawingRef = useRef<{ startX: number; startY: number; current?: Annotation } | null>(null);
   const [drawingPreview, setDrawingPreview] = useState<Annotation | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [isMovingText, setIsMovingText] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
@@ -315,6 +331,33 @@ export function PDFEditor() {
       window.removeEventListener("mouseup", stopPan);
     };
   }, [isPanning]);
+
+  useEffect(() => {
+    if (!isMovingText) return;
+    const moveText = (event: MouseEvent) => {
+      const current = moveTextRef.current;
+      if (!current) return;
+      event.preventDefault();
+      const dx = event.clientX - current.startClientX;
+      const dy = event.clientY - current.startClientY;
+      const maxX = Math.max(0, current.eraseArea.width - current.boxWidth);
+      const maxY = Math.max(0, current.eraseArea.height - current.boxHeight);
+      updateTextEdit(current.extractedId, {
+        xOffset: clamp(current.startOffsetX + dx, 0, maxX),
+        yOffset: clamp(current.startOffsetY + dy, 0, maxY),
+      });
+    };
+    const stopMoveText = () => {
+      moveTextRef.current = null;
+      setIsMovingText(false);
+    };
+    window.addEventListener("mousemove", moveText, { passive: false });
+    window.addEventListener("mouseup", stopMoveText);
+    return () => {
+      window.removeEventListener("mousemove", moveText);
+      window.removeEventListener("mouseup", stopMoveText);
+    };
+  }, [isMovingText]);
 
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
@@ -874,6 +917,24 @@ export function PDFEditor() {
       }
     }
 
+    // Apply erasers before text, so typed text remains visible over the white area.
+    for (const ann of annotations) {
+      if (ann.type !== "erase") continue;
+      const page = pages[ann.page];
+      if (!page) continue;
+      const { width: pw, height: ph } = page.getSize();
+      const sx = pw / (ann.pageWidth || pageDims.width || pw);
+      const sy = ph / (ann.pageHeight || pageDims.height || ph);
+      page.drawRectangle({
+        x: ann.x * sx,
+        y: ph - (ann.y + ann.height) * sy,
+        width: ann.width * sx,
+        height: ann.height * sy,
+        color: rgb(1, 1, 1),
+        opacity: 1,
+      });
+    }
+
     // Apply text edits (cover original + draw new in same place/font)
     for (const edit of Object.values(textEdits)) {
       const original = extractedTexts.find((t) => t.id === edit.extractedId);
@@ -888,6 +949,8 @@ export function PDFEditor() {
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
+      const drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
+      const drawY = original.pdfY - (edit.yOffset ?? 0) / scale;
 
       // Cover original text with a generously padded white rectangle so no
       // ascender/descender residue remains.
@@ -900,8 +963,8 @@ export function PDFEditor() {
       const coverWidth = Math.max(original.pdfWidth, newTextWidth) + padX * 2;
       const coverHeight = ascent + descent + padTop + padBottom;
       page.drawRectangle({
-        x: original.pdfX - padX,
-        y: original.pdfY - descent - padBottom,
+        x: drawX - padX,
+        y: drawY - descent - padBottom,
         width: coverWidth,
         height: coverHeight,
         color: rgb(1, 1, 1),
@@ -911,8 +974,8 @@ export function PDFEditor() {
       const c = hexToRgb01(edit.colorOverride || "#000000");
       if (edit.newText.trim()) {
         page.drawText(edit.newText, {
-          x: original.pdfX,
-          y: original.pdfY,
+          x: drawX,
+          y: drawY,
           size: fontSize,
           font,
           color: rgb(c.r, c.g, c.b),
@@ -921,6 +984,7 @@ export function PDFEditor() {
     }
 
     for (const ann of annotations) {
+      if (ann.type === "erase") continue;
       const page = pages[ann.page];
       if (!page) continue;
       const { width: pw, height: ph } = page.getSize();
@@ -980,15 +1044,6 @@ export function PDFEditor() {
             opacity: ann.opacity,
           });
         }
-      } else if (ann.type === "erase") {
-        page.drawRectangle({
-          x: ann.x * sx,
-          y: ph - (ann.y + ann.height) * sy,
-          width: ann.width * sx,
-          height: ann.height * sy,
-          color: rgb(1, 1, 1),
-          opacity: 1,
-        });
       }
     }
     return await doc.save();
@@ -1134,8 +1189,8 @@ export function PDFEditor() {
             const orig = extractedTexts.find((t) => t.id === e.extractedId)!;
             return {
               id: e.extractedId,
-              overlayX: orig.overlayX * ratio,
-              overlayY: orig.overlayY * ratio,
+              overlayX: (orig.overlayX + (e.xOffset ?? 0)) * ratio,
+              overlayY: (orig.overlayY + (e.yOffset ?? 0)) * ratio,
               overlayWidth: Math.max(orig.overlayWidth * ratio, 8),
               overlayHeight: orig.overlayHeight * ratio,
               originalText: orig.originalText,
@@ -1175,6 +1230,8 @@ export function PDFEditor() {
         fontKeyOverride: existing?.fontKeyOverride,
         fontSizeOverride: existing?.fontSizeOverride,
         colorOverride: existing?.colorOverride,
+        xOffset: existing?.xOffset,
+        yOffset: existing?.yOffset,
         ...patch,
       };
       const isUnchanged =
@@ -1182,7 +1239,9 @@ export function PDFEditor() {
         merged.newText === original.originalText &&
         !merged.fontKeyOverride &&
         merged.fontSizeOverride === undefined &&
-        !merged.colorOverride;
+        !merged.colorOverride &&
+        !merged.xOffset &&
+        !merged.yOffset;
       if (isUnchanged) {
         const { [extractedId]: _, ...rest } = prev;
         return rest;
@@ -1202,13 +1261,24 @@ export function PDFEditor() {
     const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * (text.overlayFontSize / text.fontSize));
     const content = edit?.newText || text.originalText || " ";
     const estimatedWidth = content.length * fontPx * 0.58;
-    const maxWidth = Math.max(24, pageDims.width - text.overlayX - 6);
-    const maxHeight = Math.max(18, pageDims.height - text.overlayY - 6);
+    const eraseArea = getEraseAreaForVirtualText(text);
+    const isEraseAreaText = !!eraseArea;
+    const maxWidth = Math.max(24, (eraseArea?.width ?? pageDims.width - text.overlayX) - 4);
+    const maxHeight = Math.max(18, (eraseArea?.height ?? pageDims.height - text.overlayY) - 4);
+    const baseWidth = isEraseAreaText ? estimatedWidth + 10 : Math.max(text.overlayWidth, estimatedWidth) + 8;
     return {
-      width: Math.min(maxWidth, Math.max(24, Math.min(Math.max(text.overlayWidth, estimatedWidth), 520) + 8)),
+      width: Math.min(maxWidth, Math.max(24, Math.min(baseWidth, 520))),
       height: Math.min(maxHeight, Math.max(18, text.overlayHeight + 6, fontPx * 1.35)),
       fontPx,
     };
+  };
+
+  const getEraseAreaForVirtualText = (text: ExtractedText) => {
+    if (!text.id.startsWith(`tv-${text.page}-`)) return undefined;
+    const eraseId = text.id.replace(`tv-${text.page}-`, "");
+    return annotations.find(
+      (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === text.page && ann.id === eraseId,
+    );
   };
 
 
@@ -1897,6 +1967,11 @@ export function PDFEditor() {
                         const textIsErased = true;
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         const metrics = getEditBoxMetrics(t, edit);
+                        const eraseArea = getEraseAreaForVirtualText(t);
+                        const maxOffsetX = Math.max(0, (eraseArea?.width ?? pageDims.width - t.overlayX) - metrics.width);
+                        const maxOffsetY = Math.max(0, (eraseArea?.height ?? pageDims.height - t.overlayY) - metrics.height);
+                        const xOffset = clamp(edit?.xOffset ?? 0, 0, maxOffsetX);
+                        const yOffset = clamp(edit?.yOffset ?? 0, 0, maxOffsetY);
                         return (
                           <div
                             key={t.id}
@@ -1914,8 +1989,8 @@ export function PDFEditor() {
                             }}
                             style={{
                               position: "absolute",
-                              left: t.overlayX,
-                              top: t.overlayY,
+                              left: (eraseArea?.x ?? t.overlayX) + xOffset,
+                              top: (eraseArea?.y ?? t.overlayY) + yOffset,
                               width: metrics.width,
                               height: metrics.height,
                               cursor: "text",
@@ -1976,6 +2051,30 @@ export function PDFEditor() {
                                   className="absolute z-20 left-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
                                   onMouseDown={(e) => e.preventDefault()}
                                 >
+                                  {eraseArea && (
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        moveTextRef.current = {
+                                          extractedId: t.id,
+                                          eraseArea,
+                                          startClientX: e.clientX,
+                                          startClientY: e.clientY,
+                                          startOffsetX: xOffset,
+                                          startOffsetY: yOffset,
+                                          boxWidth: metrics.width,
+                                          boxHeight: metrics.height,
+                                        };
+                                        setIsMovingText(true);
+                                      }}
+                                      className="h-7 w-7 rounded border border-border bg-secondary/50 flex items-center justify-center cursor-move"
+                                      title="Mover texto dentro da área apagada"
+                                    >
+                                      <Move className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                   <Select
                                     value={edit?.fontKeyOverride ?? "__auto__"}
                                     onValueChange={(v) =>
