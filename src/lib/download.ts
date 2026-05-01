@@ -1,6 +1,25 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+const SETTINGS_STORAGE_KEY = "pdfconvert-settings";
+
+/** Read a boolean user setting from localStorage with safe fallback. */
+export function getUserSetting(key: string, fallback = false): boolean {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.[key] === "boolean" ? parsed[key] : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Whether generated PDFs should be auto-deleted after a successful download. */
+export function shouldAutoCleanupAfterDownload(): boolean {
+  return getUserSetting("auto-cleanup-after-download", false);
+}
+
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   return /iPad|iPhone|iPod/i.test(navigator.userAgent) && !(window as any).MSStream;
