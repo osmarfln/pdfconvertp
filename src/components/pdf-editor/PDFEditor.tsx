@@ -373,6 +373,18 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
+    if (tool === "pan") {
+      const scroller = scrollContainerRef.current;
+      if (!scroller) return;
+      panRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        scrollLeft: scroller.scrollLeft,
+        scrollTop: scroller.scrollTop,
+      };
+      setIsPanning(true);
+      return;
+    }
     if (!pdfDoc || tool === "select" || tool === "edit-text") return;
     const rect = overlayRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -419,6 +431,14 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseMove = (e: React.MouseEvent) => {
+    if (panRef.current) {
+      e.preventDefault();
+      const scroller = scrollContainerRef.current;
+      if (!scroller) return;
+      scroller.scrollLeft = panRef.current.scrollLeft - (e.clientX - panRef.current.startX);
+      scroller.scrollTop = panRef.current.scrollTop - (e.clientY - panRef.current.startY);
+      return;
+    }
     if (!drawingRef.current) return;
     const rect = overlayRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -484,6 +504,10 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseUp = () => {
+    if (panRef.current) {
+      panRef.current = null;
+      setIsPanning(false);
+    }
     if (!drawingRef.current) return;
     if (drawingPreview) {
       pushHistory();
