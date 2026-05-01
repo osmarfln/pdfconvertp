@@ -1812,23 +1812,7 @@ export function PDFEditor() {
                   onDoubleClick={(e) => {
                     const point = getOverlayPoint(e);
                     if (!point) return;
-                    // Try existing extracted text first (real text on the PDF)
-                    const target =
-                      findErasedTextAtPoint(point.x, point.y) ??
-                      findTextAtPoint(point.x, point.y);
-                    if (target) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (tool !== "edit-text") setTool("edit-text");
-                      updateTextEdit(target.id, {
-                        newText:
-                          textEdits[target.id]?.newText ??
-                          (isExtractedTextErased(target) ? "" : target.originalText),
-                      });
-                      setEditingExtractedId(target.id);
-                      return;
-                    }
-                    // Fallback: existing erased area
+                    // Existing erased area only: do not create/edit text in blank areas.
                     const eraseArea = findEraseAtPoint(point.x, point.y);
                     if (eraseArea) {
                       e.preventDefault();
