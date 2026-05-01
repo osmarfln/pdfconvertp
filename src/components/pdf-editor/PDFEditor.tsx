@@ -902,7 +902,10 @@ export function PDFEditor() {
       const page = pages[edit.page];
       if (!page) continue;
 
-      const isDirectEdit = original.id.startsWith("tv-") && original.id.includes("-direct-");
+      const isEraseAreaEdit = annotations.some(
+        (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === original.page && original.id === `tv-${original.page}-${ann.id}`,
+      );
+      if (original.id.startsWith("tv-") && !isEraseAreaEdit) continue;
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
@@ -917,7 +920,7 @@ export function PDFEditor() {
       const newTextWidth = font.widthOfTextAtSize(edit.newText || " ", fontSize);
       const coverWidth = Math.max(original.pdfWidth, newTextWidth) + padX * 2;
       const coverHeight = ascent + descent + padTop + padBottom;
-      if (!isDirectEdit || edit.newText.trim()) {
+      if (true) {
         page.drawRectangle({
           x: original.pdfX - padX,
           y: original.pdfY - descent - padBottom,
