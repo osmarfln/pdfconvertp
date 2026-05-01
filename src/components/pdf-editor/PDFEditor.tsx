@@ -364,11 +364,13 @@ export function PDFEditor() {
         type: "text",
         x,
         y,
-        text: "Texto",
+        text: "",
         fontSize,
         fontKey,
         color,
         opacity,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setAnnotations((a) => [...a, ann]);
       setEditingTextId(ann.id);
@@ -386,6 +388,8 @@ export function PDFEditor() {
         color,
         opacity,
         strokeWidth,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       drawingRef.current.current = ann;
       setDrawingPreview(ann);
@@ -419,6 +423,8 @@ export function PDFEditor() {
         opacity: tool === "highlight" ? 0.4 : opacity,
         strokeWidth,
         filled: tool === "highlight" ? true : filled,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setDrawingPreview(ann);
     } else if (tool === "line") {
@@ -433,6 +439,8 @@ export function PDFEditor() {
         color,
         opacity,
         strokeWidth,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setDrawingPreview(ann);
     } else if (tool === "erase") {
@@ -446,6 +454,8 @@ export function PDFEditor() {
         height: Math.abs(y - startY),
         color: "#ffffff",
         opacity: 1,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setDrawingPreview(ann);
     }
