@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import logoBg from "@/assets/logo-bg.png";
 import { InstallPWAButton } from "@/components/InstallPWA";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sheet,
   SheetContent,
@@ -23,16 +24,16 @@ import {
   Pencil,
 } from "lucide-react";
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
-  { icon: FileText, label: "Meus Arquivos", id: "files" },
-  { icon: Pencil, label: "Editor PDF", id: "editor" },
-  { icon: Wand2, label: "IA & Correção", id: "ai" },
-  { icon: GitCompare, label: "Comparação", id: "compare" },
-  { icon: BarChart3, label: "Relatórios", id: "reports" },
-  { icon: Download, label: "Exportar", id: "export" },
-  { icon: ShieldCheck, label: "Admin", id: "admin" },
-  { icon: Settings, label: "Configurações", id: "settings" },
+const allNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", id: "dashboard", adminOnly: false },
+  { icon: FileText, label: "Meus Arquivos", id: "files", adminOnly: false },
+  { icon: Pencil, label: "Editor PDF", id: "editor", adminOnly: false },
+  { icon: Wand2, label: "IA & Correção", id: "ai", adminOnly: false },
+  { icon: GitCompare, label: "Comparação", id: "compare", adminOnly: false },
+  { icon: BarChart3, label: "Relatórios", id: "reports", adminOnly: true },
+  { icon: Download, label: "Exportar", id: "export", adminOnly: false },
+  { icon: ShieldCheck, label: "Admin", id: "admin", adminOnly: true },
+  { icon: Settings, label: "Configurações", id: "settings", adminOnly: true },
 ];
 
 interface AppSidebarProps {
@@ -46,6 +47,11 @@ function SidebarNav({ activeTab, onTabChange, collapsed, onItemClick }: {
   collapsed: boolean;
   onItemClick?: () => void;
 }) {
+  const { isAdmin } = useAuth();
+  const navItems = useMemo(
+    () => allNavItems.filter((item) => !item.adminOnly || isAdmin),
+    [isAdmin],
+  );
   return (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
       {navItems.map((item) => {
