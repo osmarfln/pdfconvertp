@@ -1458,6 +1458,8 @@ export function PDFEditor() {
                         ? isPanning ? "grabbing" : "grab"
                         : tool === "select"
                         ? "default"
+                        : tool === "edit-text"
+                          ? "text"
                         : tool === "text"
                           ? "text"
                           : tool === "erase"
