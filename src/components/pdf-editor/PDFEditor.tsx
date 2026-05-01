@@ -214,6 +214,8 @@ export function PDFEditor() {
       setPdfBytes(detail.bytes);
       setPdfName(detail.name || "documento.pdf");
       setAnnotations([]);
+      setExtractedTexts([]);
+      setTextEdits({});
       setHistory([]);
       setRedoStack([]);
     };
