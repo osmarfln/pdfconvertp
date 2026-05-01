@@ -190,10 +190,23 @@ export function JpgToPdfDialog({ open, onOpenChange, file }: JpgToPdfDialogProps
       a.click();
       a.remove();
 
-      generatedUrlRef.current = url;
-      setGeneratedUrl(url);
-      setGeneratedName(downloadName);
-      toast.success("PDF gerado e baixado!");
+      const autoCleanup = shouldAutoCleanupAfterDownload();
+
+      if (autoCleanup) {
+        // Revoke the blob URL shortly after the download starts to free memory.
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          generatedUrlRef.current = null;
+          setGeneratedUrl(null);
+        }, 4000);
+        setGeneratedName(downloadName);
+        toast.success("PDF baixado e removido da sessão.");
+      } else {
+        generatedUrlRef.current = url;
+        setGeneratedUrl(url);
+        setGeneratedName(downloadName);
+        toast.success("PDF gerado e baixado!");
+      }
     } catch (e: any) {
       console.error(e);
       toast.error("Erro ao gerar PDF: " + (e?.message || "desconhecido"));
