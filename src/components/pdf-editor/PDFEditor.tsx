@@ -282,6 +282,32 @@ export function PDFEditor() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isPanning) return;
+    const movePan = (event: MouseEvent) => {
+      if (!panRef.current) return;
+      event.preventDefault();
+      const dx = event.clientX - panRef.current.startX;
+      const dy = event.clientY - panRef.current.startY;
+      setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
+      const scroller = scrollContainerRef.current;
+      if (scroller) {
+        scroller.scrollLeft = panRef.current.scrollLeft - dx;
+        scroller.scrollTop = panRef.current.scrollTop - dy;
+      }
+    };
+    const stopPan = () => {
+      panRef.current = null;
+      setIsPanning(false);
+    };
+    window.addEventListener("mousemove", movePan, { passive: false });
+    window.addEventListener("mouseup", stopPan);
+    return () => {
+      window.removeEventListener("mousemove", movePan);
+      window.removeEventListener("mouseup", stopPan);
+    };
+  }, [isPanning]);
+
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
     const handler = (e: Event) => {
@@ -410,6 +436,7 @@ export function PDFEditor() {
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
     if (tool === "pan") {
+      e.preventDefault();
       const scroller = scrollContainerRef.current;
       if (!scroller) return;
       panRef.current = {
@@ -417,6 +444,8 @@ export function PDFEditor() {
         startY: e.clientY,
         scrollLeft: scroller.scrollLeft,
         scrollTop: scroller.scrollTop,
+        offsetX: panOffset.x,
+        offsetY: panOffset.y,
       };
       setIsPanning(true);
       return;
@@ -471,8 +500,11 @@ export function PDFEditor() {
       e.preventDefault();
       const scroller = scrollContainerRef.current;
       if (!scroller) return;
-      scroller.scrollLeft = panRef.current.scrollLeft - (e.clientX - panRef.current.startX);
-      scroller.scrollTop = panRef.current.scrollTop - (e.clientY - panRef.current.startY);
+      const dx = e.clientX - panRef.current.startX;
+      const dy = e.clientY - panRef.current.startY;
+      setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
+      scroller.scrollLeft = panRef.current.scrollLeft - dx;
+      scroller.scrollTop = panRef.current.scrollTop - dy;
       return;
     }
     if (!drawingRef.current) return;
