@@ -984,6 +984,7 @@ export function PDFEditor() {
     }
 
     for (const ann of annotations) {
+      if (ann.type === "erase") continue;
       const page = pages[ann.page];
       if (!page) continue;
       const { width: pw, height: ph } = page.getSize();
