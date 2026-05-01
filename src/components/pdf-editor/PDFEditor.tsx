@@ -475,106 +475,146 @@ export function PDFEditor() {
     setPageRotation((r) => ({ ...r, [pageIndex]: ((r[pageIndex] ?? 0) + 90) % 360 }));
   };
 
-  const exportPDF = async () => {
-    if (!pdfBytes) return;
-    setExporting(true);
-    try {
-      const doc = await PDFDocument.load(pdfBytes.slice(0));
-      const fontCache = new Map<FontKey, any>();
-      const getFont = async (k: FontKey) => {
-        if (fontCache.has(k)) return fontCache.get(k);
-        const opt = FONT_OPTIONS.find((f) => f.key === k)!;
-        const f = await doc.embedFont(opt.standard);
-        fontCache.set(k, f);
-        return f;
-      };
-
-      const pages = doc.getPages();
-
-      // Apply rotations
-      for (const [pIdx, rot] of Object.entries(pageRotation)) {
-        const idx = parseInt(pIdx, 10);
-        if (pages[idx]) {
-          const current = pages[idx].getRotation().angle;
-          pages[idx].setRotation(degrees((current + rot) % 360));
-        }
+  const buildEditedPdfBytes = async (): Promise<Uint8Array> => {
+    const doc = await PDFDocument.load(pdfBytes!.slice(0));
+    const fontCache = new Map<FontKey, any>();
+    const getFont = async (k: FontKey) => {
+      if (fontCache.has(k)) return fontCache.get(k);
+      const opt = FONT_OPTIONS.find((f) => f.key === k)!;
+      const f = await doc.embedFont(opt.standard);
+      fontCache.set(k, f);
+      return f;
+    };
+    const guessFontKey = (fontName: string): FontKey => {
+      const n = (fontName || "").toLowerCase();
+      const isBold = n.includes("bold");
+      const isItalic = n.includes("italic") || n.includes("oblique");
+      if (n.includes("times") || n.includes("serif")) {
+        return isBold ? "TimesRomanBold" : isItalic ? "TimesRomanItalic" : "TimesRoman";
       }
+      if (n.includes("courier") || n.includes("mono")) {
+        return isBold ? "CourierBold" : "Courier";
+      }
+      return isBold ? "HelveticaBold" : isItalic ? "HelveticaOblique" : "Helvetica";
+    };
 
-      for (const ann of annotations) {
-        const page = pages[ann.page];
-        if (!page) continue;
-        const { width: pw, height: ph } = page.getSize();
-        // The pdfjs canvas was scaled; convert overlay coords (px) to PDF points
-        const sx = pw / pageDims.width;
-        const sy = ph / pageDims.height;
-        const c = hexToRgb01(ann.color || "#000000");
+    const pages = doc.getPages();
 
-        if (ann.type === "text") {
-          const font = await getFont(ann.fontKey);
-          // y in pdf = ph - y (overlay) - fontSize
-          page.drawText(ann.text, {
-            x: ann.x * sx,
-            y: ph - ann.y * sy - ann.fontSize * sy,
-            size: ann.fontSize * sy,
-            font,
-            color: rgb(c.r, c.g, c.b),
-            opacity: ann.opacity,
-          });
-        } else if (ann.type === "rect" || ann.type === "highlight") {
-          page.drawRectangle({
-            x: ann.x * sx,
-            y: ph - (ann.y + ann.height) * sy,
-            width: ann.width * sx,
-            height: ann.height * sy,
-            color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
-            borderColor: rgb(c.r, c.g, c.b),
-            borderWidth: ann.filled ? 0 : ann.strokeWidth,
-            opacity: ann.opacity,
-          });
-        } else if (ann.type === "ellipse") {
-          page.drawEllipse({
-            x: (ann.x + ann.width / 2) * sx,
-            y: ph - (ann.y + ann.height / 2) * sy,
-            xScale: (ann.width / 2) * sx,
-            yScale: (ann.height / 2) * sy,
-            color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
-            borderColor: rgb(c.r, c.g, c.b),
-            borderWidth: ann.filled ? 0 : ann.strokeWidth,
-            opacity: ann.opacity,
-          });
-        } else if (ann.type === "line") {
+    for (const [pIdx, rot] of Object.entries(pageRotation)) {
+      const idx = parseInt(pIdx, 10);
+      if (pages[idx]) {
+        const current = pages[idx].getRotation().angle;
+        pages[idx].setRotation(degrees((current + rot) % 360));
+      }
+    }
+
+    // Apply text edits (cover original + draw new in same place/font)
+    for (const edit of Object.values(textEdits)) {
+      const original = extractedTexts.find((t) => t.id === edit.extractedId);
+      if (!original) continue;
+      const page = pages[edit.page];
+      if (!page) continue;
+      // Cover original text with white rectangle (slightly padded)
+      const padX = original.fontSize * 0.1;
+      const padY = original.fontSize * 0.15;
+      page.drawRectangle({
+        x: original.pdfX - padX,
+        y: original.pdfY - padY,
+        width: original.pdfWidth + padX * 2,
+        height: original.fontSize + padY * 2,
+        color: rgb(1, 1, 1),
+        opacity: 1,
+      });
+      const fk = guessFontKey(original.fontName);
+      const font = await getFont(fk);
+      page.drawText(edit.newText, {
+        x: original.pdfX,
+        y: original.pdfY,
+        size: original.fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+
+    for (const ann of annotations) {
+      const page = pages[ann.page];
+      if (!page) continue;
+      const { width: pw, height: ph } = page.getSize();
+      const sx = pw / pageDims.width;
+      const sy = ph / pageDims.height;
+      const c = hexToRgb01(ann.color || "#000000");
+
+      if (ann.type === "text") {
+        const font = await getFont(ann.fontKey);
+        page.drawText(ann.text, {
+          x: ann.x * sx,
+          y: ph - ann.y * sy - ann.fontSize * sy,
+          size: ann.fontSize * sy,
+          font,
+          color: rgb(c.r, c.g, c.b),
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "rect" || ann.type === "highlight") {
+        page.drawRectangle({
+          x: ann.x * sx,
+          y: ph - (ann.y + ann.height) * sy,
+          width: ann.width * sx,
+          height: ann.height * sy,
+          color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
+          borderColor: rgb(c.r, c.g, c.b),
+          borderWidth: ann.filled ? 0 : ann.strokeWidth,
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "ellipse") {
+        page.drawEllipse({
+          x: (ann.x + ann.width / 2) * sx,
+          y: ph - (ann.y + ann.height / 2) * sy,
+          xScale: (ann.width / 2) * sx,
+          yScale: (ann.height / 2) * sy,
+          color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
+          borderColor: rgb(c.r, c.g, c.b),
+          borderWidth: ann.filled ? 0 : ann.strokeWidth,
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "line") {
+        page.drawLine({
+          start: { x: ann.x1 * sx, y: ph - ann.y1 * sy },
+          end: { x: ann.x2 * sx, y: ph - ann.y2 * sy },
+          thickness: ann.strokeWidth,
+          color: rgb(c.r, c.g, c.b),
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "draw") {
+        for (let i = 1; i < ann.points.length; i++) {
+          const p1 = ann.points[i - 1];
+          const p2 = ann.points[i];
           page.drawLine({
-            start: { x: ann.x1 * sx, y: ph - ann.y1 * sy },
-            end: { x: ann.x2 * sx, y: ph - ann.y2 * sy },
+            start: { x: p1.x * sx, y: ph - p1.y * sy },
+            end: { x: p2.x * sx, y: ph - p2.y * sy },
             thickness: ann.strokeWidth,
             color: rgb(c.r, c.g, c.b),
             opacity: ann.opacity,
           });
-        } else if (ann.type === "draw") {
-          for (let i = 1; i < ann.points.length; i++) {
-            const p1 = ann.points[i - 1];
-            const p2 = ann.points[i];
-            page.drawLine({
-              start: { x: p1.x * sx, y: ph - p1.y * sy },
-              end: { x: p2.x * sx, y: ph - p2.y * sy },
-              thickness: ann.strokeWidth,
-              color: rgb(c.r, c.g, c.b),
-              opacity: ann.opacity,
-            });
-          }
-        } else if (ann.type === "erase") {
-          page.drawRectangle({
-            x: ann.x * sx,
-            y: ph - (ann.y + ann.height) * sy,
-            width: ann.width * sx,
-            height: ann.height * sy,
-            color: rgb(1, 1, 1),
-            opacity: 1,
-          });
         }
+      } else if (ann.type === "erase") {
+        page.drawRectangle({
+          x: ann.x * sx,
+          y: ph - (ann.y + ann.height) * sy,
+          width: ann.width * sx,
+          height: ann.height * sy,
+          color: rgb(1, 1, 1),
+          opacity: 1,
+        });
       }
+    }
+    return await doc.save();
+  };
 
-      const out = await doc.save();
+  const exportPDF = async () => {
+    if (!pdfBytes) return;
+    setExporting(true);
+    try {
+      const out = await buildEditedPdfBytes();
       const blob = new Blob([out as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -584,7 +624,7 @@ export function PDFEditor() {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      toast.success("PDF exportado");
+      toast.success("PDF salvo e baixado");
     } catch (e) {
       console.error(e);
       toast.error("Erro ao exportar PDF");
@@ -592,6 +632,38 @@ export function PDFEditor() {
       setExporting(false);
     }
   };
+
+  const openCompare = async () => {
+    if (!pdfBytes) return;
+    try {
+      const beforeBlob = new Blob([pdfBytes.slice(0)], { type: "application/pdf" });
+      const beforeUrl = URL.createObjectURL(beforeBlob);
+      const out = await buildEditedPdfBytes();
+      const afterBlob = new Blob([out as BlobPart], { type: "application/pdf" });
+      const afterUrl = URL.createObjectURL(afterBlob);
+      setCompareUrls({ before: beforeUrl, after: afterUrl });
+      setShowCompare(true);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao gerar comparação");
+    }
+  };
+
+  const updateTextEdit = (extractedId: string, newText: string) => {
+    const original = extractedTexts.find((t) => t.id === extractedId);
+    if (!original) return;
+    setTextEdits((prev) => {
+      if (newText === original.originalText) {
+        const { [extractedId]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [extractedId]: { extractedId, page: original.page, newText },
+      };
+    });
+  };
+
 
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
