@@ -1334,17 +1334,23 @@ export function PDFEditor() {
             <div className="flex justify-center min-w-max">
               <div
                 className="relative shadow-xl"
-                style={{ width: pageDims.width, height: pageDims.height }}
+                style={{
+                  width: pageDims.width,
+                  height: pageDims.height,
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+                  cursor: tool === "pan" ? (isPanning ? "grabbing" : "grab") : undefined,
+                }}
               >
-                <canvas ref={canvasRef} className="block bg-white" />
+                <canvas ref={canvasRef} className="block bg-white select-none" />
                 <div
                   ref={overlayRef}
                   onMouseDown={onCanvasMouseDown}
                   onMouseMove={onCanvasMouseMove}
                   onMouseUp={onCanvasMouseUp}
-                  onMouseLeave={onCanvasMouseUp}
                   className="absolute inset-0"
                   style={{
+                    touchAction: tool === "pan" ? "none" : undefined,
+                    userSelect: tool === "pan" ? "none" : undefined,
                     cursor:
                       tool === "pan"
                         ? isPanning ? "grabbing" : "grab"
