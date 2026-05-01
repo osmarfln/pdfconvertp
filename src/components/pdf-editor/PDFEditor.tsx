@@ -81,6 +81,9 @@ interface TextEdit {
   extractedId: string;
   page: number;
   newText: string;
+  fontKeyOverride?: FontKey;
+  fontSizeOverride?: number; // PDF points
+  colorOverride?: string;
 }
 
 type FontKey =
