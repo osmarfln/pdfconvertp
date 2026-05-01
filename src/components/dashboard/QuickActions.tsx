@@ -1,12 +1,13 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Image as ImageIcon, Minimize2, Loader2, AlertTriangle } from "lucide-react";
+import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Image as ImageIcon, Minimize2, Loader2, AlertTriangle, Pencil } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useILovePDFHealth } from "@/hooks/useILovePDFHealth";
 import { ConversionProgressDialog, ConversionProgressState, initialProgressState, ConversionStage } from "@/components/ConversionProgressDialog";
 import { detectPageCount } from "@/lib/pdfUtils";
+import { JpgToPdfDialog } from "@/components/dashboard/JpgToPdfDialog";
 
 interface QuickActionsProps {
   onNavigate?: (tab: string) => void;
