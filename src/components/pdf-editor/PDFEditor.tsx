@@ -1577,8 +1577,12 @@ export function PDFEditor() {
                                 <input
                                   autoFocus
                                   value={value}
+                                  placeholder="Digite o novo texto..."
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
                                   onChange={(e) => updateTextEdit(t.id, { newText: e.target.value })}
                                   onKeyDown={(e) => {
+                                    e.stopPropagation();
                                     if (e.key === "Enter") setEditingExtractedId(null);
                                     if (e.key === "Escape") {
                                       resetTextEdit(t.id);
