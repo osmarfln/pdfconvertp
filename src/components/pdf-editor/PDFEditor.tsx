@@ -28,6 +28,9 @@ import {
   Italic,
   Edit3,
   Move,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
   Eye,
   GitCompare,
   Maximize2,
@@ -89,6 +92,7 @@ interface TextEdit {
   colorOverride?: string;
   xOffset?: number; // Overlay px from the original editable area
   yOffset?: number; // Overlay px from the original editable area
+  align?: "left" | "center" | "right";
 }
 
 interface PdfTextItem {
@@ -942,15 +946,31 @@ export function PDFEditor() {
       const page = pages[edit.page];
       if (!page) continue;
 
-      const isEraseAreaEdit = annotations.some(
+      const eraseAreaForEdit = annotations.find(
         (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === original.page && original.id === `tv-${original.page}-${ann.id}`,
       );
+      const isEraseAreaEdit = !!eraseAreaForEdit;
       if (original.id.startsWith("tv-") && !isEraseAreaEdit) continue;
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
-      const drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
+      let drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
       const drawY = original.pdfY - (edit.yOffset ?? 0) / scale;
+
+      // Apply horizontal alignment within the erased area for the final PDF
+      if (eraseAreaForEdit && edit.align && edit.align !== "left" && edit.newText.trim()) {
+        const page = pages[edit.page];
+        const { width: pw } = page.getSize();
+        const sx = pw / (eraseAreaForEdit.pageWidth || pageDims.width || pw);
+        const areaPdfX = eraseAreaForEdit.x * sx;
+        const areaPdfWidth = eraseAreaForEdit.width * sx;
+        const textWidth = font.widthOfTextAtSize(edit.newText, fontSize);
+        if (edit.align === "center") {
+          drawX = areaPdfX + (areaPdfWidth - textWidth) / 2;
+        } else if (edit.align === "right") {
+          drawX = areaPdfX + areaPdfWidth - textWidth - 2;
+        }
+      }
 
       // Cover original text with a generously padded white rectangle so no
       // ascender/descender residue remains.
@@ -1232,6 +1252,7 @@ export function PDFEditor() {
         colorOverride: existing?.colorOverride,
         xOffset: existing?.xOffset,
         yOffset: existing?.yOffset,
+        align: existing?.align,
         ...patch,
       };
       const isUnchanged =
@@ -1241,7 +1262,8 @@ export function PDFEditor() {
         merged.fontSizeOverride === undefined &&
         !merged.colorOverride &&
         !merged.xOffset &&
-        !merged.yOffset;
+        !merged.yOffset &&
+        !merged.align;
       if (isUnchanged) {
         const { [extractedId]: _, ...rest } = prev;
         return rest;
@@ -1259,13 +1281,21 @@ export function PDFEditor() {
 
   const getEditBoxMetrics = (text: ExtractedText, edit?: TextEdit) => {
     const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * (text.overlayFontSize / text.fontSize));
-    const content = edit?.newText || text.originalText || " ";
-    const estimatedWidth = content.length * fontPx * 0.58;
     const eraseArea = getEraseAreaForVirtualText(text);
     const isEraseAreaText = !!eraseArea;
-    const maxWidth = Math.max(24, (eraseArea?.width ?? pageDims.width - text.overlayX) - 4);
-    const maxHeight = Math.max(18, (eraseArea?.height ?? pageDims.height - text.overlayY) - 4);
-    const baseWidth = isEraseAreaText ? estimatedWidth + 10 : Math.max(text.overlayWidth, estimatedWidth) + 8;
+    if (isEraseAreaText) {
+      // Fill the entire erased area so alignment (left/center/right) is meaningful
+      return {
+        width: Math.max(24, eraseArea!.width),
+        height: Math.max(18, eraseArea!.height),
+        fontPx,
+      };
+    }
+    const content = edit?.newText || text.originalText || " ";
+    const estimatedWidth = content.length * fontPx * 0.58;
+    const maxWidth = Math.max(24, pageDims.width - text.overlayX - 4);
+    const maxHeight = Math.max(18, pageDims.height - text.overlayY - 4);
+    const baseWidth = Math.max(text.overlayWidth, estimatedWidth) + 8;
     return {
       width: Math.min(maxWidth, Math.max(24, Math.min(baseWidth, 520))),
       height: Math.min(maxHeight, Math.max(18, text.overlayHeight + 6, fontPx * 1.35)),
@@ -2030,7 +2060,8 @@ export function PDFEditor() {
                                     color: edit?.colorOverride || "black",
                                     border: "1px solid hsl(var(--primary))",
                                     outline: "none",
-                                    padding: "0 2px",
+                                    padding: "0 4px",
+                                    textAlign: edit?.align ?? "left",
                                     fontFamily: (() => {
                                       const fk = edit?.fontKeyOverride;
                                       if (fk?.startsWith("Times")) return "Times, serif";
@@ -2078,6 +2109,33 @@ export function PDFEditor() {
                                     >
                                       <Move className="w-3.5 h-3.5" />
                                     </button>
+                                  )}
+                                  {/* Alignment buttons (only meaningful when there is an erase area) */}
+                                  {eraseArea && (
+                                    <div className="flex items-center gap-0.5 border border-border rounded bg-secondary/30 p-0.5">
+                                      {([
+                                        { v: "left", Icon: AlignLeft, title: "Alinhar à esquerda" },
+                                        { v: "center", Icon: AlignCenter, title: "Centralizar" },
+                                        { v: "right", Icon: AlignRight, title: "Alinhar à direita" },
+                                      ] as const).map(({ v, Icon, title }) => {
+                                        const active = (edit?.align ?? "left") === v;
+                                        return (
+                                          <button
+                                            key={v}
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => updateTextEdit(t.id, { align: v })}
+                                            className={cn(
+                                              "h-6 w-6 rounded flex items-center justify-center",
+                                              active ? "bg-primary/20 text-primary" : "hover:bg-secondary",
+                                            )}
+                                            title={title}
+                                          >
+                                            <Icon className="w-3.5 h-3.5" />
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
                                   )}
                                   <Select
                                     value={edit?.fontKeyOverride ?? "__auto__"}
@@ -2218,12 +2276,15 @@ export function PDFEditor() {
                                   setEditingExtractedId(t.id);
                                 }}
                                 title={value ? `Clique para editar: "${value}"` : "Clique para digitar"}
-                                className="w-full h-full text-left cursor-text overflow-visible whitespace-nowrap bg-transparent border-0"
+                                className="w-full h-full cursor-text overflow-visible bg-transparent border-0"
                                 style={{
                                   color: edit?.colorOverride || "black",
                                   fontSize: metrics.fontPx,
                                   lineHeight: `${metrics.height}px`,
-                                  padding: "0 2px",
+                                  padding: "0 4px",
+                                  textAlign: edit?.align ?? "left",
+                                  whiteSpace: "pre",
+                                  display: "block",
                                   fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
                                   fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
                                   fontStyle:
