@@ -11,6 +11,7 @@ interface SettingsState {
   "notify-error": boolean;
   "notify-weekly": boolean;
   "auto-delete": boolean;
+  "auto-cleanup-after-download": boolean;
   "2fa": boolean;
   "dark-mode": boolean;
   "reduce-motion": boolean;
@@ -24,6 +25,7 @@ const defaultSettings: SettingsState = {
   "notify-error": true,
   "notify-weekly": false,
   "auto-delete": false,
+  "auto-cleanup-after-download": false,
   "2fa": false,
   "dark-mode": true,
   "reduce-motion": false,
