@@ -212,6 +212,25 @@ export function PDFEditor() {
   const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [compareUrls, setCompareUrls] = useState<{ before?: string; after?: string }>({});
+  const [comparePages, setComparePages] = useState<
+    {
+      page: number;
+      width: number;
+      height: number;
+      beforeImg: string;
+      afterImg: string;
+      edits: {
+        id: string;
+        overlayX: number;
+        overlayY: number;
+        overlayWidth: number;
+        overlayHeight: number;
+        originalText: string;
+        newText: string;
+      }[];
+    }[]
+  >([]);
+  const [compareLoading, setCompareLoading] = useState(false);
   const [history, setHistory] = useState<Annotation[][]>([]);
   const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -704,17 +723,95 @@ export function PDFEditor() {
 
   const openCompare = async () => {
     if (!pdfBytes) return;
+    setCompareLoading(true);
+    setShowCompare(true);
     try {
       const beforeBlob = new Blob([pdfBytes.slice(0)], { type: "application/pdf" });
       const beforeUrl = URL.createObjectURL(beforeBlob);
       const out = await buildEditedPdfBytes();
-      const afterBlob = new Blob([out as BlobPart], { type: "application/pdf" });
+      const afterBytes = out as Uint8Array;
+      const afterBlob = new Blob([afterBytes as BlobPart], { type: "application/pdf" });
       const afterUrl = URL.createObjectURL(afterBlob);
       setCompareUrls({ before: beforeUrl, after: afterUrl });
-      setShowCompare(true);
+
+      // Build per-page visual comparison for pages that have edits
+      const editsByPage: Record<number, typeof extractedTexts> = {};
+      Object.values(textEdits).forEach((edit) => {
+        const orig = extractedTexts.find((t) => t.id === edit.extractedId);
+        if (!orig) return;
+        if (!editsByPage[orig.page]) editsByPage[orig.page] = [];
+        editsByPage[orig.page].push(orig);
+      });
+
+      const pagesArr = Object.keys(editsByPage)
+        .map((n) => parseInt(n, 10))
+        .sort((a, b) => a - b);
+
+      if (pagesArr.length === 0) {
+        setComparePages([]);
+        return;
+      }
+
+      const beforeDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+      const afterDoc = await pdfjsLib.getDocument({ data: afterBytes.slice(0) }).promise;
+
+      const renderPageImg = async (
+        doc: pdfjsLib.PDFDocumentProxy,
+        pageNum: number,
+        targetScale: number,
+      ) => {
+        const page = await doc.getPage(pageNum + 1);
+        const viewport = page.getViewport({ scale: targetScale });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        return {
+          dataUrl: canvas.toDataURL("image/png"),
+          width: viewport.width,
+          height: viewport.height,
+        };
+      };
+
+      const RENDER_SCALE = 1.4;
+      const built: typeof comparePages = [];
+      for (const p of pagesArr) {
+        const [before, after] = await Promise.all([
+          renderPageImg(beforeDoc, p, RENDER_SCALE),
+          renderPageImg(afterDoc, p, RENDER_SCALE),
+        ]);
+        // Convert overlayX/Y (which were captured at current `scale`) to RENDER_SCALE
+        const ratio = RENDER_SCALE / scale;
+        const editEntries = Object.values(textEdits)
+          .filter((e) => e.page === p)
+          .map((e) => {
+            const orig = extractedTexts.find((t) => t.id === e.extractedId)!;
+            return {
+              id: e.extractedId,
+              overlayX: orig.overlayX * ratio,
+              overlayY: orig.overlayY * ratio,
+              overlayWidth: Math.max(orig.overlayWidth * ratio, 8),
+              overlayHeight: orig.overlayHeight * ratio,
+              originalText: orig.originalText,
+              newText: e.newText,
+            };
+          });
+        built.push({
+          page: p,
+          width: before.width,
+          height: before.height,
+          beforeImg: before.dataUrl,
+          afterImg: after.dataUrl,
+          edits: editEntries,
+        });
+      }
+      setComparePages(built);
     } catch (e) {
       console.error(e);
       toast.error("Erro ao gerar comparação");
+    } finally {
+      setCompareLoading(false);
     }
   };
 
@@ -1398,25 +1495,36 @@ export function PDFEditor() {
             if (compareUrls.before) URL.revokeObjectURL(compareUrls.before);
             if (compareUrls.after) URL.revokeObjectURL(compareUrls.after);
             setCompareUrls({});
+            setComparePages([]);
           }
         }}
       >
-        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-4">
+        <DialogContent className="max-w-7xl w-[97vw] h-[92vh] flex flex-col p-4">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
               <GitCompare className="w-5 h-5 text-primary" />
               Comparar — Antes e Depois
               {Object.keys(textEdits).length > 0 && (
                 <span className="ml-2 text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-full">
-                  {Object.keys(textEdits).length} alteração(ões) de texto
+                  {Object.keys(textEdits).length} alteração(ões)
                 </span>
               )}
+              <span className="ml-auto flex items-center gap-3 text-[11px] font-normal text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-destructive/30 border border-destructive/70" />
+                  Original removido
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-emerald-500/30 border border-emerald-500/70" />
+                  Novo conteúdo
+                </span>
+              </span>
             </DialogTitle>
           </DialogHeader>
 
           {Object.keys(textEdits).length > 0 && (
-            <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1.5 max-h-32 overflow-auto">
-              <p className="text-xs font-semibold text-muted-foreground mb-1">Alterações:</p>
+            <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1.5 max-h-28 overflow-auto shrink-0">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Lista de alterações:</p>
               {Object.values(textEdits).map((edit) => {
                 const orig = extractedTexts.find((t) => t.id === edit.extractedId);
                 if (!orig) return null;
@@ -1428,7 +1536,7 @@ export function PDFEditor() {
                     </span>
                     <span className="text-muted-foreground">→</span>
                     <span className="text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      {edit.newText}
+                      {edit.newText || <em className="not-italic opacity-70">(apagado)</em>}
                     </span>
                   </div>
                 );
@@ -1436,19 +1544,104 @@ export function PDFEditor() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0">
-            <div className="flex flex-col min-h-0">
-              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Antes (original)</p>
-              {compareUrls.before && (
-                <iframe src={compareUrls.before} className="flex-1 w-full rounded-lg border border-border bg-white" title="Antes" />
-              )}
-            </div>
-            <div className="flex flex-col min-h-0">
-              <p className="text-xs font-semibold text-primary mb-1.5">Depois (editado)</p>
-              {compareUrls.after && (
-                <iframe src={compareUrls.after} className="flex-1 w-full rounded-lg border border-primary/40 bg-white" title="Depois" />
-              )}
-            </div>
+          <div className="flex-1 min-h-0 overflow-auto rounded-lg bg-secondary/20 border border-border p-3">
+            {compareLoading && (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                Gerando comparação visual…
+              </div>
+            )}
+
+            {!compareLoading && comparePages.length === 0 && (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center px-4">
+                Nenhuma alteração de texto detectada. Edite trechos no PDF para ver o destaque visual aqui.
+              </div>
+            )}
+
+            {!compareLoading && comparePages.length > 0 && (
+              <div className="space-y-6">
+                {comparePages.map((cp) => (
+                  <div key={cp.page} className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                      <FileText className="w-3.5 h-3.5" />
+                      Página {cp.page + 1}
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                        {cp.edits.length} alteração(ões)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* ANTES */}
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-destructive flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-destructive" /> Antes
+                        </p>
+                        <div
+                          className="relative mx-auto bg-white rounded-md shadow-md ring-1 ring-border overflow-hidden"
+                          style={{ width: cp.width, maxWidth: "100%" }}
+                        >
+                          <img
+                            src={cp.beforeImg}
+                            alt={`Antes pág ${cp.page + 1}`}
+                            style={{ width: cp.width, height: cp.height, display: "block" }}
+                          />
+                          {cp.edits.map((e) => (
+                            <div
+                              key={e.id}
+                              title={`Original: "${e.originalText}"`}
+                              className="absolute pointer-events-auto animate-pulse"
+                              style={{
+                                left: e.overlayX - 3,
+                                top: e.overlayY - 3,
+                                width: e.overlayWidth + 6,
+                                height: e.overlayHeight + 6,
+                                background: "hsl(0 84% 60% / 0.28)",
+                                border: "2px solid hsl(0 84% 60% / 0.85)",
+                                boxShadow: "0 0 0 4px hsl(0 84% 60% / 0.18)",
+                                borderRadius: 3,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* DEPOIS */}
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-500 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Depois
+                        </p>
+                        <div
+                          className="relative mx-auto bg-white rounded-md shadow-md ring-1 ring-emerald-500/40 overflow-hidden"
+                          style={{ width: cp.width, maxWidth: "100%" }}
+                        >
+                          <img
+                            src={cp.afterImg}
+                            alt={`Depois pág ${cp.page + 1}`}
+                            style={{ width: cp.width, height: cp.height, display: "block" }}
+                          />
+                          {cp.edits.map((e) => (
+                            <div
+                              key={e.id}
+                              title={`Novo: "${e.newText || "(apagado)"}"`}
+                              className="absolute pointer-events-auto"
+                              style={{
+                                left: e.overlayX - 3,
+                                top: e.overlayY - 3,
+                                width: e.overlayWidth + 6,
+                                height: e.overlayHeight + 6,
+                                background: "hsl(142 71% 45% / 0.22)",
+                                border: "2px solid hsl(142 71% 45% / 0.9)",
+                                boxShadow: "0 0 0 4px hsl(142 71% 45% / 0.15)",
+                                borderRadius: 3,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
