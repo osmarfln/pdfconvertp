@@ -723,17 +723,96 @@ export function PDFEditor() {
 
   const openCompare = async () => {
     if (!pdfBytes) return;
+    setCompareLoading(true);
+    setShowCompare(true);
     try {
       const beforeBlob = new Blob([pdfBytes.slice(0)], { type: "application/pdf" });
       const beforeUrl = URL.createObjectURL(beforeBlob);
       const out = await buildEditedPdfBytes();
-      const afterBlob = new Blob([out as BlobPart], { type: "application/pdf" });
+      const afterBytes = out as Uint8Array;
+      const afterBlob = new Blob([afterBytes as BlobPart], { type: "application/pdf" });
       const afterUrl = URL.createObjectURL(afterBlob);
       setCompareUrls({ before: beforeUrl, after: afterUrl });
-      setShowCompare(true);
+
+      // Build per-page visual comparison for pages that have edits
+      const editsByPage: Record<number, typeof extractedTexts> = {};
+      Object.values(textEdits).forEach((edit) => {
+        const orig = extractedTexts.find((t) => t.id === edit.extractedId);
+        if (!orig) return;
+        if (!editsByPage[orig.page]) editsByPage[orig.page] = [];
+        editsByPage[orig.page].push(orig);
+      });
+
+      const pagesArr = Object.keys(editsByPage)
+        .map((n) => parseInt(n, 10))
+        .sort((a, b) => a - b);
+
+      if (pagesArr.length === 0) {
+        setComparePages([]);
+        return;
+      }
+
+      const beforeDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+      const afterDoc = await pdfjsLib.getDocument({ data: afterBytes.slice(0) as ArrayBuffer })
+        .promise;
+
+      const renderPageImg = async (
+        doc: pdfjsLib.PDFDocumentProxy,
+        pageNum: number,
+        targetScale: number,
+      ) => {
+        const page = await doc.getPage(pageNum + 1);
+        const viewport = page.getViewport({ scale: targetScale });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        return {
+          dataUrl: canvas.toDataURL("image/png"),
+          width: viewport.width,
+          height: viewport.height,
+        };
+      };
+
+      const RENDER_SCALE = 1.4;
+      const built: typeof comparePages = [];
+      for (const p of pagesArr) {
+        const [before, after] = await Promise.all([
+          renderPageImg(beforeDoc, p, RENDER_SCALE),
+          renderPageImg(afterDoc, p, RENDER_SCALE),
+        ]);
+        // Convert overlayX/Y (which were captured at current `scale`) to RENDER_SCALE
+        const ratio = RENDER_SCALE / scale;
+        const editEntries = Object.values(textEdits)
+          .filter((e) => e.page === p)
+          .map((e) => {
+            const orig = extractedTexts.find((t) => t.id === e.extractedId)!;
+            return {
+              id: e.extractedId,
+              overlayX: orig.overlayX * ratio,
+              overlayY: orig.overlayY * ratio,
+              overlayWidth: Math.max(orig.overlayWidth * ratio, 8),
+              overlayHeight: orig.overlayHeight * ratio,
+              originalText: orig.originalText,
+              newText: e.newText,
+            };
+          });
+        built.push({
+          page: p,
+          width: before.width,
+          height: before.height,
+          beforeImg: before.dataUrl,
+          afterImg: after.dataUrl,
+          edits: editEntries,
+        });
+      }
+      setComparePages(built);
     } catch (e) {
       console.error(e);
       toast.error("Erro ao gerar comparação");
+    } finally {
+      setCompareLoading(false);
     }
   };
 
