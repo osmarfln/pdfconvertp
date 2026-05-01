@@ -689,13 +689,8 @@ export function PDFEditor() {
             });
             return next;
           });
-          // Switch to edit-text and open first erased block so user can type
-          // over the erased area using the same font as the original PDF text.
-          const first = erasedTexts[0];
-          setTool("edit-text");
-          setEditingExtractedId(first.id);
           toast.success(
-            `${erasedTexts.length} trecho(s) apagado(s). Digite o novo texto para escrever em cima com a mesma fonte.`,
+            `${erasedTexts.length} trecho(s) apagado(s). Agora clique em Editar Texto e depois na área branca para digitar.`,
           );
         }
       }
@@ -1185,6 +1180,19 @@ export function PDFEditor() {
 
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
+  const selectTool = (nextTool: Tool) => {
+    setTool(nextTool);
+    setEditingExtractedId(null);
+    setHoveredEraseId(null);
+    setHoveredErasedTextId(null);
+    if (nextTool === "edit-text") {
+      const hasReadyArea = extractedTexts.some((t) => t.page === pageIndex && isExtractedTextErased(t));
+      if (hasReadyArea) {
+        toast.info("Modo Editar Texto ativo: passe o mouse na área apagada e clique para digitar.");
+      }
+    }
+  };
+
   const tools: { tool: Tool; icon: LucideIcon; label: string }[] = [
     { tool: "pan", icon: Hand, label: "Mão livre / mover PDF" },
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
@@ -1310,7 +1318,7 @@ export function PDFEditor() {
                   <Tooltip key={t.tool}>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => setTool(t.tool)}
+                        onClick={() => selectTool(t.tool)}
                         aria-label={t.label}
                         className={cn(
                           "aspect-square rounded-lg flex items-center justify-center transition-colors border",
@@ -1527,7 +1535,7 @@ export function PDFEditor() {
                 size="sm"
                 variant={tool === "pan" ? "default" : "outline"}
                 className="h-8 gap-1.5"
-                onClick={() => setTool("pan")}
+                onClick={() => selectTool("pan")}
                 title="Mão livre / mover PDF"
               >
                 <Hand className="w-4 h-4" />
@@ -1990,7 +1998,7 @@ export function PDFEditor() {
                 <Tooltip key={t.tool}>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={() => setTool(t.tool)}
+                      onClick={() => selectTool(t.tool)}
                       aria-label={t.label}
                       className={cn(
                         "w-9 h-9 rounded-lg flex items-center justify-center transition-colors border",
