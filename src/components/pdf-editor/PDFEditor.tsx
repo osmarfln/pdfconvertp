@@ -240,10 +240,18 @@ export function PDFEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const panRef = useRef<{
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   const drawingRef = useRef<{ startX: number; startY: number; current?: Annotation } | null>(null);
   const [drawingPreview, setDrawingPreview] = useState<Annotation | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [pageRotation, setPageRotation] = useState<Record<number, number>>({});
@@ -255,6 +263,12 @@ export function PDFEditor() {
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
+
+  useEffect(() => {
+    setPanOffset({ x: 0, y: 0 });
+    panRef.current = null;
+    setIsPanning(false);
+  }, [pageIndex, pdfDoc]);
 
   const toggleFullscreen = useCallback(async () => {
     try {
