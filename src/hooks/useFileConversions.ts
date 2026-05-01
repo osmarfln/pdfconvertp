@@ -16,6 +16,7 @@ export interface FileConversion {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  is_backup?: boolean;
 }
 
 export function useFileConversions() {
