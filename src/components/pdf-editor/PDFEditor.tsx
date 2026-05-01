@@ -315,6 +315,7 @@ export function PDFEditor() {
       setTextEdits({});
       setHistory([]);
       setRedoStack([]);
+      setTool("pan");
     };
     window.addEventListener("open-pdf-editor", handler as EventListener);
     return () => window.removeEventListener("open-pdf-editor", handler as EventListener);
@@ -424,6 +425,7 @@ export function PDFEditor() {
       setTextEdits({});
       setHistory([]);
       setRedoStack([]);
+      setTool("pan");
       toast.success("PDF carregado");
     };
     reader.readAsArrayBuffer(file);
@@ -1274,6 +1276,16 @@ export function PDFEditor() {
               </Button>
             </div>
             <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant={tool === "pan" ? "default" : "outline"}
+                className="h-8 gap-1.5"
+                onClick={() => setTool("pan")}
+                title="Mão livre / mover PDF"
+              >
+                <Hand className="w-4 h-4" />
+                Mão livre
+              </Button>
               <Button
                 size="icon"
                 variant="ghost"
