@@ -1249,10 +1249,13 @@ export function PDFEditor() {
     const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * (text.overlayFontSize / text.fontSize));
     const content = edit?.newText || text.originalText || " ";
     const estimatedWidth = content.length * fontPx * 0.58;
-    const maxWidth = Math.max(24, pageDims.width - text.overlayX - 6);
-    const maxHeight = Math.max(18, pageDims.height - text.overlayY - 6);
+    const eraseArea = getEraseAreaForVirtualText(text);
+    const isEraseAreaText = !!eraseArea;
+    const maxWidth = Math.max(24, (eraseArea?.width ?? pageDims.width - text.overlayX) - 4);
+    const maxHeight = Math.max(18, (eraseArea?.height ?? pageDims.height - text.overlayY) - 4);
+    const baseWidth = isEraseAreaText ? estimatedWidth + 10 : Math.max(text.overlayWidth, estimatedWidth) + 8;
     return {
-      width: Math.min(maxWidth, Math.max(24, Math.min(Math.max(text.overlayWidth, estimatedWidth), 520) + 8)),
+      width: Math.min(maxWidth, Math.max(24, Math.min(baseWidth, 520))),
       height: Math.min(maxHeight, Math.max(18, text.overlayHeight + 6, fontPx * 1.35)),
       fontPx,
     };
