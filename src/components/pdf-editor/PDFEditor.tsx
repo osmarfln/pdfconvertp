@@ -167,6 +167,21 @@ export function PDFEditor() {
   const [exporting, setExporting] = useState(false);
   const [pageRotation, setPageRotation] = useState<Record<number, number>>({});
 
+  // Allow other parts of the app to open a PDF directly in the editor
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ bytes: ArrayBuffer; name: string }>).detail;
+      if (!detail?.bytes) return;
+      setPdfBytes(detail.bytes);
+      setPdfName(detail.name || "documento.pdf");
+      setAnnotations([]);
+      setHistory([]);
+      setRedoStack([]);
+    };
+    window.addEventListener("open-pdf-editor", handler as EventListener);
+    return () => window.removeEventListener("open-pdf-editor", handler as EventListener);
+  }, []);
+
   // Load PDF
   useEffect(() => {
     if (!pdfBytes) return;
