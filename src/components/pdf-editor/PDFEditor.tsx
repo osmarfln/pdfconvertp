@@ -198,7 +198,7 @@ export function PDFEditor() {
   const [scale, setScale] = useState(1.3);
   const [pageDims, setPageDims] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  const [tool, setTool] = useState<Tool>("select");
+  const [tool, setTool] = useState<Tool>("edit-text");
   const [color, setColor] = useState("#ef4444");
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [fontSize, setFontSize] = useState(16);
@@ -1331,6 +1331,19 @@ export function PDFEditor() {
                                   </Button>
                                   <Button
                                     size="sm"
+                                    variant="destructive"
+                                    className="h-7 px-2 text-xs gap-1"
+                                    onClick={() => {
+                                      updateTextEdit(t.id, { newText: "" });
+                                      setEditingExtractedId(null);
+                                      toast.success("Texto apagado");
+                                    }}
+                                    title="Apagar este trecho"
+                                  >
+                                    <Eraser className="w-3 h-3" /> Apagar
+                                  </Button>
+                                  <Button
+                                    size="sm"
                                     variant="default"
                                     className="h-7 px-2 text-xs"
                                     onClick={() => setEditingExtractedId(null)}
@@ -1345,13 +1358,14 @@ export function PDFEditor() {
                                 onClick={() => setEditingExtractedId(t.id)}
                                 title={`Clique para editar: "${t.originalText}"`}
                                 className={cn(
-                                  "w-full h-full text-left cursor-text overflow-visible whitespace-nowrap",
-                                  "border border-transparent hover:border-primary/60 hover:bg-primary/5",
-                                  changed && "border-primary/60 bg-primary/10",
+                                  "w-full h-full text-left cursor-text overflow-visible whitespace-nowrap transition-colors",
+                                  changed
+                                    ? "border border-primary/60 bg-primary/10"
+                                    : "border border-dashed border-primary/25 bg-primary/[0.03] hover:border-primary/70 hover:bg-primary/10",
                                 )}
                                 style={{
-                                  background: changed ? "white" : "transparent",
-                                  color: edit?.colorOverride || "black",
+                                  background: changed && value ? "white" : undefined,
+                                  color: edit?.colorOverride || (changed ? "black" : "transparent"),
                                   fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
                                   lineHeight: 1,
                                   padding: "0 2px",
