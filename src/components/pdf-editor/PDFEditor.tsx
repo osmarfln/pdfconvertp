@@ -333,7 +333,7 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
-    if (!pdfDoc || tool === "select") return;
+    if (!pdfDoc || tool === "select" || tool === "edit-text") return;
     const rect = overlayRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
