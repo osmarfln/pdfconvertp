@@ -917,6 +917,24 @@ export function PDFEditor() {
       }
     }
 
+    // Apply erasers before text, so typed text remains visible over the white area.
+    for (const ann of annotations) {
+      if (ann.type !== "erase") continue;
+      const page = pages[ann.page];
+      if (!page) continue;
+      const { width: pw, height: ph } = page.getSize();
+      const sx = pw / (ann.pageWidth || pageDims.width || pw);
+      const sy = ph / (ann.pageHeight || pageDims.height || ph);
+      page.drawRectangle({
+        x: ann.x * sx,
+        y: ph - (ann.y + ann.height) * sy,
+        width: ann.width * sx,
+        height: ann.height * sy,
+        color: rgb(1, 1, 1),
+        opacity: 1,
+      });
+    }
+
     // Apply text edits (cover original + draw new in same place/font)
     for (const edit of Object.values(textEdits)) {
       const original = extractedTexts.find((t) => t.id === edit.extractedId);
@@ -931,6 +949,8 @@ export function PDFEditor() {
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
+      const drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
+      const drawY = original.pdfY - (edit.yOffset ?? 0) / scale;
 
       // Cover original text with a generously padded white rectangle so no
       // ascender/descender residue remains.
@@ -943,8 +963,8 @@ export function PDFEditor() {
       const coverWidth = Math.max(original.pdfWidth, newTextWidth) + padX * 2;
       const coverHeight = ascent + descent + padTop + padBottom;
       page.drawRectangle({
-        x: original.pdfX - padX,
-        y: original.pdfY - descent - padBottom,
+        x: drawX - padX,
+        y: drawY - descent - padBottom,
         width: coverWidth,
         height: coverHeight,
         color: rgb(1, 1, 1),
@@ -954,8 +974,8 @@ export function PDFEditor() {
       const c = hexToRgb01(edit.colorOverride || "#000000");
       if (edit.newText.trim()) {
         page.drawText(edit.newText, {
-          x: original.pdfX,
-          y: original.pdfY,
+          x: drawX,
+          y: drawY,
           size: fontSize,
           font,
           color: rgb(c.r, c.g, c.b),
