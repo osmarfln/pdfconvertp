@@ -1239,6 +1239,13 @@ export function PDFEditor() {
             </div>
           )}
 
+          {tool === "pan" && (
+            <div className="glass rounded-xl px-3 py-2 text-xs text-muted-foreground flex items-center gap-2 border border-primary/30">
+              <Hand className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span>Arraste o PDF com o mouse para mover a página sem alterar o zoom.</span>
+            </div>
+          )}
+
           <div
             ref={scrollContainerRef}
             className="glass rounded-xl p-3 max-h-[calc(100vh-260px)] overflow-auto"
