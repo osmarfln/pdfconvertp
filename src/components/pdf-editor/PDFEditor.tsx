@@ -1728,6 +1728,8 @@ export function PDFEditor() {
                         const value = edit ? edit.newText : t.originalText;
                         const changed = !!edit;
                         const isEditing = editingExtractedId === t.id;
+                        const textIsErased = isExtractedTextErased(t);
+                        const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         return (
                           <div
                             key={t.id}
@@ -1738,7 +1740,7 @@ export function PDFEditor() {
                               e.stopPropagation();
                               if (!isEditing) {
                                 updateTextEdit(t.id, {
-                                  newText: textEdits[t.id]?.newText ?? t.originalText,
+                                  newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText),
                                 });
                                 setEditingExtractedId(t.id);
                               }
@@ -1942,7 +1944,7 @@ export function PDFEditor() {
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? "" });
+                                  updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
                                   setEditingExtractedId(t.id);
                                 }}
                                 title={`Clique para editar: "${t.originalText}"`}
@@ -1966,7 +1968,7 @@ export function PDFEditor() {
                                       : "normal",
                                 }}
                               >
-                                {changed ? value : ""}
+                                {showHoverPlaceholder ? <span className="text-primary animate-pulse">| Digite aqui</span> : changed ? value : ""}
                               </button>
                             )}
                           </div>
