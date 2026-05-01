@@ -242,7 +242,7 @@ export function PDFEditor() {
     };
   }, [pdfBytes]);
 
-  // Render current page
+  // Render current page + extract text positions
   useEffect(() => {
     if (!pdfDoc) return;
     let cancelled = false;
@@ -257,6 +257,49 @@ export function PDFEditor() {
       setPageDims({ width: viewport.width, height: viewport.height });
       const ctx = canvas.getContext("2d")!;
       await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+
+      try {
+        const textContent = await page.getTextContent();
+        const items: ExtractedText[] = [];
+        textContent.items.forEach((it: any, i: number) => {
+          const str: string = it.str;
+          if (!str || !str.trim()) return;
+          const tr = pdfjsLib.Util.transform(viewport.transform, it.transform);
+          const fontHeightPx = Math.hypot(tr[2], tr[3]);
+          const widthPx = (it.width || 0) * scale;
+          const overlayX = tr[4];
+          const overlayY = tr[5] - fontHeightPx;
+          const pdfX = it.transform[4];
+          const pdfYBaseline = it.transform[5];
+          const pdfFontSize = Math.hypot(it.transform[2], it.transform[3]);
+          const pdfWidth = it.width || 0;
+          const pdfHeight = it.height || pdfFontSize;
+          items.push({
+            id: `t-${pageIndex}-${i}`,
+            page: pageIndex,
+            pdfX,
+            pdfY: pdfYBaseline,
+            pdfWidth,
+            pdfHeight,
+            fontSize: pdfFontSize,
+            fontName: it.fontName || "Helvetica",
+            originalText: str,
+            overlayX,
+            overlayY,
+            overlayWidth: widthPx,
+            overlayHeight: fontHeightPx,
+            overlayFontSize: fontHeightPx,
+          });
+        });
+        if (!cancelled) {
+          setExtractedTexts((prev) => [
+            ...prev.filter((t) => t.page !== pageIndex),
+            ...items,
+          ]);
+        }
+      } catch (err) {
+        console.warn("text extract failed", err);
+      }
     })();
     return () => {
       cancelled = true;
