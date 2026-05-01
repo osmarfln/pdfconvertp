@@ -436,6 +436,20 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
+    if (tool === "edit-text") {
+      const point = getOverlayPoint(e);
+      if (!point) return;
+      const target = findTextAtPoint(point.x, point.y);
+      if (target) {
+        e.preventDefault();
+        e.stopPropagation();
+        updateTextEdit(target.id, { newText: textEdits[target.id]?.newText ?? target.originalText });
+        setEditingExtractedId(target.id);
+      } else {
+        setEditingExtractedId(null);
+      }
+      return;
+    }
     if (tool === "pan") {
       e.preventDefault();
       const scroller = scrollContainerRef.current;
@@ -451,10 +465,10 @@ export function PDFEditor() {
       setIsPanning(true);
       return;
     }
-    if (!pdfDoc || tool === "select" || tool === "edit-text") return;
-    const rect = overlayRef.current!.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (!pdfDoc || tool === "select") return;
+    const point = getOverlayPoint(e);
+    if (!point) return;
+    const { x, y } = point;
 
     if (tool === "text") {
       pushHistory();
@@ -505,9 +519,9 @@ export function PDFEditor() {
       return;
     }
     if (!drawingRef.current) return;
-    const rect = overlayRef.current!.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const point = getOverlayPoint(e);
+    if (!point) return;
+    const { x, y } = point;
     const { startX, startY } = drawingRef.current;
 
     if (tool === "draw" && drawingRef.current.current) {
