@@ -695,7 +695,7 @@ export function PDFEditor() {
 
   const buildEditedPdfBytes = async (): Promise<Uint8Array> => {
     const doc = await PDFDocument.load(pdfBytes!.slice(0));
-    const fontCache = new Map<FontKey, any>();
+    const fontCache = new Map<FontKey, PDFFont>();
     const getFont = async (k: FontKey) => {
       if (fontCache.has(k)) return fontCache.get(k);
       const opt = FONT_OPTIONS.find((f) => f.key === k)!;
@@ -1048,7 +1048,7 @@ export function PDFEditor() {
 
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
-  const tools: { tool: Tool; icon: any; label: string }[] = [
+  const tools: { tool: Tool; icon: LucideIcon; label: string }[] = [
     { tool: "pan", icon: Hand, label: "Mão livre / mover PDF" },
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
     { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
