@@ -1226,6 +1226,19 @@ export function PDFEditor() {
     });
   };
 
+  const getEditBoxMetrics = (text: ExtractedText, edit?: TextEdit) => {
+    const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * (text.overlayFontSize / text.fontSize));
+    const content = edit?.newText || text.originalText || " ";
+    const estimatedWidth = content.length * fontPx * 0.58;
+    const maxWidth = Math.max(24, pageDims.width - text.overlayX - 6);
+    const maxHeight = Math.max(18, pageDims.height - text.overlayY - 6);
+    return {
+      width: Math.min(maxWidth, Math.max(24, Math.min(Math.max(text.overlayWidth, estimatedWidth), 520) + 8)),
+      height: Math.min(maxHeight, Math.max(18, text.overlayHeight + 6, fontPx * 1.35)),
+      fontPx,
+    };
+  };
+
 
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
@@ -1262,7 +1275,7 @@ export function PDFEditor() {
   };
 
   const tools: { tool: Tool; icon: LucideIcon; label: string }[] = [
-    { tool: "pan", icon: Hand, label: "Mão livre / mover PDF" },
+    { tool: "pan", icon: Hand, label: "Mover PDF" },
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
     { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
     { tool: "text", icon: Type, label: "Adicionar Texto" },
