@@ -1110,10 +1110,9 @@ export function PDFEditor() {
       </div>
 
       <div className={cn("grid grid-cols-1 gap-4", !isFullscreen && "lg:grid-cols-[260px_1fr]")}>
-        {isFullscreen && <div className="hidden" />}
         {!isFullscreen && (
-        {/* Toolbar */}
-        <div className="glass rounded-xl p-3 space-y-3 lg:sticky lg:top-2 lg:self-start">
+          /* Toolbar */
+          <div className="glass rounded-xl p-3 space-y-3 lg:sticky lg:top-2 lg:self-start">
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Ferramentas</Label>
             <TooltipProvider delayDuration={100}>
