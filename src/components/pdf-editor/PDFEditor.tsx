@@ -240,10 +240,18 @@ export function PDFEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const panRef = useRef<{
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   const drawingRef = useRef<{ startX: number; startY: number; current?: Annotation } | null>(null);
   const [drawingPreview, setDrawingPreview] = useState<Annotation | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [pageRotation, setPageRotation] = useState<Record<number, number>>({});
@@ -255,6 +263,12 @@ export function PDFEditor() {
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
+
+  useEffect(() => {
+    setPanOffset({ x: 0, y: 0 });
+    panRef.current = null;
+    setIsPanning(false);
+  }, [pageIndex, pdfDoc]);
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -268,6 +282,27 @@ export function PDFEditor() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isPanning) return;
+    const movePan = (event: MouseEvent) => {
+      if (!panRef.current) return;
+      event.preventDefault();
+      const dx = event.clientX - panRef.current.startX;
+      const dy = event.clientY - panRef.current.startY;
+      setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
+    };
+    const stopPan = () => {
+      panRef.current = null;
+      setIsPanning(false);
+    };
+    window.addEventListener("mousemove", movePan, { passive: false });
+    window.addEventListener("mouseup", stopPan);
+    return () => {
+      window.removeEventListener("mousemove", movePan);
+      window.removeEventListener("mouseup", stopPan);
+    };
+  }, [isPanning]);
+
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
     const handler = (e: Event) => {
@@ -280,6 +315,7 @@ export function PDFEditor() {
       setTextEdits({});
       setHistory([]);
       setRedoStack([]);
+      setTool("pan");
     };
     window.addEventListener("open-pdf-editor", handler as EventListener);
     return () => window.removeEventListener("open-pdf-editor", handler as EventListener);
@@ -389,6 +425,7 @@ export function PDFEditor() {
       setTextEdits({});
       setHistory([]);
       setRedoStack([]);
+      setTool("pan");
       toast.success("PDF carregado");
     };
     reader.readAsArrayBuffer(file);
@@ -396,6 +433,7 @@ export function PDFEditor() {
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
     if (tool === "pan") {
+      e.preventDefault();
       const scroller = scrollContainerRef.current;
       if (!scroller) return;
       panRef.current = {
@@ -403,6 +441,8 @@ export function PDFEditor() {
         startY: e.clientY,
         scrollLeft: scroller.scrollLeft,
         scrollTop: scroller.scrollTop,
+        offsetX: panOffset.x,
+        offsetY: panOffset.y,
       };
       setIsPanning(true);
       return;
@@ -455,10 +495,9 @@ export function PDFEditor() {
   const onCanvasMouseMove = (e: React.MouseEvent) => {
     if (panRef.current) {
       e.preventDefault();
-      const scroller = scrollContainerRef.current;
-      if (!scroller) return;
-      scroller.scrollLeft = panRef.current.scrollLeft - (e.clientX - panRef.current.startX);
-      scroller.scrollTop = panRef.current.scrollTop - (e.clientY - panRef.current.startY);
+      const dx = e.clientX - panRef.current.startX;
+      const dy = e.clientY - panRef.current.startY;
+      setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
       return;
     }
     if (!drawingRef.current) return;
@@ -1238,6 +1277,16 @@ export function PDFEditor() {
             </div>
             <div className="flex items-center gap-1">
               <Button
+                size="sm"
+                variant={tool === "pan" ? "default" : "outline"}
+                className="h-8 gap-1.5"
+                onClick={() => setTool("pan")}
+                title="Mão livre / mover PDF"
+              >
+                <Hand className="w-4 h-4" />
+                Mão livre
+              </Button>
+              <Button
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8"
@@ -1288,17 +1337,23 @@ export function PDFEditor() {
             <div className="flex justify-center min-w-max">
               <div
                 className="relative shadow-xl"
-                style={{ width: pageDims.width, height: pageDims.height }}
+                style={{
+                  width: pageDims.width,
+                  height: pageDims.height,
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+                  cursor: tool === "pan" ? (isPanning ? "grabbing" : "grab") : undefined,
+                }}
               >
-                <canvas ref={canvasRef} className="block bg-white" />
+                <canvas ref={canvasRef} className="block bg-white select-none" />
                 <div
                   ref={overlayRef}
                   onMouseDown={onCanvasMouseDown}
                   onMouseMove={onCanvasMouseMove}
                   onMouseUp={onCanvasMouseUp}
-                  onMouseLeave={onCanvasMouseUp}
                   className="absolute inset-0"
                   style={{
+                    touchAction: tool === "pan" ? "none" : undefined,
+                    userSelect: tool === "pan" ? "none" : undefined,
                     cursor:
                       tool === "pan"
                         ? isPanning ? "grabbing" : "grab"
