@@ -753,8 +753,7 @@ export function PDFEditor() {
       }
 
       const beforeDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
-      const afterDoc = await pdfjsLib.getDocument({ data: afterBytes.slice(0) as ArrayBuffer })
-        .promise;
+      const afterDoc = await pdfjsLib.getDocument({ data: afterBytes.slice(0) }).promise;
 
       const renderPageImg = async (
         doc: pdfjsLib.PDFDocumentProxy,
