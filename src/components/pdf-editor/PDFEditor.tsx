@@ -538,24 +538,27 @@ export function PDFEditor() {
           }));
           setEditingExtractedId(virtual.id);
         } else {
-          const ann: TextAnnotation = {
-            id: uid(),
+          const directArea: EraseAnnotation = {
+            id: `direct-${uid()}`,
             page: pageIndex,
-            type: "text",
+            type: "erase",
             x: point.x,
-            y: Math.max(0, point.y - fontSize),
-            text: "",
-            fontSize,
-            fontKey,
+            y: Math.max(0, point.y - fontSize * 1.15),
+            width: Math.min(Math.max(220, fontSize * 12), Math.max(220, pageDims.width - point.x - 8)),
+            height: Math.max(32, fontSize * 1.9),
             color: "#000000",
             opacity: 1,
             pageWidth: pageDims.width,
             pageHeight: pageDims.height,
           };
-          pushHistory();
-          setAnnotations((a) => [...a, ann]);
-          setEditingExtractedId(null);
-          setEditingTextId(ann.id);
+          const virtual = createVirtualTextForErase(directArea);
+          setExtractedTexts((prev) => [...prev, virtual]);
+          setTextEdits((prev) => ({
+            ...prev,
+            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: "" },
+          }));
+          setEditingTextId(null);
+          setEditingExtractedId(virtual.id);
         }
       }
       return;
@@ -930,6 +933,7 @@ export function PDFEditor() {
       const page = pages[edit.page];
       if (!page) continue;
 
+      const isDirectEdit = original.id.startsWith("tv-") && original.id.includes("-direct-");
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
@@ -944,14 +948,16 @@ export function PDFEditor() {
       const newTextWidth = font.widthOfTextAtSize(edit.newText || " ", fontSize);
       const coverWidth = Math.max(original.pdfWidth, newTextWidth) + padX * 2;
       const coverHeight = ascent + descent + padTop + padBottom;
-      page.drawRectangle({
-        x: original.pdfX - padX,
-        y: original.pdfY - descent - padBottom,
-        width: coverWidth,
-        height: coverHeight,
-        color: rgb(1, 1, 1),
-        opacity: 1,
-      });
+      if (!isDirectEdit || edit.newText.trim()) {
+        page.drawRectangle({
+          x: original.pdfX - padX,
+          y: original.pdfY - descent - padBottom,
+          width: coverWidth,
+          height: coverHeight,
+          color: rgb(1, 1, 1),
+          opacity: 1,
+        });
+      }
 
       const c = hexToRgb01(edit.colorOverride || "#000000");
       if (edit.newText.trim()) {
@@ -2557,6 +2563,11 @@ function AnnotationView({
           <input
             autoFocus
             value={ann.text}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.currentTarget.focus();
+            }}
             onChange={(e) => onEdit(e.target.value)}
             onBlur={onFinishEdit}
             onKeyDown={(e) => {
