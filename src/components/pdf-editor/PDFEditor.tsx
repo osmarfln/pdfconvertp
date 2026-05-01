@@ -1239,8 +1239,11 @@ export function PDFEditor() {
             </div>
           )}
 
-          <ScrollArea className="glass rounded-xl p-3 max-h-[calc(100vh-260px)]">
-            <div className="flex justify-center">
+          <div
+            ref={scrollContainerRef}
+            className="glass rounded-xl p-3 max-h-[calc(100vh-260px)] overflow-auto"
+          >
+            <div className="flex justify-center min-w-max">
               <div
                 className="relative shadow-xl"
                 style={{ width: pageDims.width, height: pageDims.height }}
@@ -1255,7 +1258,9 @@ export function PDFEditor() {
                   className="absolute inset-0"
                   style={{
                     cursor:
-                      tool === "select"
+                      tool === "pan"
+                        ? isPanning ? "grabbing" : "grab"
+                        : tool === "select"
                         ? "default"
                         : tool === "text"
                           ? "text"
@@ -1511,7 +1516,7 @@ export function PDFEditor() {
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </div>
 
