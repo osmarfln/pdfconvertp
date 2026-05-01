@@ -1235,9 +1235,26 @@ export function PDFEditor() {
     setHoveredEraseId(null);
     setHoveredErasedTextId(null);
     if (nextTool === "edit-text") {
-      const hasReadyArea = extractedTexts.some((t) => t.page === pageIndex && isExtractedTextErased(t));
+      const eraseAreas = annotations.filter(
+        (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex,
+      );
+      const missingVirtualAreas = eraseAreas.filter(
+        (ann) => !extractedTexts.some((t) => t.id === `tv-${pageIndex}-${ann.id}`),
+      );
+      if (missingVirtualAreas.length) {
+        const virtualAreas = missingVirtualAreas.map((ann) => createVirtualTextForErase(ann));
+        setExtractedTexts((prev) => [...prev, ...virtualAreas]);
+        setTextEdits((prev) => {
+          const next = { ...prev };
+          virtualAreas.forEach((area) => {
+            next[area.id] = next[area.id] ?? { extractedId: area.id, page: area.page, newText: "" };
+          });
+          return next;
+        });
+      }
+      const hasReadyArea = eraseAreas.length > 0 || extractedTexts.some((t) => t.page === pageIndex && isExtractedTextErased(t));
       if (hasReadyArea) {
-        toast.info("Modo Editar Texto ativo: passe o mouse na área apagada e clique para digitar.");
+        toast.info("Modo Editar Texto ativo: clique na área apagada destacada para digitar.");
       }
     }
   };
