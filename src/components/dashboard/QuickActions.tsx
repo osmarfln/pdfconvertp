@@ -324,7 +324,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   ];
 
   return (
-    <div className="glass rounded-xl p-5">
+    <div className="rounded-xl p-5 bg-transparent">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display font-semibold text-foreground">Ações Rápidas</h3>
         {healthy === false && (
