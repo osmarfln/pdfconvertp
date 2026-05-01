@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import { motion } from "framer-motion";
 import { PDFDocument, PDFFont, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
@@ -1560,6 +1560,92 @@ export function PDFEditor() {
               </Button>
             </div>
           </div>
+
+          {(tool === "erase" || tool === "edit-text") && (() => {
+            const erasedOnPage = annotations.filter(
+              (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex,
+            );
+            const hasErased = erasedOnPage.length > 0;
+            const isTypingNow = editingExtractedId !== null;
+            // Etapa atual: 1 = apagar, 2 = ativar editar texto, 3 = clicar/digitar
+            const currentStep = isTypingNow ? 3 : !hasErased ? 1 : tool === "edit-text" ? 3 : 2;
+
+            const steps = [
+              {
+                n: 1,
+                icon: Eraser,
+                title: "Passe a Borracha",
+                desc: "Arraste sobre o texto para apagar.",
+                done: hasErased,
+              },
+              {
+                n: 2,
+                icon: Edit3,
+                title: "Ative Editar Texto",
+                desc: "Clique na ferramenta Editar Texto.",
+                done: hasErased && tool === "edit-text",
+              },
+              {
+                n: 3,
+                icon: Type,
+                title: "Clique e digite",
+                desc: "Clique na área amarela apagada e escreva.",
+                done: isTypingNow,
+              },
+            ];
+
+            return (
+              <div className="glass rounded-xl px-3 py-2.5 border border-primary/30 flex items-center gap-2 overflow-x-auto">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary shrink-0 pr-1">
+                  Guia
+                </span>
+                {steps.map((s, idx) => {
+                  const Icon = s.icon;
+                  const isActive = currentStep === s.n;
+                  const isDone = s.done && currentStep !== s.n;
+                  return (
+                    <Fragment key={s.n}>
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 rounded-lg px-2.5 py-1.5 border transition-all shrink-0",
+                          isActive &&
+                            "border-warning bg-warning/15 text-foreground shadow-[0_0_12px_-2px_hsl(var(--warning)/0.6)] animate-pulse",
+                          isDone && "border-success/50 bg-success/10 text-success",
+                          !isActive && !isDone && "border-border/40 text-muted-foreground",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold shrink-0",
+                            isActive && "bg-warning text-warning-foreground",
+                            isDone && "bg-success text-success-foreground",
+                            !isActive && !isDone && "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {isDone ? "✓" : s.n}
+                        </span>
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <div className="flex flex-col leading-tight">
+                          <span className="text-xs font-semibold">{s.title}</span>
+                          <span className="text-[10px] opacity-80">{s.desc}</span>
+                        </div>
+                      </div>
+                      {idx < steps.length - 1 && (
+                        <span
+                          className={cn(
+                            "text-base shrink-0",
+                            currentStep > s.n ? "text-success" : "text-muted-foreground/40",
+                          )}
+                        >
+                          →
+                        </span>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {tool === "edit-text" && (() => {
             const erasedReadyCount = extractedTexts.filter((t) => {
