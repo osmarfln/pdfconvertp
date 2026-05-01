@@ -709,6 +709,15 @@ export function PDFEditor() {
           });
         });
 
+        if (finalized.width > 6 && finalized.height > 6) {
+          const virtual = createVirtualTextForErase(finalized, erasedTexts[0]);
+          setExtractedTexts((prev) => [...prev, virtual]);
+          setTextEdits((prev) => ({
+            ...prev,
+            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: "" },
+          }));
+        }
+
         if (erasedTexts.length) {
           setTextEdits((prev) => {
             const next = { ...prev };
@@ -726,34 +735,6 @@ export function PDFEditor() {
             `${erasedTexts.length} trecho(s) apagado(s). Agora clique em Editar Texto e depois na área branca para digitar.`,
           );
         } else if (finalized.width > 6 && finalized.height > 6) {
-          // Fallback: no detectable text under the eraser (scanned PDF, vector
-          // text, or unsupported encoding). Create a synthetic editable region
-          // so the user can still click "Editar Texto" and type over the area.
-          const overlayFontSize = Math.max(10, Math.min(finalized.height * 0.7, 48));
-          const pdfFontSize = overlayFontSize / scale;
-          const pageHeightPdf = (pageDims.height || finalized.height) / scale;
-          const virtual: ExtractedText = {
-            id: `tv-${pageIndex}-${finalized.id}`,
-            page: pageIndex,
-            pdfX: finalized.x / scale,
-            // Convert top-left overlay Y -> baseline Y (PDF origin bottom-left)
-            pdfY: pageHeightPdf - (finalized.y + finalized.height) / scale + pdfFontSize * 0.2,
-            pdfWidth: finalized.width / scale,
-            pdfHeight: finalized.height / scale,
-            fontSize: pdfFontSize,
-            fontName: "Helvetica",
-            originalText: "",
-            overlayX: finalized.x,
-            overlayY: finalized.y,
-            overlayWidth: finalized.width,
-            overlayHeight: finalized.height,
-            overlayFontSize,
-          };
-          setExtractedTexts((prev) => [...prev, virtual]);
-          setTextEdits((prev) => ({
-            ...prev,
-            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: "" },
-          }));
           toast.success(
             "Área pronta para edição. Clique em Editar Texto e depois na área apagada para digitar.",
           );
