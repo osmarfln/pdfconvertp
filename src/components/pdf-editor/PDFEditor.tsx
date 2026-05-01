@@ -1444,6 +1444,15 @@ export function PDFEditor() {
             </div>
           )}
 
+          {tool === "erase" && (
+            <div className="glass rounded-xl px-3 py-2 text-xs text-muted-foreground flex items-center gap-2 border border-warning/30">
+              <Eraser className="w-3.5 h-3.5 text-warning shrink-0" />
+              <span>
+                Arraste sobre o texto para apagar. Em seguida, digite o novo texto no painel — será escrito em cima com a mesma fonte do PDF.
+              </span>
+            </div>
+          )}
+
           <div
             ref={scrollContainerRef}
             className={cn(
