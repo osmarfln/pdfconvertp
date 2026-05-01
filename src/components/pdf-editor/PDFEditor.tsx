@@ -1389,7 +1389,7 @@ export function PDFEditor() {
             ref={scrollContainerRef}
             className={cn(
               "glass rounded-xl p-3 overflow-auto",
-              isFullscreen ? "max-h-[calc(100vh-160px)]" : "max-h-[calc(100vh-260px)]"
+              isFullscreen ? "max-h-[calc(100vh-110px)]" : "max-h-[calc(100vh-260px)]"
             )}
           >
             <div className="flex justify-center min-w-max">
