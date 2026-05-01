@@ -1547,16 +1547,29 @@ export function PDFEditor() {
                         return (
                           <div
                             key={t.id}
+                            onMouseDown={(e) => {
+                              // Prevent the canvas-level handler from
+                              // re-triggering / stealing focus while the
+                              // user interacts with this editable block.
+                              e.stopPropagation();
+                              if (!isEditing) {
+                                updateTextEdit(t.id, {
+                                  newText: textEdits[t.id]?.newText ?? t.originalText,
+                                });
+                                setEditingExtractedId(t.id);
+                              }
+                            }}
                             style={{
                               position: "absolute",
                               left: t.overlayX,
                               top: t.overlayY,
                               minWidth: Math.max(t.overlayWidth, 30),
                               height: t.overlayHeight + 4,
+                              cursor: "text",
                             }}
                             className={cn(
                               "group",
-                              changed && "ring-1 ring-primary/60",
+                              changed && "ring-1 ring-primary/60 bg-white/40",
                             )}
                           >
                             {isEditing ? (
