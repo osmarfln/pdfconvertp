@@ -27,7 +27,16 @@ import {
   Bold,
   Italic,
   AlignLeft,
+  Edit3,
+  Eye,
+  GitCompare,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +56,32 @@ import { cn } from "@/lib/utils";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-type Tool = "select" | "text" | "rect" | "ellipse" | "line" | "draw" | "highlight" | "erase";
+type Tool = "select" | "text" | "edit-text" | "rect" | "ellipse" | "line" | "draw" | "highlight" | "erase";
+
+interface ExtractedText {
+  id: string;
+  page: number;
+  // Original PDF coordinates (PDF points, origin bottom-left)
+  pdfX: number;
+  pdfY: number;
+  pdfWidth: number;
+  pdfHeight: number;
+  fontSize: number; // PDF points
+  fontName: string;
+  originalText: string;
+  // Overlay coordinates (CSS px, origin top-left) for current zoom
+  overlayX: number;
+  overlayY: number;
+  overlayWidth: number;
+  overlayHeight: number;
+  overlayFontSize: number;
+}
+
+interface TextEdit {
+  extractedId: string;
+  page: number;
+  newText: string;
+}
 
 type FontKey =
   | "Helvetica"
@@ -155,6 +189,11 @@ export function PDFEditor() {
   const [opacity, setOpacity] = useState(1);
 
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [extractedTexts, setExtractedTexts] = useState<ExtractedText[]>([]);
+  const [textEdits, setTextEdits] = useState<Record<string, TextEdit>>({});
+  const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
+  const [compareUrls, setCompareUrls] = useState<{ before?: string; after?: string }>({});
   const [history, setHistory] = useState<Annotation[][]>([]);
   const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -175,6 +214,8 @@ export function PDFEditor() {
       setPdfBytes(detail.bytes);
       setPdfName(detail.name || "documento.pdf");
       setAnnotations([]);
+      setExtractedTexts([]);
+      setTextEdits({});
       setHistory([]);
       setRedoStack([]);
     };
@@ -203,7 +244,7 @@ export function PDFEditor() {
     };
   }, [pdfBytes]);
 
-  // Render current page
+  // Render current page + extract text positions
   useEffect(() => {
     if (!pdfDoc) return;
     let cancelled = false;
@@ -218,6 +259,49 @@ export function PDFEditor() {
       setPageDims({ width: viewport.width, height: viewport.height });
       const ctx = canvas.getContext("2d")!;
       await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+
+      try {
+        const textContent = await page.getTextContent();
+        const items: ExtractedText[] = [];
+        textContent.items.forEach((it: any, i: number) => {
+          const str: string = it.str;
+          if (!str || !str.trim()) return;
+          const tr = pdfjsLib.Util.transform(viewport.transform, it.transform);
+          const fontHeightPx = Math.hypot(tr[2], tr[3]);
+          const widthPx = (it.width || 0) * scale;
+          const overlayX = tr[4];
+          const overlayY = tr[5] - fontHeightPx;
+          const pdfX = it.transform[4];
+          const pdfYBaseline = it.transform[5];
+          const pdfFontSize = Math.hypot(it.transform[2], it.transform[3]);
+          const pdfWidth = it.width || 0;
+          const pdfHeight = it.height || pdfFontSize;
+          items.push({
+            id: `t-${pageIndex}-${i}`,
+            page: pageIndex,
+            pdfX,
+            pdfY: pdfYBaseline,
+            pdfWidth,
+            pdfHeight,
+            fontSize: pdfFontSize,
+            fontName: it.fontName || "Helvetica",
+            originalText: str,
+            overlayX,
+            overlayY,
+            overlayWidth: widthPx,
+            overlayHeight: fontHeightPx,
+            overlayFontSize: fontHeightPx,
+          });
+        });
+        if (!cancelled) {
+          setExtractedTexts((prev) => [
+            ...prev.filter((t) => t.page !== pageIndex),
+            ...items,
+          ]);
+        }
+      } catch (err) {
+        console.warn("text extract failed", err);
+      }
     })();
     return () => {
       cancelled = true;
@@ -239,6 +323,8 @@ export function PDFEditor() {
       setPdfBytes(e.target?.result as ArrayBuffer);
       setPdfName(file.name);
       setAnnotations([]);
+      setExtractedTexts([]);
+      setTextEdits({});
       setHistory([]);
       setRedoStack([]);
       toast.success("PDF carregado");
@@ -247,7 +333,7 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
-    if (!pdfDoc || tool === "select") return;
+    if (!pdfDoc || tool === "select" || tool === "edit-text") return;
     const rect = overlayRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -389,106 +475,146 @@ export function PDFEditor() {
     setPageRotation((r) => ({ ...r, [pageIndex]: ((r[pageIndex] ?? 0) + 90) % 360 }));
   };
 
-  const exportPDF = async () => {
-    if (!pdfBytes) return;
-    setExporting(true);
-    try {
-      const doc = await PDFDocument.load(pdfBytes.slice(0));
-      const fontCache = new Map<FontKey, any>();
-      const getFont = async (k: FontKey) => {
-        if (fontCache.has(k)) return fontCache.get(k);
-        const opt = FONT_OPTIONS.find((f) => f.key === k)!;
-        const f = await doc.embedFont(opt.standard);
-        fontCache.set(k, f);
-        return f;
-      };
-
-      const pages = doc.getPages();
-
-      // Apply rotations
-      for (const [pIdx, rot] of Object.entries(pageRotation)) {
-        const idx = parseInt(pIdx, 10);
-        if (pages[idx]) {
-          const current = pages[idx].getRotation().angle;
-          pages[idx].setRotation(degrees((current + rot) % 360));
-        }
+  const buildEditedPdfBytes = async (): Promise<Uint8Array> => {
+    const doc = await PDFDocument.load(pdfBytes!.slice(0));
+    const fontCache = new Map<FontKey, any>();
+    const getFont = async (k: FontKey) => {
+      if (fontCache.has(k)) return fontCache.get(k);
+      const opt = FONT_OPTIONS.find((f) => f.key === k)!;
+      const f = await doc.embedFont(opt.standard);
+      fontCache.set(k, f);
+      return f;
+    };
+    const guessFontKey = (fontName: string): FontKey => {
+      const n = (fontName || "").toLowerCase();
+      const isBold = n.includes("bold");
+      const isItalic = n.includes("italic") || n.includes("oblique");
+      if (n.includes("times") || n.includes("serif")) {
+        return isBold ? "TimesRomanBold" : isItalic ? "TimesRomanItalic" : "TimesRoman";
       }
+      if (n.includes("courier") || n.includes("mono")) {
+        return isBold ? "CourierBold" : "Courier";
+      }
+      return isBold ? "HelveticaBold" : isItalic ? "HelveticaOblique" : "Helvetica";
+    };
 
-      for (const ann of annotations) {
-        const page = pages[ann.page];
-        if (!page) continue;
-        const { width: pw, height: ph } = page.getSize();
-        // The pdfjs canvas was scaled; convert overlay coords (px) to PDF points
-        const sx = pw / pageDims.width;
-        const sy = ph / pageDims.height;
-        const c = hexToRgb01(ann.color || "#000000");
+    const pages = doc.getPages();
 
-        if (ann.type === "text") {
-          const font = await getFont(ann.fontKey);
-          // y in pdf = ph - y (overlay) - fontSize
-          page.drawText(ann.text, {
-            x: ann.x * sx,
-            y: ph - ann.y * sy - ann.fontSize * sy,
-            size: ann.fontSize * sy,
-            font,
-            color: rgb(c.r, c.g, c.b),
-            opacity: ann.opacity,
-          });
-        } else if (ann.type === "rect" || ann.type === "highlight") {
-          page.drawRectangle({
-            x: ann.x * sx,
-            y: ph - (ann.y + ann.height) * sy,
-            width: ann.width * sx,
-            height: ann.height * sy,
-            color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
-            borderColor: rgb(c.r, c.g, c.b),
-            borderWidth: ann.filled ? 0 : ann.strokeWidth,
-            opacity: ann.opacity,
-          });
-        } else if (ann.type === "ellipse") {
-          page.drawEllipse({
-            x: (ann.x + ann.width / 2) * sx,
-            y: ph - (ann.y + ann.height / 2) * sy,
-            xScale: (ann.width / 2) * sx,
-            yScale: (ann.height / 2) * sy,
-            color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
-            borderColor: rgb(c.r, c.g, c.b),
-            borderWidth: ann.filled ? 0 : ann.strokeWidth,
-            opacity: ann.opacity,
-          });
-        } else if (ann.type === "line") {
+    for (const [pIdx, rot] of Object.entries(pageRotation)) {
+      const idx = parseInt(pIdx, 10);
+      if (pages[idx]) {
+        const current = pages[idx].getRotation().angle;
+        pages[idx].setRotation(degrees((current + rot) % 360));
+      }
+    }
+
+    // Apply text edits (cover original + draw new in same place/font)
+    for (const edit of Object.values(textEdits)) {
+      const original = extractedTexts.find((t) => t.id === edit.extractedId);
+      if (!original) continue;
+      const page = pages[edit.page];
+      if (!page) continue;
+      // Cover original text with white rectangle (slightly padded)
+      const padX = original.fontSize * 0.1;
+      const padY = original.fontSize * 0.15;
+      page.drawRectangle({
+        x: original.pdfX - padX,
+        y: original.pdfY - padY,
+        width: original.pdfWidth + padX * 2,
+        height: original.fontSize + padY * 2,
+        color: rgb(1, 1, 1),
+        opacity: 1,
+      });
+      const fk = guessFontKey(original.fontName);
+      const font = await getFont(fk);
+      page.drawText(edit.newText, {
+        x: original.pdfX,
+        y: original.pdfY,
+        size: original.fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+
+    for (const ann of annotations) {
+      const page = pages[ann.page];
+      if (!page) continue;
+      const { width: pw, height: ph } = page.getSize();
+      const sx = pw / pageDims.width;
+      const sy = ph / pageDims.height;
+      const c = hexToRgb01(ann.color || "#000000");
+
+      if (ann.type === "text") {
+        const font = await getFont(ann.fontKey);
+        page.drawText(ann.text, {
+          x: ann.x * sx,
+          y: ph - ann.y * sy - ann.fontSize * sy,
+          size: ann.fontSize * sy,
+          font,
+          color: rgb(c.r, c.g, c.b),
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "rect" || ann.type === "highlight") {
+        page.drawRectangle({
+          x: ann.x * sx,
+          y: ph - (ann.y + ann.height) * sy,
+          width: ann.width * sx,
+          height: ann.height * sy,
+          color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
+          borderColor: rgb(c.r, c.g, c.b),
+          borderWidth: ann.filled ? 0 : ann.strokeWidth,
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "ellipse") {
+        page.drawEllipse({
+          x: (ann.x + ann.width / 2) * sx,
+          y: ph - (ann.y + ann.height / 2) * sy,
+          xScale: (ann.width / 2) * sx,
+          yScale: (ann.height / 2) * sy,
+          color: ann.filled ? rgb(c.r, c.g, c.b) : undefined,
+          borderColor: rgb(c.r, c.g, c.b),
+          borderWidth: ann.filled ? 0 : ann.strokeWidth,
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "line") {
+        page.drawLine({
+          start: { x: ann.x1 * sx, y: ph - ann.y1 * sy },
+          end: { x: ann.x2 * sx, y: ph - ann.y2 * sy },
+          thickness: ann.strokeWidth,
+          color: rgb(c.r, c.g, c.b),
+          opacity: ann.opacity,
+        });
+      } else if (ann.type === "draw") {
+        for (let i = 1; i < ann.points.length; i++) {
+          const p1 = ann.points[i - 1];
+          const p2 = ann.points[i];
           page.drawLine({
-            start: { x: ann.x1 * sx, y: ph - ann.y1 * sy },
-            end: { x: ann.x2 * sx, y: ph - ann.y2 * sy },
+            start: { x: p1.x * sx, y: ph - p1.y * sy },
+            end: { x: p2.x * sx, y: ph - p2.y * sy },
             thickness: ann.strokeWidth,
             color: rgb(c.r, c.g, c.b),
             opacity: ann.opacity,
           });
-        } else if (ann.type === "draw") {
-          for (let i = 1; i < ann.points.length; i++) {
-            const p1 = ann.points[i - 1];
-            const p2 = ann.points[i];
-            page.drawLine({
-              start: { x: p1.x * sx, y: ph - p1.y * sy },
-              end: { x: p2.x * sx, y: ph - p2.y * sy },
-              thickness: ann.strokeWidth,
-              color: rgb(c.r, c.g, c.b),
-              opacity: ann.opacity,
-            });
-          }
-        } else if (ann.type === "erase") {
-          page.drawRectangle({
-            x: ann.x * sx,
-            y: ph - (ann.y + ann.height) * sy,
-            width: ann.width * sx,
-            height: ann.height * sy,
-            color: rgb(1, 1, 1),
-            opacity: 1,
-          });
         }
+      } else if (ann.type === "erase") {
+        page.drawRectangle({
+          x: ann.x * sx,
+          y: ph - (ann.y + ann.height) * sy,
+          width: ann.width * sx,
+          height: ann.height * sy,
+          color: rgb(1, 1, 1),
+          opacity: 1,
+        });
       }
+    }
+    return await doc.save();
+  };
 
-      const out = await doc.save();
+  const exportPDF = async () => {
+    if (!pdfBytes) return;
+    setExporting(true);
+    try {
+      const out = await buildEditedPdfBytes();
       const blob = new Blob([out as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -498,7 +624,7 @@ export function PDFEditor() {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      toast.success("PDF exportado");
+      toast.success("PDF salvo e baixado");
     } catch (e) {
       console.error(e);
       toast.error("Erro ao exportar PDF");
@@ -507,11 +633,44 @@ export function PDFEditor() {
     }
   };
 
+  const openCompare = async () => {
+    if (!pdfBytes) return;
+    try {
+      const beforeBlob = new Blob([pdfBytes.slice(0)], { type: "application/pdf" });
+      const beforeUrl = URL.createObjectURL(beforeBlob);
+      const out = await buildEditedPdfBytes();
+      const afterBlob = new Blob([out as BlobPart], { type: "application/pdf" });
+      const afterUrl = URL.createObjectURL(afterBlob);
+      setCompareUrls({ before: beforeUrl, after: afterUrl });
+      setShowCompare(true);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao gerar comparação");
+    }
+  };
+
+  const updateTextEdit = (extractedId: string, newText: string) => {
+    const original = extractedTexts.find((t) => t.id === extractedId);
+    if (!original) return;
+    setTextEdits((prev) => {
+      if (newText === original.originalText) {
+        const { [extractedId]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [extractedId]: { extractedId, page: original.page, newText },
+      };
+    });
+  };
+
+
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
   const tools: { tool: Tool; icon: any; label: string }[] = [
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
-    { tool: "text", icon: Type, label: "Texto" },
+    { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
+    { tool: "text", icon: Type, label: "Adicionar Texto" },
     { tool: "draw", icon: Pencil, label: "Desenhar" },
     { tool: "highlight", icon: Highlighter, label: "Marca-texto" },
     { tool: "rect", icon: Square, label: "Retângulo" },
@@ -597,9 +756,12 @@ export function PDFEditor() {
               e.target.value = "";
             }}
           />
+          <Button variant="outline" size="sm" onClick={openCompare} className="gap-2">
+            <GitCompare className="w-4 h-4" /> Antes/Depois
+          </Button>
           <Button variant="glow" size="sm" onClick={exportPDF} disabled={exporting} className="gap-2">
             <Download className="w-4 h-4" />
-            {exporting ? "Exportando..." : "Baixar PDF"}
+            {exporting ? "Salvando..." : "Salvar e Baixar"}
           </Button>
         </div>
       </div>
@@ -841,6 +1003,20 @@ export function PDFEditor() {
             </div>
           </div>
 
+          {tool === "edit-text" && (
+            <div className="glass rounded-xl px-3 py-2 text-xs text-muted-foreground flex items-center gap-2 border border-primary/30">
+              <Edit3 className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span>
+                Clique sobre qualquer trecho de texto do PDF para editar. As alterações ficam destacadas e são aplicadas ao salvar.
+              </span>
+              {Object.keys(textEdits).length > 0 && (
+                <span className="ml-auto bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">
+                  {Object.keys(textEdits).length} alteração(ões)
+                </span>
+              )}
+            </div>
+          )}
+
           <ScrollArea className="glass rounded-xl p-3 max-h-[calc(100vh-260px)]">
             <div className="flex justify-center">
               <div
@@ -878,12 +1054,145 @@ export function PDFEditor() {
                       onFinishEdit={() => setEditingTextId(null)}
                     />
                   ))}
+
+                  {/* Editable extracted text overlays */}
+                  {tool === "edit-text" &&
+                    extractedTexts
+                      .filter((t) => t.page === pageIndex)
+                      .map((t) => {
+                        const edit = textEdits[t.id];
+                        const value = edit ? edit.newText : t.originalText;
+                        const changed = !!edit;
+                        const isEditing = editingExtractedId === t.id;
+                        return (
+                          <div
+                            key={t.id}
+                            style={{
+                              position: "absolute",
+                              left: t.overlayX,
+                              top: t.overlayY,
+                              minWidth: Math.max(t.overlayWidth, 30),
+                              height: t.overlayHeight + 4,
+                            }}
+                            className={cn(
+                              "group",
+                              changed && "ring-1 ring-primary/60",
+                            )}
+                          >
+                            {isEditing ? (
+                              <input
+                                autoFocus
+                                value={value}
+                                onChange={(e) => updateTextEdit(t.id, e.target.value)}
+                                onBlur={() => setEditingExtractedId(null)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") setEditingExtractedId(null);
+                                  if (e.key === "Escape") {
+                                    updateTextEdit(t.id, t.originalText);
+                                    setEditingExtractedId(null);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: t.overlayFontSize,
+                                  lineHeight: 1,
+                                  width: "100%",
+                                  height: "100%",
+                                  background: "white",
+                                  color: "black",
+                                  border: "1px solid hsl(var(--primary))",
+                                  outline: "none",
+                                  padding: "0 2px",
+                                  fontFamily: t.fontName.toLowerCase().includes("times")
+                                    ? "Times, serif"
+                                    : t.fontName.toLowerCase().includes("courier")
+                                      ? "Courier, monospace"
+                                      : "Helvetica, Arial, sans-serif",
+                                }}
+                              />
+                            ) : (
+                              <button
+                                onClick={() => setEditingExtractedId(t.id)}
+                                title={`Clique para editar: "${t.originalText}"`}
+                                className={cn(
+                                  "w-full h-full text-left cursor-text",
+                                  "border border-transparent hover:border-primary/60 hover:bg-primary/5",
+                                  changed && "border-primary/60 bg-primary/10",
+                                )}
+                                style={{ background: changed ? undefined : "transparent" }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                 </div>
               </div>
             </div>
           </ScrollArea>
         </div>
       </div>
+
+      <Dialog
+        open={showCompare}
+        onOpenChange={(o) => {
+          setShowCompare(o);
+          if (!o) {
+            if (compareUrls.before) URL.revokeObjectURL(compareUrls.before);
+            if (compareUrls.after) URL.revokeObjectURL(compareUrls.after);
+            setCompareUrls({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitCompare className="w-5 h-5 text-primary" />
+              Comparar — Antes e Depois
+              {Object.keys(textEdits).length > 0 && (
+                <span className="ml-2 text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-full">
+                  {Object.keys(textEdits).length} alteração(ões) de texto
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {Object.keys(textEdits).length > 0 && (
+            <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1.5 max-h-32 overflow-auto">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Alterações:</p>
+              {Object.values(textEdits).map((edit) => {
+                const orig = extractedTexts.find((t) => t.id === edit.extractedId);
+                if (!orig) return null;
+                return (
+                  <div key={edit.extractedId} className="text-xs flex flex-wrap items-center gap-1.5">
+                    <span className="text-muted-foreground">pág {edit.page + 1}:</span>
+                    <span className="line-through text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">
+                      {orig.originalText}
+                    </span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className="text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      {edit.newText}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0">
+            <div className="flex flex-col min-h-0">
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Antes (original)</p>
+              {compareUrls.before && (
+                <iframe src={compareUrls.before} className="flex-1 w-full rounded-lg border border-border bg-white" title="Antes" />
+              )}
+            </div>
+            <div className="flex flex-col min-h-0">
+              <p className="text-xs font-semibold text-primary mb-1.5">Depois (editado)</p>
+              {compareUrls.after && (
+                <iframe src={compareUrls.after} className="flex-1 w-full rounded-lg border border-primary/40 bg-white" title="Depois" />
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
