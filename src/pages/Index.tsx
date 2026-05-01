@@ -154,6 +154,12 @@ export default function Index() {
             </motion.div>
           )}
 
+          {activeTab === "editor" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <PDFEditor />
+            </motion.div>
+          )}
+
           {activeTab === "compare" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <TextComparison />
