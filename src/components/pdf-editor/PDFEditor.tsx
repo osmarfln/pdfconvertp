@@ -517,25 +517,37 @@ export function PDFEditor() {
       if (!original) continue;
       const page = pages[edit.page];
       if (!page) continue;
-      // Cover original text with white rectangle (slightly padded)
-      const padX = original.fontSize * 0.1;
-      const padY = original.fontSize * 0.15;
+
+      const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
+      const fontSize = edit.fontSizeOverride ?? original.fontSize;
+      const font = await getFont(fk);
+
+      // Cover original text with a generously padded white rectangle so no
+      // ascender/descender residue remains.
+      const ascent = original.fontSize * 0.9;
+      const descent = original.fontSize * 0.35;
+      const padX = Math.max(2, original.fontSize * 0.2);
+      const padTop = Math.max(2, original.fontSize * 0.25);
+      const padBottom = Math.max(2, original.fontSize * 0.2);
+      const newTextWidth = font.widthOfTextAtSize(edit.newText || " ", fontSize);
+      const coverWidth = Math.max(original.pdfWidth, newTextWidth) + padX * 2;
+      const coverHeight = ascent + descent + padTop + padBottom;
       page.drawRectangle({
         x: original.pdfX - padX,
-        y: original.pdfY - padY,
-        width: original.pdfWidth + padX * 2,
-        height: original.fontSize + padY * 2,
+        y: original.pdfY - descent - padBottom,
+        width: coverWidth,
+        height: coverHeight,
         color: rgb(1, 1, 1),
         opacity: 1,
       });
-      const fk = guessFontKey(original.fontName);
-      const font = await getFont(fk);
+
+      const c = hexToRgb01(edit.colorOverride || "#000000");
       page.drawText(edit.newText, {
         x: original.pdfX,
         y: original.pdfY,
-        size: original.fontSize,
+        size: fontSize,
         font,
-        color: rgb(0, 0, 0),
+        color: rgb(c.r, c.g, c.b),
       });
     }
 
