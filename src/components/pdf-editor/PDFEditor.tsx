@@ -221,6 +221,8 @@ export function PDFEditor() {
   const [extractedTexts, setExtractedTexts] = useState<ExtractedText[]>([]);
   const [textEdits, setTextEdits] = useState<Record<string, TextEdit>>({});
   const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
+  const [hoveredEraseId, setHoveredEraseId] = useState<string | null>(null);
+  const [hoveredErasedTextId, setHoveredErasedTextId] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [compareUrls, setCompareUrls] = useState<{ before?: string; after?: string }>({});
   const [comparePages, setComparePages] = useState<
@@ -478,12 +480,36 @@ export function PDFEditor() {
     if (tool === "edit-text") {
       const point = getOverlayPoint(e);
       if (!point) return;
-      const target = findTextAtPoint(point.x, point.y) ?? findErasedTextAtPoint(point.x, point.y);
+      const erasedTarget = findErasedTextAtPoint(point.x, point.y);
+      const target = erasedTarget ?? findTextAtPoint(point.x, point.y);
       if (target) {
         e.preventDefault();
         e.stopPropagation();
-        updateTextEdit(target.id, { newText: textEdits[target.id]?.newText ?? "" });
+        updateTextEdit(target.id, {
+          newText: textEdits[target.id]?.newText ?? (erasedTarget || isExtractedTextErased(target) ? "" : target.originalText),
+        });
         setEditingExtractedId(target.id);
+      } else if (findEraseAtPoint(point.x, point.y)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const ann: TextAnnotation = {
+          id: uid(),
+          page: pageIndex,
+          type: "text",
+          x: point.x,
+          y: point.y,
+          text: "",
+          fontSize,
+          fontKey,
+          color: "#000000",
+          opacity: 1,
+          pageWidth: pageDims.width,
+          pageHeight: pageDims.height,
+        };
+        pushHistory();
+        setAnnotations((a) => [...a, ann]);
+        setEditingExtractedId(null);
+        setEditingTextId(ann.id);
       } else {
         setEditingExtractedId(null);
       }
@@ -555,6 +581,14 @@ export function PDFEditor() {
       const dx = e.clientX - panRef.current.startX;
       const dy = e.clientY - panRef.current.startY;
       setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
+      return;
+    }
+    if (tool === "edit-text") {
+      const point = getOverlayPoint(e);
+      const erase = point ? findEraseAtPoint(point.x, point.y) : undefined;
+      const erasedText = point ? findErasedTextAtPoint(point.x, point.y) : undefined;
+      setHoveredEraseId(erase?.id ?? null);
+      setHoveredErasedTextId(erasedText?.id ?? null);
       return;
     }
     if (!drawingRef.current) return;
@@ -722,6 +756,38 @@ export function PDFEditor() {
         .sort((a, b) => a.distance - b.distance)[0]?.text;
     },
     [extractedTexts, pageIndex],
+  );
+
+  const findEraseAtPoint = useCallback(
+    (x: number, y: number) => {
+      const matches = annotations.filter(
+        (ann): ann is EraseAnnotation =>
+          ann.page === pageIndex &&
+          ann.type === "erase" &&
+          x >= ann.x &&
+          x <= ann.x + ann.width &&
+          y >= ann.y &&
+          y <= ann.y + ann.height,
+      );
+      return matches[matches.length - 1];
+    },
+    [annotations, pageIndex],
+  );
+
+  const isExtractedTextErased = useCallback(
+    (text: ExtractedText) =>
+      annotations.some(
+        (ann): ann is EraseAnnotation =>
+          ann.type === "erase" &&
+          ann.page === text.page &&
+          rectanglesIntersect(ann, {
+            x: text.overlayX - 4,
+            y: text.overlayY - 4,
+            width: text.overlayWidth + 8,
+            height: text.overlayHeight + 10,
+          }),
+      ),
+    [annotations],
   );
 
   const findErasedTextAtPoint = useCallback(
@@ -1588,6 +1654,10 @@ export function PDFEditor() {
                   onMouseDown={onCanvasMouseDown}
                   onMouseMove={onCanvasMouseMove}
                   onMouseUp={onCanvasMouseUp}
+                  onMouseLeave={() => {
+                    setHoveredEraseId(null);
+                    setHoveredErasedTextId(null);
+                  }}
                   className="absolute inset-0"
                   style={{
                     touchAction: tool === "pan" ? "none" : undefined,
@@ -1623,21 +1693,31 @@ export function PDFEditor() {
                   {tool === "edit-text" &&
                     annotations
                       .filter((ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex)
-                      .map((ann) => (
-                        <div
-                          key={`erase-hint-${ann.id}`}
-                          className="absolute pointer-events-none rounded-sm animate-pulse"
-                          style={{
-                            left: ann.x,
-                            top: ann.y,
-                            width: ann.width,
-                            height: ann.height,
-                            border: "1.5px dashed hsl(var(--warning))",
-                            background: "hsl(var(--warning) / 0.12)",
-                            boxShadow: "0 0 0 1px hsl(var(--warning) / 0.3)",
-                          }}
-                        />
-                      ))}
+                      .map((ann) => {
+                        const isHovered = hoveredEraseId === ann.id;
+                        return (
+                          <div
+                            key={`erase-hint-${ann.id}`}
+                            className={cn("absolute pointer-events-none rounded-sm", isHovered && "animate-pulse")}
+                            style={{
+                              left: ann.x,
+                              top: ann.y,
+                              width: ann.width,
+                              height: ann.height,
+                              border: `1.5px dashed hsl(var(${isHovered ? "--primary" : "--warning"}))`,
+                              background: isHovered ? "hsl(var(--primary) / 0.12)" : "hsl(var(--warning) / 0.12)",
+                              boxShadow: isHovered ? "0 0 0 2px hsl(var(--primary) / 0.25)" : "0 0 0 1px hsl(var(--warning) / 0.3)",
+                            }}
+                          >
+                            {isHovered && editingExtractedId === null && (
+                              <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold text-primary bg-background/95 border border-primary/40 rounded px-1.5 py-0.5 shadow-lg whitespace-nowrap">
+                                <span className="inline-block h-4 w-px bg-primary animate-pulse" />
+                                Clique para digitar
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
 
                   {/* Editable extracted text overlays */}
                   {tool === "edit-text" &&
@@ -1648,6 +1728,8 @@ export function PDFEditor() {
                         const value = edit ? edit.newText : t.originalText;
                         const changed = !!edit;
                         const isEditing = editingExtractedId === t.id;
+                        const textIsErased = isExtractedTextErased(t);
+                        const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         return (
                           <div
                             key={t.id}
@@ -1658,7 +1740,7 @@ export function PDFEditor() {
                               e.stopPropagation();
                               if (!isEditing) {
                                 updateTextEdit(t.id, {
-                                  newText: textEdits[t.id]?.newText ?? t.originalText,
+                                  newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText),
                                 });
                                 setEditingExtractedId(t.id);
                               }
@@ -1862,7 +1944,7 @@ export function PDFEditor() {
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? "" });
+                                  updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
                                   setEditingExtractedId(t.id);
                                 }}
                                 title={`Clique para editar: "${t.originalText}"`}
@@ -1886,7 +1968,7 @@ export function PDFEditor() {
                                       : "normal",
                                 }}
                               >
-                                {changed ? value : ""}
+                                {showHoverPlaceholder ? <span className="text-primary animate-pulse">| Digite aqui</span> : changed ? value : ""}
                               </button>
                             )}
                           </div>
