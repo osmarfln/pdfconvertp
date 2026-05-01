@@ -164,6 +164,17 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       return;
     }
 
+    if (label === "Editar PDF") {
+      editPdfInputRef.current?.click();
+      return;
+    }
+
+    if (label === "JPG → PDF") {
+      // Open file picker; preview shown in dialog before converting
+      jpgInputRef.current?.click();
+      return;
+    }
+
     // All other actions need iLovePDF
     if (healthy === false) {
       toast.error(reason || "Serviço de conversão indisponível no momento. Tente novamente mais tarde.");
