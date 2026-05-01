@@ -369,6 +369,16 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
 
       {/* Hidden file inputs */}
       <input
+        ref={pickerInputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) handlePickedFile(f);
+        }}
+      />
+      <input
         ref={jpgInputRef}
         type="file"
         accept="image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
