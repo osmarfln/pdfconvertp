@@ -28,6 +28,9 @@ import {
   Italic,
   Edit3,
   Move,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
   Eye,
   GitCompare,
   Maximize2,
@@ -89,6 +92,7 @@ interface TextEdit {
   colorOverride?: string;
   xOffset?: number; // Overlay px from the original editable area
   yOffset?: number; // Overlay px from the original editable area
+  align?: "left" | "center" | "right";
 }
 
 interface PdfTextItem {
