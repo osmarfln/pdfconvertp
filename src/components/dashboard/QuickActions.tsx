@@ -1,12 +1,13 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Image as ImageIcon, Minimize2, Loader2, AlertTriangle } from "lucide-react";
+import { FileOutput, FileText, ScanText, Wand2, Merge, Split, ImageDown, Image as ImageIcon, Minimize2, Loader2, AlertTriangle, Pencil } from "lucide-react";
 import { useFileConversions } from "@/hooks/useFileConversions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useILovePDFHealth } from "@/hooks/useILovePDFHealth";
 import { ConversionProgressDialog, ConversionProgressState, initialProgressState, ConversionStage } from "@/components/ConversionProgressDialog";
 import { detectPageCount } from "@/lib/pdfUtils";
+import { JpgToPdfDialog } from "@/components/dashboard/JpgToPdfDialog";
 
 interface QuickActionsProps {
   onNavigate?: (tab: string) => void;
@@ -18,6 +19,14 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const { healthy, reason, checking, recheck } = useILovePDFHealth();
   const [progress, setProgress] = useState<ConversionProgressState>(initialProgressState);
   const progressTimer = useRef<number | null>(null);
+
+  // JPG → PDF dialog
+  const [jpgDialogOpen, setJpgDialogOpen] = useState(false);
+  const [jpgFile, setJpgFile] = useState<File | null>(null);
+  const jpgInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit PDF (open in editor)
+  const editPdfInputRef = useRef<HTMLInputElement>(null);
 
   const stopProgressTimer = () => {
     if (progressTimer.current) {
@@ -155,6 +164,17 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       return;
     }
 
+    if (label === "Editar PDF") {
+      editPdfInputRef.current?.click();
+      return;
+    }
+
+    if (label === "JPG → PDF") {
+      // Open file picker; preview shown in dialog before converting
+      jpgInputRef.current?.click();
+      return;
+    }
+
     // All other actions need iLovePDF
     if (healthy === false) {
       toast.error(reason || "Serviço de conversão indisponível no momento. Tente novamente mais tarde.");
@@ -203,19 +223,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       return;
     }
 
-    if (label === "JPG → PDF") {
-      if (imageFiles.length === 0) {
-        toast.info("Envie uma imagem JPG ou PNG primeiro.");
-        return;
-      }
-      setProcessingAction(label);
-      const file = imageFiles[0];
-      await runConversionWithProgress("JPG → PDF", file.original_name, async () => {
-        await convertFile(file.id, file.original_path!, "pdf");
-      }, file.file_size, file.original_format, file.original_path);
-      setProcessingAction(null);
-      return;
-    }
+    // JPG → PDF is handled before the health check (opens dialog with preview)
 
     if (label === "Comprimir") {
       if (pdfFiles.length === 0) {
@@ -260,6 +268,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const actions = [
     { icon: FileOutput, label: "Word → PDF", desc: "Converter documentos", color: "bg-primary/10 text-primary" },
     { icon: FileText, label: "PDF → Word", desc: "PDF para DOCX", color: "bg-primary/10 text-primary" },
+    { icon: Pencil, label: "Editar PDF", desc: "Abrir no editor", color: "bg-primary/10 text-primary" },
     { icon: ScanText, label: "OCR", desc: "Extrair texto", color: "bg-success/10 text-success" },
     { icon: Wand2, label: "Corrigir com IA", desc: "Ortografia e gramática", color: "bg-warning/10 text-warning" },
     { icon: Merge, label: "Mesclar PDF", desc: "Unir arquivos", color: "bg-primary/10 text-primary" },
@@ -311,6 +320,59 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       <ConversionProgressDialog
         state={progress}
         onClose={() => setProgress(initialProgressState)}
+      />
+
+      {/* Hidden file inputs */}
+      <input
+        ref={jpgInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) {
+            setJpgFile(f);
+            setJpgDialogOpen(true);
+          }
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={editPdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          if (!f.name.toLowerCase().endsWith(".pdf")) {
+            toast.error("Selecione um arquivo PDF");
+            return;
+          }
+          try {
+            const bytes = await f.arrayBuffer();
+            onNavigate?.("editor");
+            // Defer event to next tick so the editor is mounted
+            setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("open-pdf-editor", { detail: { bytes, name: f.name } }),
+              );
+            }, 60);
+            toast.success("Abrindo no Editor de PDF...");
+          } catch (err: any) {
+            toast.error("Erro ao abrir PDF: " + (err?.message || "desconhecido"));
+          }
+        }}
+      />
+
+      <JpgToPdfDialog
+        open={jpgDialogOpen}
+        onOpenChange={(o) => {
+          setJpgDialogOpen(o);
+          if (!o) setJpgFile(null);
+        }}
+        file={jpgFile}
       />
     </div>
   );
