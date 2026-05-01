@@ -920,16 +920,14 @@ export function PDFEditor() {
       const newTextWidth = font.widthOfTextAtSize(edit.newText || " ", fontSize);
       const coverWidth = Math.max(original.pdfWidth, newTextWidth) + padX * 2;
       const coverHeight = ascent + descent + padTop + padBottom;
-      if (true) {
-        page.drawRectangle({
-          x: original.pdfX - padX,
-          y: original.pdfY - descent - padBottom,
-          width: coverWidth,
-          height: coverHeight,
-          color: rgb(1, 1, 1),
-          opacity: 1,
-        });
-      }
+      page.drawRectangle({
+        x: original.pdfX - padX,
+        y: original.pdfY - descent - padBottom,
+        width: coverWidth,
+        height: coverHeight,
+        color: rgb(1, 1, 1),
+        opacity: 1,
+      });
 
       const c = hexToRgb01(edit.colorOverride || "#000000");
       if (edit.newText.trim()) {
