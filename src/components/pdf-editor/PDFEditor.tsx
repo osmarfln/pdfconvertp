@@ -20,6 +20,7 @@ import {
   Undo2,
   Redo2,
   Highlighter,
+  Hand,
   MousePointer2,
   RotateCw,
   Image as ImageIcon,
@@ -50,14 +51,13 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-type Tool = "select" | "text" | "edit-text" | "rect" | "ellipse" | "line" | "draw" | "highlight" | "erase";
+type Tool = "pan" | "select" | "text" | "edit-text" | "rect" | "ellipse" | "line" | "draw" | "highlight" | "erase";
 
 interface ExtractedText {
   id: string;
@@ -236,9 +236,12 @@ export function PDFEditor() {
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
   const drawingRef = useRef<{ startX: number; startY: number; current?: Annotation } | null>(null);
   const [drawingPreview, setDrawingPreview] = useState<Annotation | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [pageRotation, setPageRotation] = useState<Record<number, number>>({});
@@ -370,6 +373,18 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
+    if (tool === "pan") {
+      const scroller = scrollContainerRef.current;
+      if (!scroller) return;
+      panRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        scrollLeft: scroller.scrollLeft,
+        scrollTop: scroller.scrollTop,
+      };
+      setIsPanning(true);
+      return;
+    }
     if (!pdfDoc || tool === "select" || tool === "edit-text") return;
     const rect = overlayRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -416,6 +431,14 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseMove = (e: React.MouseEvent) => {
+    if (panRef.current) {
+      e.preventDefault();
+      const scroller = scrollContainerRef.current;
+      if (!scroller) return;
+      scroller.scrollLeft = panRef.current.scrollLeft - (e.clientX - panRef.current.startX);
+      scroller.scrollTop = panRef.current.scrollTop - (e.clientY - panRef.current.startY);
+      return;
+    }
     if (!drawingRef.current) return;
     const rect = overlayRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -481,6 +504,10 @@ export function PDFEditor() {
   };
 
   const onCanvasMouseUp = () => {
+    if (panRef.current) {
+      panRef.current = null;
+      setIsPanning(false);
+    }
     if (!drawingRef.current) return;
     if (drawingPreview) {
       pushHistory();
@@ -856,6 +883,7 @@ export function PDFEditor() {
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
   const tools: { tool: Tool; icon: any; label: string }[] = [
+    { tool: "pan", icon: Hand, label: "Mão livre / mover PDF" },
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
     { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
     { tool: "text", icon: Type, label: "Adicionar Texto" },
@@ -1211,8 +1239,18 @@ export function PDFEditor() {
             </div>
           )}
 
-          <ScrollArea className="glass rounded-xl p-3 max-h-[calc(100vh-260px)]">
-            <div className="flex justify-center">
+          {tool === "pan" && (
+            <div className="glass rounded-xl px-3 py-2 text-xs text-muted-foreground flex items-center gap-2 border border-primary/30">
+              <Hand className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span>Arraste o PDF com o mouse para mover a página sem alterar o zoom.</span>
+            </div>
+          )}
+
+          <div
+            ref={scrollContainerRef}
+            className="glass rounded-xl p-3 max-h-[calc(100vh-260px)] overflow-auto"
+          >
+            <div className="flex justify-center min-w-max">
               <div
                 className="relative shadow-xl"
                 style={{ width: pageDims.width, height: pageDims.height }}
@@ -1227,7 +1265,9 @@ export function PDFEditor() {
                   className="absolute inset-0"
                   style={{
                     cursor:
-                      tool === "select"
+                      tool === "pan"
+                        ? isPanning ? "grabbing" : "grab"
+                        : tool === "select"
                         ? "default"
                         : tool === "text"
                           ? "text"
@@ -1483,7 +1523,7 @@ export function PDFEditor() {
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </div>
 
