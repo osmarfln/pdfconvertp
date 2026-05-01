@@ -20,6 +20,14 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const [progress, setProgress] = useState<ConversionProgressState>(initialProgressState);
   const progressTimer = useRef<number | null>(null);
 
+  // JPG → PDF dialog
+  const [jpgDialogOpen, setJpgDialogOpen] = useState(false);
+  const [jpgFile, setJpgFile] = useState<File | null>(null);
+  const jpgInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit PDF (open in editor)
+  const editPdfInputRef = useRef<HTMLInputElement>(null);
+
   const stopProgressTimer = () => {
     if (progressTimer.current) {
       window.clearInterval(progressTimer.current);
