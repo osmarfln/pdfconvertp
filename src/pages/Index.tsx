@@ -123,7 +123,7 @@ export default function Index() {
                   {getGreeting()}, {displayName} 👋
                 </h2>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  Gerencie seus documentos e use o poder da IA para otimizar seus textos.
+                  Gerencie seus documentos, usa a ferramenta para otimizar seus textos PDF sua melhor amigo CONVERT PDF PRO
                 </p>
               </div>
               <StatsCards />
