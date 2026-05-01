@@ -2563,6 +2563,11 @@ function AnnotationView({
           <input
             autoFocus
             value={ann.text}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.currentTarget.focus();
+            }}
             onChange={(e) => onEdit(e.target.value)}
             onBlur={onFinishEdit}
             onKeyDown={(e) => {
