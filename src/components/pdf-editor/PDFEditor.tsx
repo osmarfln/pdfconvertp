@@ -233,6 +233,10 @@ export function PDFEditor() {
     }[]
   >([]);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewPages, setPreviewPages] = useState<{ page: number; img: string; width: number; height: number }[]>([]);
+  const [previewBytes, setPreviewBytes] = useState<Uint8Array | null>(null);
   const [history, setHistory] = useState<Annotation[][]>([]);
   const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
