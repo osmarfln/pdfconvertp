@@ -221,6 +221,8 @@ export function PDFEditor() {
   const [extractedTexts, setExtractedTexts] = useState<ExtractedText[]>([]);
   const [textEdits, setTextEdits] = useState<Record<string, TextEdit>>({});
   const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
+  const [hoveredEraseId, setHoveredEraseId] = useState<string | null>(null);
+  const [hoveredErasedTextId, setHoveredErasedTextId] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [compareUrls, setCompareUrls] = useState<{ before?: string; after?: string }>({});
   const [comparePages, setComparePages] = useState<
@@ -478,12 +480,36 @@ export function PDFEditor() {
     if (tool === "edit-text") {
       const point = getOverlayPoint(e);
       if (!point) return;
-      const target = findTextAtPoint(point.x, point.y) ?? findErasedTextAtPoint(point.x, point.y);
+      const erasedTarget = findErasedTextAtPoint(point.x, point.y);
+      const target = erasedTarget ?? findTextAtPoint(point.x, point.y);
       if (target) {
         e.preventDefault();
         e.stopPropagation();
-        updateTextEdit(target.id, { newText: textEdits[target.id]?.newText ?? "" });
+        updateTextEdit(target.id, {
+          newText: textEdits[target.id]?.newText ?? (erasedTarget || isExtractedTextErased(target) ? "" : target.originalText),
+        });
         setEditingExtractedId(target.id);
+      } else if (findEraseAtPoint(point.x, point.y)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const ann: TextAnnotation = {
+          id: uid(),
+          page: pageIndex,
+          type: "text",
+          x: point.x,
+          y: point.y,
+          text: "",
+          fontSize,
+          fontKey,
+          color: "#000000",
+          opacity: 1,
+          pageWidth: pageDims.width,
+          pageHeight: pageDims.height,
+        };
+        pushHistory();
+        setAnnotations((a) => [...a, ann]);
+        setEditingExtractedId(null);
+        setEditingTextId(ann.id);
       } else {
         setEditingExtractedId(null);
       }
@@ -555,6 +581,14 @@ export function PDFEditor() {
       const dx = e.clientX - panRef.current.startX;
       const dy = e.clientY - panRef.current.startY;
       setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
+      return;
+    }
+    if (tool === "edit-text") {
+      const point = getOverlayPoint(e);
+      const erase = point ? findEraseAtPoint(point.x, point.y) : undefined;
+      const erasedText = point ? findErasedTextAtPoint(point.x, point.y) : undefined;
+      setHoveredEraseId(erase?.id ?? null);
+      setHoveredErasedTextId(erasedText?.id ?? null);
       return;
     }
     if (!drawingRef.current) return;
