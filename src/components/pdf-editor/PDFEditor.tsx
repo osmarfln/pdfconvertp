@@ -1109,9 +1109,10 @@ export function PDFEditor() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
-        {/* Toolbar */}
-        <div className="glass rounded-xl p-3 space-y-3 lg:sticky lg:top-2 lg:self-start">
+      <div className={cn("grid grid-cols-1 gap-4", !isFullscreen && "lg:grid-cols-[260px_1fr]")}>
+        {!isFullscreen && (
+          /* Toolbar */
+          <div className="glass rounded-xl p-3 space-y-3 lg:sticky lg:top-2 lg:self-start">
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Ferramentas</Label>
             <TooltipProvider delayDuration={100}>
@@ -1303,7 +1304,8 @@ export function PDFEditor() {
           <Button size="sm" variant="outline" className="w-full h-8 gap-1" onClick={rotatePage}>
             <RotateCw className="w-3.5 h-3.5" /> Girar página
           </Button>
-        </div>
+          </div>
+        )}
 
         {/* Canvas area */}
         <div className="space-y-3">
@@ -1387,7 +1389,7 @@ export function PDFEditor() {
             ref={scrollContainerRef}
             className={cn(
               "glass rounded-xl p-3 overflow-auto",
-              isFullscreen ? "max-h-[calc(100vh-160px)]" : "max-h-[calc(100vh-260px)]"
+              isFullscreen ? "max-h-[calc(100vh-110px)]" : "max-h-[calc(100vh-260px)]"
             )}
           >
             <div className="flex justify-center min-w-max">
@@ -1672,6 +1674,144 @@ export function PDFEditor() {
           </div>
         </div>
       </div>
+
+      {/* Floating footer toolbar (fullscreen) */}
+      {isFullscreen && (
+        <TooltipProvider delayDuration={100}>
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 glass rounded-2xl px-3 py-2 shadow-2xl border border-border/60 flex items-center gap-2 backdrop-blur-xl flex-wrap max-w-[96vw] justify-center">
+            <div className="flex items-center gap-1">
+              {tools.map((t) => (
+                <Tooltip key={t.tool}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setTool(t.tool)}
+                      aria-label={t.label}
+                      className={cn(
+                        "w-9 h-9 rounded-lg flex items-center justify-center transition-colors border",
+                        tool === t.tool
+                          ? "bg-primary/20 border-primary/50 text-primary"
+                          : "bg-secondary/40 border-border hover:bg-secondary text-foreground",
+                      )}
+                    >
+                      <t.icon className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{t.label}</TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+            <Separator orientation="vertical" className="h-7" />
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={undo} disabled={!history.length}>
+                    <Undo2 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Desfazer</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={redo} disabled={!redoStack.length}>
+                    <Redo2 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Refazer</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={rotatePage}>
+                    <RotateCw className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Girar página</TooltipContent>
+              </Tooltip>
+            </div>
+            <Separator orientation="vertical" className="h-7" />
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9"
+                    onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                    disabled={pageIndex === 0}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Página anterior</TooltipContent>
+              </Tooltip>
+              <span className="text-xs tabular-nums px-1 min-w-[3.5rem] text-center">
+                {pageIndex + 1} / {numPages}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9"
+                    onClick={() => setPageIndex((p) => Math.min(numPages - 1, p + 1))}
+                    disabled={pageIndex >= numPages - 1}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Próxima página</TooltipContent>
+              </Tooltip>
+            </div>
+            <Separator orientation="vertical" className="h-7" />
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}>
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Diminuir zoom</TooltipContent>
+              </Tooltip>
+              <span className="text-xs tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setScale((s) => Math.min(3, s + 0.2))}>
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Aumentar zoom</TooltipContent>
+              </Tooltip>
+            </div>
+            <Separator orientation="vertical" className="h-7" />
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={openPreview}>
+                    <Eye className="w-4 h-4" /> Pré-visualizar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Ver resultado final</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="glow" className="h-9 gap-1.5" onClick={exportPDF} disabled={exporting}>
+                    <Download className="w-4 h-4" />
+                    {exporting ? "Salvando..." : "Baixar"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Baixar PDF editado</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={toggleFullscreen}>
+                    <Minimize2 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Sair da tela cheia</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </TooltipProvider>
+      )}
 
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-6xl w-[95vw] h-[92vh] flex flex-col p-4">
