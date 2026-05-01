@@ -463,6 +463,32 @@ export function PDFEditor() {
     setRedoStack([]);
   }, [annotations]);
 
+  const createVirtualTextForErase = useCallback(
+    (eraseArea: EraseAnnotation, sourceText?: ExtractedText): ExtractedText => {
+      const overlayFontSize = sourceText?.overlayFontSize ?? Math.max(12, Math.min(eraseArea.height * 0.7, 48));
+      const pdfFontSize = sourceText?.fontSize ?? overlayFontSize / scale;
+      const pageHeightPdf = (pageDims.height || eraseArea.height) / scale;
+
+      return {
+        id: `tv-${eraseArea.page}-${eraseArea.id}`,
+        page: eraseArea.page,
+        pdfX: eraseArea.x / scale,
+        pdfY: pageHeightPdf - (eraseArea.y + eraseArea.height) / scale + pdfFontSize * 0.2,
+        pdfWidth: eraseArea.width / scale,
+        pdfHeight: eraseArea.height / scale,
+        fontSize: pdfFontSize,
+        fontName: sourceText?.fontName ?? fontKey,
+        originalText: "",
+        overlayX: eraseArea.x,
+        overlayY: eraseArea.y,
+        overlayWidth: Math.max(eraseArea.width, sourceText?.overlayWidth ?? 80),
+        overlayHeight: Math.max(eraseArea.height, overlayFontSize + 6),
+        overlayFontSize,
+      };
+    },
+    [fontKey, pageDims.height, scale],
+  );
+
   const handleUpload = (file: File) => {
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       toast.error("Selecione um arquivo PDF");
