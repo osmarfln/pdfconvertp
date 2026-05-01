@@ -20,6 +20,7 @@ import { PDFEditor } from "@/components/pdf-editor/PDFEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { PhoneGate } from "@/components/auth/PhoneGate";
+import dashboardBg from "@/assets/dashboard-bg.png";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -117,18 +118,26 @@ export default function Index() {
 
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
           {activeTab === "dashboard" && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 md:space-y-6">
-              <div>
-                <h2 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-foreground">
-                  {getGreeting()}, {displayName} 👋
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Gerencie seus documentos, usa a ferramenta para otimizar seus textos PDF sua melhor amigo CONVERT PDF PRO
-                </p>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative space-y-4 md:space-y-6">
+              {/* Plano de fundo do dashboard - 25% opacidade (75% transparente) */}
+              <div
+                aria-hidden
+                className="pointer-events-none fixed inset-0 z-0 bg-center bg-no-repeat bg-contain opacity-25"
+                style={{ backgroundImage: `url(${dashboardBg})` }}
+              />
+              <div className="relative z-10 space-y-4 md:space-y-6">
+                <div>
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-foreground">
+                    {getGreeting()}, {displayName} 👋
+                  </h2>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Gerencie seus documentos, usa a ferramenta para otimizar seus textos PDF sua melhor amigo CONVERT PDF PRO
+                  </p>
+                </div>
+                <StatsCards />
+                <QuickActions onNavigate={setActiveTab} />
+                <FileList />
               </div>
-              <StatsCards />
-              <QuickActions onNavigate={setActiveTab} />
-              <FileList />
             </motion.div>
           )}
 
