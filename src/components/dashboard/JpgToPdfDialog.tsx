@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Download, FileImage, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { shouldAutoCleanupAfterDownload } from "@/lib/download";
 
 interface JpgToPdfDialogProps {
   open: boolean;
