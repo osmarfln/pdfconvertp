@@ -1218,6 +1218,8 @@ export function PDFEditor() {
         fontKeyOverride: existing?.fontKeyOverride,
         fontSizeOverride: existing?.fontSizeOverride,
         colorOverride: existing?.colorOverride,
+        xOffset: existing?.xOffset,
+        yOffset: existing?.yOffset,
         ...patch,
       };
       const isUnchanged =
@@ -1225,7 +1227,9 @@ export function PDFEditor() {
         merged.newText === original.originalText &&
         !merged.fontKeyOverride &&
         merged.fontSizeOverride === undefined &&
-        !merged.colorOverride;
+        !merged.colorOverride &&
+        !merged.xOffset &&
+        !merged.yOffset;
       if (isUnchanged) {
         const { [extractedId]: _, ...rest } = prev;
         return rest;
@@ -1252,6 +1256,14 @@ export function PDFEditor() {
       height: Math.min(maxHeight, Math.max(18, text.overlayHeight + 6, fontPx * 1.35)),
       fontPx,
     };
+  };
+
+  const getEraseAreaForVirtualText = (text: ExtractedText) => {
+    if (!text.id.startsWith(`tv-${text.page}-`)) return undefined;
+    const eraseId = text.id.replace(`tv-${text.page}-`, "");
+    return annotations.find(
+      (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === text.page && ann.id === eraseId,
+    );
   };
 
 
