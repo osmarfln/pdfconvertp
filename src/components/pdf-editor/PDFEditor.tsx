@@ -1109,7 +1109,9 @@ export function PDFEditor() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+      <div className={cn("grid grid-cols-1 gap-4", !isFullscreen && "lg:grid-cols-[260px_1fr]")}>
+        {isFullscreen && <div className="hidden" />}
+        {!isFullscreen && (
         {/* Toolbar */}
         <div className="glass rounded-xl p-3 space-y-3 lg:sticky lg:top-2 lg:self-start">
           <div>
