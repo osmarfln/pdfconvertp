@@ -1269,7 +1269,7 @@ export function PDFEditor() {
       toast.info(
         hasReadyArea
           ? "Modo Editar Texto ativo: clique na área apagada destacada para digitar."
-          : "Modo Editar Texto ativo: clique em qualquer ponto do PDF para escrever por cima.",
+          : "Modo Editar Texto ativo: clique em um texto existente para editar.",
       );
     }
   };
@@ -1310,7 +1310,7 @@ export function PDFEditor() {
             Carregue um PDF para editar
           </h3>
           <p className="text-muted-foreground text-sm mb-6 max-w-md mx-auto">
-            Adicione textos com diferentes fontes, desenhe à mão livre, marque, apague trechos e
+            Adicione textos com diferentes fontes, marque, apague trechos e
             insira formas geométricas.
           </p>
           <input
@@ -1616,10 +1616,10 @@ export function PDFEditor() {
                 variant={tool === "pan" ? "default" : "outline"}
                 className="h-8 gap-1.5"
                 onClick={() => selectTool("pan")}
-                title="Mão livre / mover PDF"
+                title="Mover PDF"
               >
                 <Hand className="w-4 h-4" />
-                Mão livre
+                Mover PDF
               </Button>
               <Button
                 size="icon"
