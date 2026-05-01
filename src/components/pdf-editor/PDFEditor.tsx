@@ -1955,6 +1955,11 @@ export function PDFEditor() {
                         const textIsErased = true;
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         const metrics = getEditBoxMetrics(t, edit);
+                        const eraseArea = getEraseAreaForVirtualText(t);
+                        const maxOffsetX = Math.max(0, (eraseArea?.width ?? pageDims.width - t.overlayX) - metrics.width);
+                        const maxOffsetY = Math.max(0, (eraseArea?.height ?? pageDims.height - t.overlayY) - metrics.height);
+                        const xOffset = clamp(edit?.xOffset ?? 0, 0, maxOffsetX);
+                        const yOffset = clamp(edit?.yOffset ?? 0, 0, maxOffsetY);
                         return (
                           <div
                             key={t.id}
@@ -1972,8 +1977,8 @@ export function PDFEditor() {
                             }}
                             style={{
                               position: "absolute",
-                              left: t.overlayX,
-                              top: t.overlayY,
+                              left: (eraseArea?.x ?? t.overlayX) + xOffset,
+                              top: (eraseArea?.y ?? t.overlayY) + yOffset,
                               width: metrics.width,
                               height: metrics.height,
                               cursor: "text",
@@ -2034,6 +2039,30 @@ export function PDFEditor() {
                                   className="absolute z-20 left-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
                                   onMouseDown={(e) => e.preventDefault()}
                                 >
+                                  {eraseArea && (
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        moveTextRef.current = {
+                                          extractedId: t.id,
+                                          eraseArea,
+                                          startClientX: e.clientX,
+                                          startClientY: e.clientY,
+                                          startOffsetX: xOffset,
+                                          startOffsetY: yOffset,
+                                          boxWidth: metrics.width,
+                                          boxHeight: metrics.height,
+                                        };
+                                        setIsMovingText(true);
+                                      }}
+                                      className="h-7 w-7 rounded border border-border bg-secondary/50 flex items-center justify-center cursor-move"
+                                      title="Mover texto dentro da área apagada"
+                                    >
+                                      <Move className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                   <Select
                                     value={edit?.fontKeyOverride ?? "__auto__"}
                                     onValueChange={(v) =>
