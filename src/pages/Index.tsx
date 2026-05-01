@@ -18,6 +18,7 @@ import { ExportPage } from "@/components/pages/ExportPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { PDFEditor } from "@/components/pdf-editor/PDFEditor";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { PhoneGate } from "@/components/auth/PhoneGate";
 
 function getGreeting(): string {
@@ -29,6 +30,15 @@ function getGreeting(): string {
 
 export default function Index() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const { isAdmin } = useAuth();
+
+  // Redirect non-admins away from admin-only tabs
+  useEffect(() => {
+    const adminOnly = ["reports", "admin", "settings"];
+    if (!isAdmin && adminOnly.includes(activeTab)) {
+      setActiveTab("dashboard");
+    }
+  }, [isAdmin, activeTab]);
   const [userName, setUserName] = useState("");
   const [needsPhone, setNeedsPhone] = useState<boolean | null>(null);
   const [userId, setUserId] = useState("");
@@ -156,7 +166,7 @@ export default function Index() {
             </motion.div>
           )}
 
-          {activeTab === "reports" && (
+          {activeTab === "reports" && isAdmin && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <ReportsPage />
             </motion.div>
@@ -168,13 +178,13 @@ export default function Index() {
             </motion.div>
           )}
 
-          {activeTab === "admin" && (
+          {activeTab === "admin" && isAdmin && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <AdminPanel />
             </motion.div>
           )}
 
-          {activeTab === "settings" && (
+          {activeTab === "settings" && isAdmin && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <SettingsPage />
             </motion.div>
