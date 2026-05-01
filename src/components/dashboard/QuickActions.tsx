@@ -321,6 +321,59 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
         state={progress}
         onClose={() => setProgress(initialProgressState)}
       />
+
+      {/* Hidden file inputs */}
+      <input
+        ref={jpgInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) {
+            setJpgFile(f);
+            setJpgDialogOpen(true);
+          }
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={editPdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          if (!f.name.toLowerCase().endsWith(".pdf")) {
+            toast.error("Selecione um arquivo PDF");
+            return;
+          }
+          try {
+            const bytes = await f.arrayBuffer();
+            onNavigate?.("editor");
+            // Defer event to next tick so the editor is mounted
+            setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("open-pdf-editor", { detail: { bytes, name: f.name } }),
+              );
+            }, 60);
+            toast.success("Abrindo no Editor de PDF...");
+          } catch (err: any) {
+            toast.error("Erro ao abrir PDF: " + (err?.message || "desconhecido"));
+          }
+        }}
+      />
+
+      <JpgToPdfDialog
+        open={jpgDialogOpen}
+        onOpenChange={(o) => {
+          setJpgDialogOpen(o);
+          if (!o) setJpgFile(null);
+        }}
+        file={jpgFile}
+      />
     </div>
   );
 }
