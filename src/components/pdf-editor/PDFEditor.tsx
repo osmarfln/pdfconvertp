@@ -1935,7 +1935,10 @@ export function PDFEditor() {
                                   value={value}
                                   placeholder="Digite o novo texto..."
                                   onMouseDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.currentTarget.focus();
+                                  }}
                                   onChange={(e) => updateTextEdit(t.id, { newText: e.target.value })}
                                   onKeyDown={(e) => {
                                     e.stopPropagation();
