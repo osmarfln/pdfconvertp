@@ -1236,6 +1236,7 @@ export function PDFEditor() {
         colorOverride: existing?.colorOverride,
         xOffset: existing?.xOffset,
         yOffset: existing?.yOffset,
+        align: existing?.align,
         ...patch,
       };
       const isUnchanged =
@@ -1245,7 +1246,8 @@ export function PDFEditor() {
         merged.fontSizeOverride === undefined &&
         !merged.colorOverride &&
         !merged.xOffset &&
-        !merged.yOffset;
+        !merged.yOffset &&
+        !merged.align;
       if (isUnchanged) {
         const { [extractedId]: _, ...rest } = prev;
         return rest;
