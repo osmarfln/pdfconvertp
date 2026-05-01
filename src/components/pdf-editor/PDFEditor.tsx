@@ -198,7 +198,7 @@ export function PDFEditor() {
   const [scale, setScale] = useState(1.3);
   const [pageDims, setPageDims] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  const [tool, setTool] = useState<Tool>("select");
+  const [tool, setTool] = useState<Tool>("edit-text");
   const [color, setColor] = useState("#ef4444");
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [fontSize, setFontSize] = useState(16);
