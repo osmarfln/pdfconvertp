@@ -382,6 +382,133 @@ export function AnalyticsCharts({ users }: Props) {
         </ResponsiveContainer>
       </div>
 
+      {/* Configuração de alertas de latência */}
+      <div className="glass rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Settings2 className="w-4 h-4 text-primary" />
+          <h3 className="font-display font-semibold text-foreground text-sm">
+            Alertas de latência
+          </h3>
+          <div className="ml-auto flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              {alertsEnabled ? (
+                <Bell className="w-3.5 h-3.5 text-success" />
+              ) : (
+                <BellOff className="w-3.5 h-3.5 text-muted-foreground" />
+              )}
+              <Label htmlFor="alerts-on" className="text-xs cursor-pointer">
+                Ativar alertas
+              </Label>
+              <Switch
+                id="alerts-on"
+                checked={alertsEnabled}
+                onCheckedChange={setAlertsEnabled}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="alerts-browser" className="text-xs cursor-pointer">
+                Notificações do navegador
+              </Label>
+              <Switch
+                id="alerts-browser"
+                checked={browserNotif}
+                onCheckedChange={setBrowserNotif}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Limite Backend (ms) — atual: <span className="text-foreground font-semibold">{currentSupabase < 0 ? "—" : `${currentSupabase}ms`}</span>
+            </Label>
+            <Input
+              type="number"
+              min={50}
+              max={10000}
+              value={thresholdBackend}
+              onChange={(e) => setThresholdBackend(Math.max(50, Number(e.target.value) || 0))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Limite Internet (ms) — atual: <span className="text-foreground font-semibold">{currentInternet < 0 ? "—" : `${currentInternet}ms`}</span>
+            </Label>
+            <Input
+              type="number"
+              min={50}
+              max={10000}
+              value={thresholdInternet}
+              onChange={(e) => setThresholdInternet(Math.max(50, Number(e.target.value) || 0))}
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => {
+              setThresholdBackend(500);
+              setThresholdInternet(800);
+              toast.success("Limites restaurados ao padrão");
+            }}
+          >
+            Restaurar padrão
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => {
+              fireAlert("Backend", currentSupabase, thresholdBackend);
+            }}
+          >
+            Testar alerta
+          </Button>
+          {alertHistory.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs ml-auto"
+              onClick={() => setAlertHistory([])}
+            >
+              Limpar histórico
+            </Button>
+          )}
+        </div>
+
+        {alertHistory.length > 0 && (
+          <div className="rounded-lg border border-border bg-secondary/20 p-2 max-h-40 overflow-auto">
+            <div className="text-[10px] text-muted-foreground mb-1 px-1">
+              Últimos alertas disparados
+            </div>
+            <ul className="space-y-1">
+              {alertHistory.map((a, i) => (
+                <li
+                  key={i}
+                  className="flex items-center gap-2 text-xs px-2 py-1 rounded bg-destructive/5"
+                >
+                  <AlertTriangle className="w-3 h-3 text-destructive shrink-0" />
+                  <span className="text-muted-foreground">{a.time}</span>
+                  <span className="font-medium text-foreground">{a.type}</span>
+                  <span className="ml-auto text-destructive font-semibold">
+                    {a.value}ms
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    (limite {a.threshold}ms)
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
       {/* Saúde da conexão (radial) + Status usuários (pizza) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="glass rounded-xl p-4">
