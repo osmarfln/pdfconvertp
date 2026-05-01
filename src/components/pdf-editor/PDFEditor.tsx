@@ -1828,6 +1828,50 @@ export function PDFEditor() {
                   onMouseDown={onCanvasMouseDown}
                   onMouseMove={onCanvasMouseMove}
                   onMouseUp={onCanvasMouseUp}
+                  onDoubleClick={(e) => {
+                    const point = getOverlayPoint(e);
+                    if (!point) return;
+                    // Try existing extracted text first (real text on the PDF)
+                    const target =
+                      findErasedTextAtPoint(point.x, point.y) ??
+                      findTextAtPoint(point.x, point.y);
+                    if (target) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (tool !== "edit-text") setTool("edit-text");
+                      updateTextEdit(target.id, {
+                        newText:
+                          textEdits[target.id]?.newText ??
+                          (isExtractedTextErased(target) ? "" : target.originalText),
+                      });
+                      setEditingExtractedId(target.id);
+                      return;
+                    }
+                    // Fallback: existing erased area
+                    const eraseArea = findEraseAtPoint(point.x, point.y);
+                    if (eraseArea) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (tool !== "edit-text") setTool("edit-text");
+                      const existingVirtual = extractedTexts.find(
+                        (t) => t.id === `tv-${pageIndex}-${eraseArea.id}`,
+                      );
+                      const virtual =
+                        existingVirtual ?? createVirtualTextForErase(eraseArea);
+                      if (!existingVirtual) {
+                        setExtractedTexts((prev) => [...prev, virtual]);
+                      }
+                      setTextEdits((prev) => ({
+                        ...prev,
+                        [virtual.id]: {
+                          extractedId: virtual.id,
+                          page: pageIndex,
+                          newText: prev[virtual.id]?.newText ?? "",
+                        },
+                      }));
+                      setEditingExtractedId(virtual.id);
+                    }
+                  }}
                   onMouseLeave={() => {
                     setHoveredEraseId(null);
                     setHoveredErasedTextId(null);
