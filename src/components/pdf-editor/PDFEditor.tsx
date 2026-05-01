@@ -323,6 +323,8 @@ export function PDFEditor() {
       setPdfBytes(e.target?.result as ArrayBuffer);
       setPdfName(file.name);
       setAnnotations([]);
+      setExtractedTexts([]);
+      setTextEdits({});
       setHistory([]);
       setRedoStack([]);
       toast.success("PDF carregado");
