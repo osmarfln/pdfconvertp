@@ -815,17 +815,17 @@ export function PDFEditor() {
 
   const isExtractedTextErased = useCallback(
     (text: ExtractedText) =>
-      annotations.some(
-        (ann): ann is EraseAnnotation =>
-          ann.type === "erase" &&
-          ann.page === text.page &&
-          rectanglesIntersect(ann, {
-            x: text.overlayX - 4,
-            y: text.overlayY - 4,
-            width: text.overlayWidth + 8,
-            height: text.overlayHeight + 10,
-          }),
-      ),
+      annotations.some((ann): ann is EraseAnnotation => {
+        if (ann.type !== "erase" || ann.page !== text.page) return false;
+        const padX = Math.max(6, text.overlayHeight * 0.4);
+        const padY = Math.max(6, text.overlayHeight * 0.5);
+        return rectanglesIntersect(ann, {
+          x: text.overlayX - padX,
+          y: text.overlayY - padY,
+          width: Math.max(text.overlayWidth, 12) + padX * 2,
+          height: Math.max(text.overlayHeight, 10) + padY * 2,
+        });
+      }),
     [annotations],
   );
 
@@ -846,14 +846,16 @@ export function PDFEditor() {
         .filter(
           (t) =>
             t.page === pageIndex &&
-            erasers.some((eraser) =>
-              rectanglesIntersect(eraser, {
-                x: t.overlayX - 4,
-                y: t.overlayY - 4,
-                width: t.overlayWidth + 8,
-                height: t.overlayHeight + 10,
-              }),
-            ),
+            erasers.some((eraser) => {
+              const padX = Math.max(6, t.overlayHeight * 0.4);
+              const padY = Math.max(6, t.overlayHeight * 0.5);
+              return rectanglesIntersect(eraser, {
+                x: t.overlayX - padX,
+                y: t.overlayY - padY,
+                width: Math.max(t.overlayWidth, 12) + padX * 2,
+                height: Math.max(t.overlayHeight, 10) + padY * 2,
+              });
+            }),
         )
         .map((t) => {
           const centerX = t.overlayX + t.overlayWidth / 2;
