@@ -373,6 +373,33 @@ export function PDFEditor() {
 
       try {
         const textContent = await page.getTextContent();
+
+        // Resolve internal pdf.js font ids (e.g. "g_d0_f1") to the real
+        // PostScript font name embedded in the PDF (e.g. "Helvetica-Bold",
+        // "TimesNewRomanPS-ItalicMT"). This lets us pick the right standard
+        // font when re-drawing edited text on top of the erased area.
+        const resolveFontName = (id?: string): string => {
+          if (!id) return "Helvetica";
+          try {
+            // commonObjs holds standard fonts; objs holds embedded fonts
+            const anyPage = page as unknown as {
+              commonObjs?: { has: (k: string) => boolean; get: (k: string) => unknown };
+              objs?: { has: (k: string) => boolean; get: (k: string) => unknown };
+            };
+            const sources = [anyPage.commonObjs, anyPage.objs];
+            for (const src of sources) {
+              if (src && typeof src.has === "function" && src.has(id)) {
+                const obj = src.get(id) as { name?: string; loadedName?: string } | undefined;
+                const real = obj?.name || obj?.loadedName;
+                if (real) return real;
+              }
+            }
+          } catch {
+            // ignore — fall back to id
+          }
+          return id;
+        };
+
         const items: ExtractedText[] = [];
         textContent.items.forEach((it, i: number) => {
           if (!("str" in it)) return;
@@ -389,6 +416,7 @@ export function PDFEditor() {
           const pdfFontSize = Math.hypot(textItem.transform[2], textItem.transform[3]);
           const pdfWidth = textItem.width || 0;
           const pdfHeight = textItem.height || pdfFontSize;
+          const realFontName = resolveFontName(textItem.fontName);
           items.push({
             id: `t-${pageIndex}-${i}`,
             page: pageIndex,
@@ -397,7 +425,7 @@ export function PDFEditor() {
             pdfWidth,
             pdfHeight,
             fontSize: pdfFontSize,
-            fontName: textItem.fontName || "Helvetica",
+            fontName: realFontName,
             originalText: str,
             overlayX,
             overlayY,
