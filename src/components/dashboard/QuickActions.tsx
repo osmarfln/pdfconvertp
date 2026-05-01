@@ -223,19 +223,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       return;
     }
 
-    if (label === "JPG → PDF") {
-      if (imageFiles.length === 0) {
-        toast.info("Envie uma imagem JPG ou PNG primeiro.");
-        return;
-      }
-      setProcessingAction(label);
-      const file = imageFiles[0];
-      await runConversionWithProgress("JPG → PDF", file.original_name, async () => {
-        await convertFile(file.id, file.original_path!, "pdf");
-      }, file.file_size, file.original_format, file.original_path);
-      setProcessingAction(null);
-      return;
-    }
+    // JPG → PDF is handled before the health check (opens dialog with preview)
 
     if (label === "Comprimir") {
       if (pdfFiles.length === 0) {
