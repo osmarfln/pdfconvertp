@@ -1792,23 +1792,36 @@ export function PDFEditor() {
                         return (
                           <div
                             key={`erase-hint-${ann.id}`}
-                            className={cn("absolute pointer-events-none rounded-sm", isHovered && "animate-pulse")}
+                            className={cn(
+                              "absolute pointer-events-none rounded-sm animate-pulse",
+                              isHovered && "z-10",
+                            )}
                             style={{
                               left: ann.x,
                               top: ann.y,
                               width: ann.width,
                               height: ann.height,
-                              border: `1.5px dashed hsl(var(${isHovered ? "--primary" : "--warning"}))`,
-                              background: isHovered ? "hsl(var(--primary) / 0.12)" : "hsl(var(--warning) / 0.12)",
-                              boxShadow: isHovered ? "0 0 0 2px hsl(var(--primary) / 0.25)" : "0 0 0 1px hsl(var(--warning) / 0.3)",
+                              border: `2.5px dashed hsl(var(${isHovered ? "--primary" : "--warning"}))`,
+                              background: isHovered
+                                ? "hsl(var(--primary) / 0.25)"
+                                : "hsl(var(--warning) / 0.35)",
+                              boxShadow: isHovered
+                                ? "0 0 0 3px hsl(var(--primary) / 0.4), 0 0 14px hsl(var(--primary) / 0.5)"
+                                : "0 0 0 2px hsl(var(--warning) / 0.5), 0 0 10px hsl(var(--warning) / 0.45)",
                             }}
                           >
-                            {isHovered && editingExtractedId === null && (
-                              <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold text-primary bg-background/95 border border-primary/40 rounded px-1.5 py-0.5 shadow-lg whitespace-nowrap">
-                                <span className="inline-block h-4 w-px bg-primary animate-pulse" />
-                                Clique para digitar
-                              </div>
-                            )}
+                            {/* Always-visible label so users see exactly where to click */}
+                            <div
+                              className={cn(
+                                "absolute -top-6 left-0 flex items-center gap-1 text-[10px] font-bold rounded px-1.5 py-0.5 shadow-lg whitespace-nowrap border",
+                                isHovered
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-warning text-warning-foreground border-warning",
+                              )}
+                            >
+                              <span className="inline-block h-3 w-px bg-current animate-pulse" />
+                              {isHovered ? "Clique aqui para digitar" : "Área editável"}
+                            </div>
                           </div>
                         );
                       })}
