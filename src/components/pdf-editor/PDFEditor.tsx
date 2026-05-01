@@ -406,18 +406,25 @@ export function PDFEditor() {
         textContent.items.forEach((it, i: number) => {
           if (!("str" in it)) return;
           const textItem = it as PdfTextItem;
-          const str: string = textItem.str;
-          if (!str || !str.trim()) return;
+          const str: string = textItem.str ?? "";
+          // Keep whitespace-only items too (they often anchor blank/justified
+          // regions where the user might want to type after erasing).
+          if (!str) return;
           const tr = pdfjsLib.Util.transform(viewport.transform, textItem.transform);
-          const fontHeightPx = Math.hypot(tr[2], tr[3]);
-          const widthPx = (textItem.width || 0) * scale;
+          const fontHeightPx = Math.max(Math.hypot(tr[2], tr[3]), 6);
+          // Some glyphs/fonts report width=0 (combining marks, emoji, custom
+          // encodings). Estimate a sensible width so the bbox can still be
+          // hit-tested by the eraser.
+          const reportedWidthPx = (textItem.width || 0) * scale;
+          const fallbackWidthPx = Math.max(str.length, 1) * fontHeightPx * 0.5;
+          const widthPx = Math.max(reportedWidthPx, fallbackWidthPx);
           const overlayX = tr[4];
           const overlayY = tr[5] - fontHeightPx;
           const pdfX = textItem.transform[4];
           const pdfYBaseline = textItem.transform[5];
-          const pdfFontSize = Math.hypot(textItem.transform[2], textItem.transform[3]);
-          const pdfWidth = textItem.width || 0;
-          const pdfHeight = textItem.height || pdfFontSize;
+          const pdfFontSize = Math.max(Math.hypot(textItem.transform[2], textItem.transform[3]), 6);
+          const pdfWidth = Math.max(textItem.width || 0, (widthPx / scale));
+          const pdfHeight = Math.max(textItem.height || 0, pdfFontSize);
           const realFontName = resolveFontName(textItem.fontName);
           items.push({
             id: `t-${pageIndex}-${i}`,
@@ -666,16 +673,21 @@ export function PDFEditor() {
       const finalized: Annotation = { ...drawingPreview, id: uid() };
       setAnnotations((a) => [...a, finalized]);
       if (finalized.type === "erase") {
-        const erasedTexts = extractedTexts.filter(
-          (t) =>
-            t.page === pageIndex &&
-            rectanglesIntersect(finalized, {
-              x: t.overlayX - 2,
-              y: t.overlayY - 2,
-              width: t.overlayWidth + 4,
-              height: t.overlayHeight + 6,
-            }),
-        );
+        // More generous intersection: pad each text bbox by a fraction of its
+        // own font height so partial overlaps still register, and so that
+        // small/thin glyphs (numbers, punctuation) are detected reliably.
+        const candidates = extractedTexts.filter((t) => t.page === pageIndex);
+        const erasedTexts = candidates.filter((t) => {
+          const padX = Math.max(6, t.overlayHeight * 0.4);
+          const padY = Math.max(6, t.overlayHeight * 0.5);
+          return rectanglesIntersect(finalized, {
+            x: t.overlayX - padX,
+            y: t.overlayY - padY,
+            width: Math.max(t.overlayWidth, 12) + padX * 2,
+            height: Math.max(t.overlayHeight, 10) + padY * 2,
+          });
+        });
+
         if (erasedTexts.length) {
           setTextEdits((prev) => {
             const next = { ...prev };
@@ -691,6 +703,38 @@ export function PDFEditor() {
           });
           toast.success(
             `${erasedTexts.length} trecho(s) apagado(s). Agora clique em Editar Texto e depois na área branca para digitar.`,
+          );
+        } else if (finalized.width > 6 && finalized.height > 6) {
+          // Fallback: no detectable text under the eraser (scanned PDF, vector
+          // text, or unsupported encoding). Create a synthetic editable region
+          // so the user can still click "Editar Texto" and type over the area.
+          const overlayFontSize = Math.max(10, Math.min(finalized.height * 0.7, 48));
+          const pdfFontSize = overlayFontSize / scale;
+          const pageHeightPdf = (pageDims.height || finalized.height) / scale;
+          const virtual: ExtractedText = {
+            id: `tv-${pageIndex}-${finalized.id}`,
+            page: pageIndex,
+            pdfX: finalized.x / scale,
+            // Convert top-left overlay Y -> baseline Y (PDF origin bottom-left)
+            pdfY: pageHeightPdf - (finalized.y + finalized.height) / scale + pdfFontSize * 0.2,
+            pdfWidth: finalized.width / scale,
+            pdfHeight: finalized.height / scale,
+            fontSize: pdfFontSize,
+            fontName: "Helvetica",
+            originalText: "",
+            overlayX: finalized.x,
+            overlayY: finalized.y,
+            overlayWidth: finalized.width,
+            overlayHeight: finalized.height,
+            overlayFontSize,
+          };
+          setExtractedTexts((prev) => [...prev, virtual]);
+          setTextEdits((prev) => ({
+            ...prev,
+            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: "" },
+          }));
+          toast.success(
+            "Área pronta para edição. Clique em Editar Texto e depois na área apagada para digitar.",
           );
         }
       }
@@ -771,17 +815,17 @@ export function PDFEditor() {
 
   const isExtractedTextErased = useCallback(
     (text: ExtractedText) =>
-      annotations.some(
-        (ann): ann is EraseAnnotation =>
-          ann.type === "erase" &&
-          ann.page === text.page &&
-          rectanglesIntersect(ann, {
-            x: text.overlayX - 4,
-            y: text.overlayY - 4,
-            width: text.overlayWidth + 8,
-            height: text.overlayHeight + 10,
-          }),
-      ),
+      annotations.some((ann): ann is EraseAnnotation => {
+        if (ann.type !== "erase" || ann.page !== text.page) return false;
+        const padX = Math.max(6, text.overlayHeight * 0.4);
+        const padY = Math.max(6, text.overlayHeight * 0.5);
+        return rectanglesIntersect(ann, {
+          x: text.overlayX - padX,
+          y: text.overlayY - padY,
+          width: Math.max(text.overlayWidth, 12) + padX * 2,
+          height: Math.max(text.overlayHeight, 10) + padY * 2,
+        });
+      }),
     [annotations],
   );
 
@@ -802,14 +846,16 @@ export function PDFEditor() {
         .filter(
           (t) =>
             t.page === pageIndex &&
-            erasers.some((eraser) =>
-              rectanglesIntersect(eraser, {
-                x: t.overlayX - 4,
-                y: t.overlayY - 4,
-                width: t.overlayWidth + 8,
-                height: t.overlayHeight + 10,
-              }),
-            ),
+            erasers.some((eraser) => {
+              const padX = Math.max(6, t.overlayHeight * 0.4);
+              const padY = Math.max(6, t.overlayHeight * 0.5);
+              return rectanglesIntersect(eraser, {
+                x: t.overlayX - padX,
+                y: t.overlayY - padY,
+                width: Math.max(t.overlayWidth, 12) + padX * 2,
+                height: Math.max(t.overlayHeight, 10) + padY * 2,
+              });
+            }),
         )
         .map((t) => {
           const centerX = t.overlayX + t.overlayWidth / 2;
