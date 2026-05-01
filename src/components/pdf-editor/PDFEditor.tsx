@@ -1210,13 +1210,14 @@ export function PDFEditor() {
       const merged: TextEdit = {
         extractedId,
         page: original.page,
-        newText: existing?.newText ?? original.originalText,
+          newText: existing?.newText ?? (isExtractedTextErased(original) ? "" : original.originalText),
         fontKeyOverride: existing?.fontKeyOverride,
         fontSizeOverride: existing?.fontSizeOverride,
         colorOverride: existing?.colorOverride,
         ...patch,
       };
       const isUnchanged =
+          !isExtractedTextErased(original) &&
         merged.newText === original.originalText &&
         !merged.fontKeyOverride &&
         merged.fontSizeOverride === undefined &&
