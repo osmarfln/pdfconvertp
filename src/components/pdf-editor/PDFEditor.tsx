@@ -1040,6 +1040,76 @@ export function PDFEditor() {
                       onFinishEdit={() => setEditingTextId(null)}
                     />
                   ))}
+
+                  {/* Editable extracted text overlays */}
+                  {tool === "edit-text" &&
+                    extractedTexts
+                      .filter((t) => t.page === pageIndex)
+                      .map((t) => {
+                        const edit = textEdits[t.id];
+                        const value = edit ? edit.newText : t.originalText;
+                        const changed = !!edit;
+                        const isEditing = editingExtractedId === t.id;
+                        return (
+                          <div
+                            key={t.id}
+                            style={{
+                              position: "absolute",
+                              left: t.overlayX,
+                              top: t.overlayY,
+                              minWidth: Math.max(t.overlayWidth, 30),
+                              height: t.overlayHeight + 4,
+                            }}
+                            className={cn(
+                              "group",
+                              changed && "ring-1 ring-primary/60",
+                            )}
+                          >
+                            {isEditing ? (
+                              <input
+                                autoFocus
+                                value={value}
+                                onChange={(e) => updateTextEdit(t.id, e.target.value)}
+                                onBlur={() => setEditingExtractedId(null)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") setEditingExtractedId(null);
+                                  if (e.key === "Escape") {
+                                    updateTextEdit(t.id, t.originalText);
+                                    setEditingExtractedId(null);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: t.overlayFontSize,
+                                  lineHeight: 1,
+                                  width: "100%",
+                                  height: "100%",
+                                  background: "white",
+                                  color: "black",
+                                  border: "1px solid hsl(var(--primary))",
+                                  outline: "none",
+                                  padding: "0 2px",
+                                  fontFamily: t.fontName.toLowerCase().includes("times")
+                                    ? "Times, serif"
+                                    : t.fontName.toLowerCase().includes("courier")
+                                      ? "Courier, monospace"
+                                      : "Helvetica, Arial, sans-serif",
+                                }}
+                              />
+                            ) : (
+                              <button
+                                onClick={() => setEditingExtractedId(t.id)}
+                                title={`Clique para editar: "${t.originalText}"`}
+                                className={cn(
+                                  "w-full h-full text-left cursor-text",
+                                  "border border-transparent hover:border-primary/60 hover:bg-primary/5",
+                                  changed && "border-primary/60 bg-primary/10",
+                                )}
+                                style={{ background: changed ? undefined : "transparent" }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                 </div>
               </div>
             </div>
