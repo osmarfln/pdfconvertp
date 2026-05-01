@@ -531,25 +531,7 @@ export function PDFEditor() {
         e.preventDefault();
         e.stopPropagation();
         const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
-        const overlayFontSize = Math.max(12, Math.min(eraseArea.height * 0.7, 48));
-        const pdfFontSize = overlayFontSize / scale;
-        const pageHeightPdf = (pageDims.height || eraseArea.height) / scale;
-        const virtual: ExtractedText = existingVirtual ?? {
-          id: `tv-${pageIndex}-${eraseArea.id}`,
-          page: pageIndex,
-          pdfX: eraseArea.x / scale,
-          pdfY: pageHeightPdf - (eraseArea.y + eraseArea.height) / scale + pdfFontSize * 0.2,
-          pdfWidth: eraseArea.width / scale,
-          pdfHeight: eraseArea.height / scale,
-          fontSize: pdfFontSize,
-          fontName: fontKey,
-          originalText: "",
-          overlayX: eraseArea.x,
-          overlayY: eraseArea.y,
-          overlayWidth: Math.max(eraseArea.width, 80),
-          overlayHeight: Math.max(eraseArea.height, overlayFontSize + 6),
-          overlayFontSize,
-        };
+        const virtual = existingVirtual ?? createVirtualTextForErase(eraseArea);
         if (!existingVirtual) {
           setExtractedTexts((prev) => [...prev, virtual]);
         }
