@@ -627,7 +627,14 @@ export function PDFEditor() {
             });
             return next;
           });
-          toast.success(`${erasedTexts.length} trecho(s) marcado(s) para apagar`);
+          // Switch to edit-text and open first erased block so user can type
+          // over the erased area using the same font as the original PDF text.
+          const first = erasedTexts[0];
+          setTool("edit-text");
+          setEditingExtractedId(first.id);
+          toast.success(
+            `${erasedTexts.length} trecho(s) apagado(s). Digite o novo texto para escrever em cima com a mesma fonte.`,
+          );
         }
       }
     }
