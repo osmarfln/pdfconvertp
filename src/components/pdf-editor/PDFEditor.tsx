@@ -861,6 +861,8 @@ export function PDFEditor() {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     toast.success("PDF baixado");
   };
+
+  const openCompare = async () => {
     if (!pdfBytes) return;
     setCompareLoading(true);
     setShowCompare(true);
