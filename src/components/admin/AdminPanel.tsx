@@ -14,7 +14,9 @@ import {
   Trash2,
   Eye,
   X,
+  BarChart3,
 } from "lucide-react";
+import { AnalyticsCharts } from "./AnalyticsCharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -183,6 +185,10 @@ export function AdminPanel() {
             <Users className="w-4 h-4 mr-1.5" />
             Usuários
           </TabsTrigger>
+          <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <BarChart3 className="w-4 h-4 mr-1.5" />
+            Analytics
+          </TabsTrigger>
           <TabsTrigger value="permissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Shield className="w-4 h-4 mr-1.5" />
             Permissões
@@ -192,6 +198,11 @@ export function AdminPanel() {
             Configurações
           </TabsTrigger>
         </TabsList>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics">
+          <AnalyticsCharts users={users} />
+        </TabsContent>
 
         {/* Users Tab */}
         <TabsContent value="users" className="space-y-4">
