@@ -1331,6 +1331,19 @@ export function PDFEditor() {
                                   </Button>
                                   <Button
                                     size="sm"
+                                    variant="destructive"
+                                    className="h-7 px-2 text-xs gap-1"
+                                    onClick={() => {
+                                      updateTextEdit(t.id, { newText: "" });
+                                      setEditingExtractedId(null);
+                                      toast.success("Texto apagado");
+                                    }}
+                                    title="Apagar este trecho"
+                                  >
+                                    <Eraser className="w-3 h-3" /> Apagar
+                                  </Button>
+                                  <Button
+                                    size="sm"
                                     variant="default"
                                     className="h-7 px-2 text-xs"
                                     onClick={() => setEditingExtractedId(null)}
