@@ -946,15 +946,31 @@ export function PDFEditor() {
       const page = pages[edit.page];
       if (!page) continue;
 
-      const isEraseAreaEdit = annotations.some(
+      const eraseAreaForEdit = annotations.find(
         (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === original.page && original.id === `tv-${original.page}-${ann.id}`,
       );
+      const isEraseAreaEdit = !!eraseAreaForEdit;
       if (original.id.startsWith("tv-") && !isEraseAreaEdit) continue;
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
-      const drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
+      let drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
       const drawY = original.pdfY - (edit.yOffset ?? 0) / scale;
+
+      // Apply horizontal alignment within the erased area for the final PDF
+      if (eraseAreaForEdit && edit.align && edit.align !== "left" && edit.newText.trim()) {
+        const page = pages[edit.page];
+        const { width: pw } = page.getSize();
+        const sx = pw / (eraseAreaForEdit.pageWidth || pageDims.width || pw);
+        const areaPdfX = eraseAreaForEdit.x * sx;
+        const areaPdfWidth = eraseAreaForEdit.width * sx;
+        const textWidth = font.widthOfTextAtSize(edit.newText, fontSize);
+        if (edit.align === "center") {
+          drawX = areaPdfX + (areaPdfWidth - textWidth) / 2;
+        } else if (edit.align === "right") {
+          drawX = areaPdfX + areaPdfWidth - textWidth - 2;
+        }
+      }
 
       // Cover original text with a generously padded white rectangle so no
       // ascender/descender residue remains.
