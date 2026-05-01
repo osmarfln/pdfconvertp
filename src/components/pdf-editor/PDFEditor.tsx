@@ -10,7 +10,6 @@ import {
   Circle as CircleIcon,
   Minus,
   Eraser,
-  Pencil,
   Download,
   Trash2,
   ChevronLeft,
@@ -27,7 +26,6 @@ import {
   FileText,
   Bold,
   Italic,
-  AlignLeft,
   Edit3,
   Eye,
   GitCompare,
@@ -522,44 +520,23 @@ export function PDFEditor() {
           newText: textEdits[target.id]?.newText ?? (erasedTarget || isExtractedTextErased(target) ? "" : target.originalText),
         });
         setEditingExtractedId(target.id);
-      } else {
+        return;
+      }
+
+      const eraseArea = findEraseAtPoint(point.x, point.y);
+      if (eraseArea) {
         e.preventDefault();
         e.stopPropagation();
-        const eraseArea = findEraseAtPoint(point.x, point.y);
-        if (eraseArea) {
-          const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
-          const virtual = existingVirtual ?? createVirtualTextForErase(eraseArea);
-          if (!existingVirtual) {
-            setExtractedTexts((prev) => [...prev, virtual]);
-          }
-          setTextEdits((prev) => ({
-            ...prev,
-            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
-          }));
-          setEditingExtractedId(virtual.id);
-        } else {
-          const directArea: EraseAnnotation = {
-            id: `direct-${uid()}`,
-            page: pageIndex,
-            type: "erase",
-            x: point.x,
-            y: Math.max(0, point.y - fontSize * 1.15),
-            width: Math.min(Math.max(220, fontSize * 12), Math.max(220, pageDims.width - point.x - 8)),
-            height: Math.max(32, fontSize * 1.9),
-            color: "#000000",
-            opacity: 1,
-            pageWidth: pageDims.width,
-            pageHeight: pageDims.height,
-          };
-          const virtual = createVirtualTextForErase(directArea);
+        const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
+        const virtual = existingVirtual ?? createVirtualTextForErase(eraseArea);
+        if (!existingVirtual) {
           setExtractedTexts((prev) => [...prev, virtual]);
-          setTextEdits((prev) => ({
-            ...prev,
-            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: "" },
-          }));
-          setEditingTextId(null);
-          setEditingExtractedId(virtual.id);
         }
+        setTextEdits((prev) => ({
+          ...prev,
+          [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
+        }));
+        setEditingExtractedId(virtual.id);
       }
       return;
     }
