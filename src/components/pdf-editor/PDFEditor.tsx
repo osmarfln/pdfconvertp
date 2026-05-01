@@ -2233,13 +2233,15 @@ export function PDFEditor() {
                                   setEditingExtractedId(t.id);
                                 }}
                                 title={value ? `Clique para editar: "${value}"` : "Clique para digitar"}
-                                className="w-full h-full text-left cursor-text overflow-visible whitespace-nowrap bg-transparent border-0"
+                                className="w-full h-full cursor-text overflow-visible bg-transparent border-0"
                                 style={{
                                   color: edit?.colorOverride || "black",
                                   fontSize: metrics.fontPx,
                                   lineHeight: `${metrics.height}px`,
                                   padding: "0 4px",
                                   textAlign: edit?.align ?? "left",
+                                  whiteSpace: "pre",
+                                  display: "block",
                                   fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
                                   fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
                                   fontStyle:
