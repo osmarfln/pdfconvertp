@@ -445,7 +445,7 @@ export function PDFEditor() {
         });
         if (!cancelled) {
           setExtractedTexts((prev) => [
-            ...prev.filter((t) => t.page !== pageIndex),
+            ...prev.filter((t) => t.page !== pageIndex || t.id.startsWith("tv-")),
             ...items,
           ]);
         }
