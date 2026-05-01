@@ -1920,10 +1920,7 @@ export function PDFEditor() {
                               height: metrics.height,
                               cursor: "text",
                             }}
-                            className={cn(
-                              "group",
-                              changed && "ring-1 ring-primary/60 bg-white/40",
-                            )}
+                            className="group"
                           >
                             {isEditing ? (
                               <>
