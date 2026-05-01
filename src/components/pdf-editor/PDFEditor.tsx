@@ -767,27 +767,6 @@ export function PDFEditor() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const findTextAtPoint = useCallback(
-    (x: number, y: number) => {
-      const padding = 10;
-      return extractedTexts
-        .filter((t) => t.page === pageIndex)
-        .map((t) => {
-          const left = t.overlayX - padding;
-          const top = t.overlayY - padding;
-          const right = t.overlayX + Math.max(t.overlayWidth, 20) + padding;
-          const bottom = t.overlayY + Math.max(t.overlayHeight, 12) + padding;
-          const inside = x >= left && x <= right && y >= top && y <= bottom;
-          const centerX = t.overlayX + t.overlayWidth / 2;
-          const centerY = t.overlayY + t.overlayHeight / 2;
-          return { text: t, inside, distance: Math.hypot(x - centerX, y - centerY) };
-        })
-        .filter((item) => item.inside)
-        .sort((a, b) => a.distance - b.distance)[0]?.text;
-    },
-    [extractedTexts, pageIndex],
-  );
-
   const findEraseAtPoint = useCallback(
     (x: number, y: number) => {
       const matches = annotations.filter(
