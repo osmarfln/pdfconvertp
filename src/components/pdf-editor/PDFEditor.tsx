@@ -51,6 +51,7 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +114,8 @@ interface BaseAnnotation {
   type: Tool;
   color: string;
   opacity: number;
+  pageWidth?: number;
+  pageHeight?: number;
 }
 
 interface TextAnnotation extends BaseAnnotation {
@@ -165,6 +168,18 @@ type Annotation =
   | EraseAnnotation;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+const getFontFamily = (fontKeyOrName?: string) => {
+  const name = (fontKeyOrName || "").toLowerCase();
+  if (name.includes("times") || name.includes("serif")) return "Times, serif";
+  if (name.includes("courier") || name.includes("mono")) return "Courier, monospace";
+  return "Helvetica, Arial, sans-serif";
+};
+
+const rectanglesIntersect = (
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 
 function hexToRgb01(hex: string) {
   const m = hex.replace("#", "");
@@ -349,11 +364,13 @@ export function PDFEditor() {
         type: "text",
         x,
         y,
-        text: "Texto",
+        text: "",
         fontSize,
         fontKey,
         color,
         opacity,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setAnnotations((a) => [...a, ann]);
       setEditingTextId(ann.id);
@@ -371,6 +388,8 @@ export function PDFEditor() {
         color,
         opacity,
         strokeWidth,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       drawingRef.current.current = ann;
       setDrawingPreview(ann);
@@ -404,6 +423,8 @@ export function PDFEditor() {
         opacity: tool === "highlight" ? 0.4 : opacity,
         strokeWidth,
         filled: tool === "highlight" ? true : filled,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setDrawingPreview(ann);
     } else if (tool === "line") {
@@ -418,6 +439,8 @@ export function PDFEditor() {
         color,
         opacity,
         strokeWidth,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setDrawingPreview(ann);
     } else if (tool === "erase") {
@@ -431,6 +454,8 @@ export function PDFEditor() {
         height: Math.abs(y - startY),
         color: "#ffffff",
         opacity: 1,
+        pageWidth: pageDims.width,
+        pageHeight: pageDims.height,
       };
       setDrawingPreview(ann);
     }
@@ -442,6 +467,33 @@ export function PDFEditor() {
       pushHistory();
       const finalized: Annotation = { ...drawingPreview, id: uid() };
       setAnnotations((a) => [...a, finalized]);
+      if (finalized.type === "erase") {
+        const erasedTexts = extractedTexts.filter(
+          (t) =>
+            t.page === pageIndex &&
+            rectanglesIntersect(finalized, {
+              x: t.overlayX - 2,
+              y: t.overlayY - 2,
+              width: t.overlayWidth + 4,
+              height: t.overlayHeight + 6,
+            }),
+        );
+        if (erasedTexts.length) {
+          setTextEdits((prev) => {
+            const next = { ...prev };
+            erasedTexts.forEach((t) => {
+              next[t.id] = {
+                ...(next[t.id] || { extractedId: t.id, page: t.page }),
+                extractedId: t.id,
+                page: t.page,
+                newText: "",
+              };
+            });
+            return next;
+          });
+          toast.success(`${erasedTexts.length} trecho(s) marcado(s) para apagar`);
+        }
+      }
     }
     drawingRef.current = null;
     setDrawingPreview(null);
@@ -542,21 +594,23 @@ export function PDFEditor() {
       });
 
       const c = hexToRgb01(edit.colorOverride || "#000000");
-      page.drawText(edit.newText, {
-        x: original.pdfX,
-        y: original.pdfY,
-        size: fontSize,
-        font,
-        color: rgb(c.r, c.g, c.b),
-      });
+      if (edit.newText.trim()) {
+        page.drawText(edit.newText, {
+          x: original.pdfX,
+          y: original.pdfY,
+          size: fontSize,
+          font,
+          color: rgb(c.r, c.g, c.b),
+        });
+      }
     }
 
     for (const ann of annotations) {
       const page = pages[ann.page];
       if (!page) continue;
       const { width: pw, height: ph } = page.getSize();
-      const sx = pw / pageDims.width;
-      const sy = ph / pageDims.height;
+      const sx = pw / (ann.pageWidth || pageDims.width || pw);
+      const sy = ph / (ann.pageHeight || pageDims.height || ph);
       const c = hexToRgb01(ann.color || "#000000");
 
       if (ann.type === "text") {
@@ -713,7 +767,7 @@ export function PDFEditor() {
     { tool: "rect", icon: Square, label: "Retângulo" },
     { tool: "ellipse", icon: CircleIcon, label: "Elipse" },
     { tool: "line", icon: Minus, label: "Linha" },
-    { tool: "erase", icon: Eraser, label: "Apagar (cobrir)" },
+    { tool: "erase", icon: Eraser, label: "Borracha / Apagar texto" },
   ];
 
   if (!pdfBytes) {
@@ -808,23 +862,29 @@ export function PDFEditor() {
         <div className="glass rounded-xl p-3 space-y-3 lg:sticky lg:top-2 lg:self-start">
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Ferramentas</Label>
-            <div className="grid grid-cols-4 gap-1.5">
-              {tools.map((t) => (
-                <button
-                  key={t.tool}
-                  onClick={() => setTool(t.tool)}
-                  title={t.label}
-                  className={cn(
-                    "aspect-square rounded-lg flex items-center justify-center transition-colors border",
-                    tool === t.tool
-                      ? "bg-primary/15 border-primary/50 text-primary"
-                      : "bg-secondary/50 border-border hover:bg-secondary text-foreground",
-                  )}
-                >
-                  <t.icon className="w-4 h-4" />
-                </button>
-              ))}
-            </div>
+            <TooltipProvider delayDuration={100}>
+              <div className="grid grid-cols-4 gap-1.5">
+                {tools.map((t) => (
+                  <Tooltip key={t.tool}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setTool(t.tool)}
+                        aria-label={t.label}
+                        className={cn(
+                          "aspect-square rounded-lg flex items-center justify-center transition-colors border",
+                          tool === t.tool
+                            ? "bg-primary/15 border-primary/50 text-primary"
+                            : "bg-secondary/50 border-border hover:bg-secondary text-foreground",
+                        )}
+                      >
+                        <t.icon className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.label}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </TooltipProvider>
           </div>
 
           <Separator />
@@ -1285,12 +1345,26 @@ export function PDFEditor() {
                                 onClick={() => setEditingExtractedId(t.id)}
                                 title={`Clique para editar: "${t.originalText}"`}
                                 className={cn(
-                                  "w-full h-full text-left cursor-text",
+                                  "w-full h-full text-left cursor-text overflow-visible whitespace-nowrap",
                                   "border border-transparent hover:border-primary/60 hover:bg-primary/5",
                                   changed && "border-primary/60 bg-primary/10",
                                 )}
-                                style={{ background: changed ? undefined : "transparent" }}
-                              />
+                                style={{
+                                  background: changed ? "white" : "transparent",
+                                  color: edit?.colorOverride || "black",
+                                  fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
+                                  lineHeight: 1,
+                                  padding: "0 2px",
+                                  fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
+                                  fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
+                                  fontStyle:
+                                    edit?.fontKeyOverride?.includes("Oblique") || edit?.fontKeyOverride?.includes("Italic")
+                                      ? "italic"
+                                      : "normal",
+                                }}
+                              >
+                                {changed ? value : ""}
+                              </button>
                             )}
                           </div>
                         );
