@@ -1099,9 +1099,12 @@ export function PDFEditor() {
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             {isFullscreen ? "Sair tela cheia" : "Tela cheia"}
           </Button>
+          <Button variant="outline" size="sm" onClick={openPreview} className="gap-2">
+            <Eye className="w-4 h-4" /> Pré-visualizar
+          </Button>
           <Button variant="glow" size="sm" onClick={exportPDF} disabled={exporting} className="gap-2">
             <Download className="w-4 h-4" />
-            {exporting ? "Salvando..." : "Salvar e Baixar"}
+            {exporting ? "Salvando..." : "Baixar PDF"}
           </Button>
         </div>
       </div>
