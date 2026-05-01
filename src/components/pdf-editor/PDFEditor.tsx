@@ -332,6 +332,33 @@ export function PDFEditor() {
     };
   }, [isPanning]);
 
+  useEffect(() => {
+    if (!isMovingText) return;
+    const moveText = (event: MouseEvent) => {
+      const current = moveTextRef.current;
+      if (!current) return;
+      event.preventDefault();
+      const dx = event.clientX - current.startClientX;
+      const dy = event.clientY - current.startClientY;
+      const maxX = Math.max(0, current.eraseArea.width - current.boxWidth);
+      const maxY = Math.max(0, current.eraseArea.height - current.boxHeight);
+      updateTextEdit(current.extractedId, {
+        xOffset: clamp(current.startOffsetX + dx, 0, maxX),
+        yOffset: clamp(current.startOffsetY + dy, 0, maxY),
+      });
+    };
+    const stopMoveText = () => {
+      moveTextRef.current = null;
+      setIsMovingText(false);
+    };
+    window.addEventListener("mousemove", moveText, { passive: false });
+    window.addEventListener("mouseup", stopMoveText);
+    return () => {
+      window.removeEventListener("mousemove", moveText);
+      window.removeEventListener("mouseup", stopMoveText);
+    };
+  }, [isMovingText]);
+
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
     const handler = (e: Event) => {
