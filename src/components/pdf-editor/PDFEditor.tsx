@@ -538,24 +538,27 @@ export function PDFEditor() {
           }));
           setEditingExtractedId(virtual.id);
         } else {
-          const ann: TextAnnotation = {
-            id: uid(),
+          const directArea: EraseAnnotation = {
+            id: `direct-${uid()}`,
             page: pageIndex,
-            type: "text",
+            type: "erase",
             x: point.x,
-            y: Math.max(0, point.y - fontSize),
-            text: "",
-            fontSize,
-            fontKey,
+            y: Math.max(0, point.y - fontSize * 1.15),
+            width: Math.min(Math.max(220, fontSize * 12), Math.max(220, pageDims.width - point.x - 8)),
+            height: Math.max(32, fontSize * 1.9),
             color: "#000000",
             opacity: 1,
             pageWidth: pageDims.width,
             pageHeight: pageDims.height,
           };
-          pushHistory();
-          setAnnotations((a) => [...a, ann]);
-          setEditingExtractedId(null);
-          setEditingTextId(ann.id);
+          const virtual = createVirtualTextForErase(directArea);
+          setExtractedTexts((prev) => [...prev, virtual]);
+          setTextEdits((prev) => ({
+            ...prev,
+            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: "" },
+          }));
+          setEditingTextId(null);
+          setEditingExtractedId(virtual.id);
         }
       }
       return;
