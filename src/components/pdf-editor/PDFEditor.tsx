@@ -1345,12 +1345,26 @@ export function PDFEditor() {
                                 onClick={() => setEditingExtractedId(t.id)}
                                 title={`Clique para editar: "${t.originalText}"`}
                                 className={cn(
-                                  "w-full h-full text-left cursor-text",
+                                  "w-full h-full text-left cursor-text overflow-visible whitespace-nowrap",
                                   "border border-transparent hover:border-primary/60 hover:bg-primary/5",
                                   changed && "border-primary/60 bg-primary/10",
                                 )}
-                                style={{ background: changed ? undefined : "transparent" }}
-                              />
+                                style={{
+                                  background: changed ? "white" : "transparent",
+                                  color: edit?.colorOverride || "black",
+                                  fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
+                                  lineHeight: 1,
+                                  padding: "0 2px",
+                                  fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
+                                  fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
+                                  fontStyle:
+                                    edit?.fontKeyOverride?.includes("Oblique") || edit?.fontKeyOverride?.includes("Italic")
+                                      ? "italic"
+                                      : "normal",
+                                }}
+                              >
+                                {changed ? value : ""}
+                              </button>
                             )}
                           </div>
                         );
