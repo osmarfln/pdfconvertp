@@ -1750,7 +1750,7 @@ export function PDFEditor() {
                     <span>
                       {erasedReadyCount > 0
                         ? "Clique em qualquer área apagada (destacada em amarelo) para escrever em cima com a fonte original."
-                        : "Clique em um texto do PDF para abrir uma caixa do mesmo tamanho e editar por cima."}
+                        : "Use a borracha para apagar uma área; depois clique na área apagada para digitar."}
                     </span>
                   </>
                 )}
