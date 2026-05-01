@@ -290,11 +290,6 @@ export function PDFEditor() {
       const dx = event.clientX - panRef.current.startX;
       const dy = event.clientY - panRef.current.startY;
       setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
-      const scroller = scrollContainerRef.current;
-      if (scroller) {
-        scroller.scrollLeft = panRef.current.scrollLeft - dx;
-        scroller.scrollTop = panRef.current.scrollTop - dy;
-      }
     };
     const stopPan = () => {
       panRef.current = null;
@@ -498,13 +493,9 @@ export function PDFEditor() {
   const onCanvasMouseMove = (e: React.MouseEvent) => {
     if (panRef.current) {
       e.preventDefault();
-      const scroller = scrollContainerRef.current;
-      if (!scroller) return;
       const dx = e.clientX - panRef.current.startX;
       const dy = e.clientY - panRef.current.startY;
       setPanOffset({ x: panRef.current.offsetX + dx, y: panRef.current.offsetY + dy });
-      scroller.scrollLeft = panRef.current.scrollLeft - dx;
-      scroller.scrollTop = panRef.current.scrollTop - dy;
       return;
     }
     if (!drawingRef.current) return;
