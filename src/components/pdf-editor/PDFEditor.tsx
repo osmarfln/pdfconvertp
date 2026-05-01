@@ -1920,11 +1920,13 @@ export function PDFEditor() {
                     extractedTexts
                       .filter((t) => t.page === pageIndex)
                       .map((t) => {
+                        const isEraseAreaText = t.id.startsWith(`tv-${pageIndex}-`);
+                        if (!isEraseAreaText) return null;
                         const edit = textEdits[t.id];
                         const value = edit ? edit.newText : t.originalText;
                         const changed = !!edit;
                         const isEditing = editingExtractedId === t.id;
-                        const textIsErased = isExtractedTextErased(t);
+                        const textIsErased = true;
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         const metrics = getEditBoxMetrics(t, edit);
                         return (
