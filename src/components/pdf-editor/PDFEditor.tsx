@@ -1604,7 +1604,7 @@ export function PDFEditor() {
                   const isActive = currentStep === s.n;
                   const isDone = s.done && currentStep !== s.n;
                   return (
-                    <React.Fragment key={s.n}>
+                    <Fragment key={s.n}>
                       <div
                         className={cn(
                           "flex items-center gap-2 rounded-lg px-2.5 py-1.5 border transition-all shrink-0",
@@ -1640,7 +1640,7 @@ export function PDFEditor() {
                           →
                         </span>
                       )}
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })}
               </div>
