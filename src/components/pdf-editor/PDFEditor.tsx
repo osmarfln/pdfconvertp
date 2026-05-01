@@ -523,31 +523,40 @@ export function PDFEditor() {
         });
         setEditingExtractedId(target.id);
       } else {
-        const eraseArea = findEraseAtPoint(point.x, point.y) ?? {
-          id: `free-${uid()}`,
-          page: pageIndex,
-          type: "erase" as const,
-          x: point.x,
-          y: Math.max(0, point.y - fontSize),
-          width: Math.max(180, fontSize * 8),
-          height: Math.max(28, fontSize * 1.8),
-          color: "#ffffff",
-          opacity: 1,
-          pageWidth: pageDims.width,
-          pageHeight: pageDims.height,
-        };
         e.preventDefault();
         e.stopPropagation();
-        const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
-        const virtual = existingVirtual ?? createVirtualTextForErase(eraseArea);
-        if (!existingVirtual) {
-          setExtractedTexts((prev) => [...prev, virtual]);
+        const eraseArea = findEraseAtPoint(point.x, point.y);
+        if (eraseArea) {
+          const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
+          const virtual = existingVirtual ?? createVirtualTextForErase(eraseArea);
+          if (!existingVirtual) {
+            setExtractedTexts((prev) => [...prev, virtual]);
+          }
+          setTextEdits((prev) => ({
+            ...prev,
+            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
+          }));
+          setEditingExtractedId(virtual.id);
+        } else {
+          const ann: TextAnnotation = {
+            id: uid(),
+            page: pageIndex,
+            type: "text",
+            x: point.x,
+            y: Math.max(0, point.y - fontSize),
+            text: "",
+            fontSize,
+            fontKey,
+            color: "#000000",
+            opacity: 1,
+            pageWidth: pageDims.width,
+            pageHeight: pageDims.height,
+          };
+          pushHistory();
+          setAnnotations((a) => [...a, ann]);
+          setEditingExtractedId(null);
+          setEditingTextId(ann.id);
         }
-        setTextEdits((prev) => ({
-          ...prev,
-          [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
-        }));
-        setEditingExtractedId(virtual.id);
       }
       return;
     }
