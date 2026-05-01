@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/sheet";
 import {
   LayoutDashboard,
-  Upload,
   FileText,
   Wand2,
   GitCompare,
@@ -26,7 +25,6 @@ import {
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
-  { icon: Upload, label: "Upload", id: "upload" },
   { icon: FileText, label: "Meus Arquivos", id: "files" },
   { icon: Pencil, label: "Editor PDF", id: "editor" },
   { icon: Wand2, label: "IA & Correção", id: "ai" },
