@@ -120,27 +120,52 @@ export function useFileConversions() {
 
       const convertedPath: string | undefined = data.convertedPath;
 
+      // Always create a backup copy of this conversion in the user's history,
+      // independent of any auto-cleanup setting. This ensures the file is
+      // always recoverable from "Meus Arquivos → Backup".
+      if (convertedPath) {
+        try {
+          const { data: src } = await supabase
+            .from("file_conversions")
+            .select("user_id, original_name, original_format, file_size")
+            .eq("id", conversionId)
+            .single();
+          if (src) {
+            await supabase.from("file_conversions").insert({
+              user_id: src.user_id,
+              original_name: src.original_name,
+              original_format: src.original_format,
+              target_format: targetFormat,
+              status: "completed",
+              original_path: filePath,
+              converted_path: convertedPath,
+              file_size: src.file_size ?? 0,
+              is_backup: true,
+            });
+          }
+        } catch (backupErr) {
+          console.warn("[Convert] Backup record creation failed:", backupErr);
+        }
+      }
+
       // Auto-download the converted file (mobile + desktop friendly via signed URL)
       if (convertedPath) {
         const baseName = filePath.split("/").pop()?.replace(/\.[^.]+$/, "") || "converted";
         const downloadName = `${baseName}.${targetFormat}`;
         const ok = await downloadFromStorage(convertedPath, downloadName);
         if (ok) {
-          // Optional auto-cleanup: delete the generated file from storage and the
-          // conversion record so URLs/blobs don't accumulate in the session.
+          // Optional auto-cleanup: only deletes the ACTIVE record. The backup
+          // copy created above stays intact in "Meus Arquivos → Backup".
           if (shouldAutoCleanupAfterDownload()) {
-            // Give the browser a moment to start the actual download stream
-            // before we revoke access to the file.
             setTimeout(async () => {
               try {
-                await supabase.storage.from("documents").remove([convertedPath]);
                 await supabase.from("file_conversions").delete().eq("id", conversionId);
                 await fetchConversions();
               } catch (cleanupErr) {
                 console.warn("[Convert] Auto-cleanup failed:", cleanupErr);
               }
             }, 8000);
-            toast.success(`${downloadName} baixado. Removendo da sua sessão...`, { duration: 5000 });
+            toast.success(`${downloadName} baixado. Uma cópia foi salva no Backup.`, { duration: 5000 });
           } else {
             toast.success(`${downloadName} baixado automaticamente!`, { duration: 5000 });
           }
