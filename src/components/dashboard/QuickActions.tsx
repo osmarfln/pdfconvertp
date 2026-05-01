@@ -14,7 +14,7 @@ interface QuickActionsProps {
 }
 
 export function QuickActions({ onNavigate }: QuickActionsProps) {
-  const { conversions, convertFile, compressFile } = useFileConversions();
+  const { conversions, convertFile, compressFile, uploadFile } = useFileConversions();
   const [processingAction, setProcessingAction] = useState<string | null>(null);
   const { healthy, reason, checking, recheck } = useILovePDFHealth();
   const [progress, setProgress] = useState<ConversionProgressState>(initialProgressState);
@@ -27,6 +27,30 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
 
   // Edit PDF (open in editor)
   const editPdfInputRef = useRef<HTMLInputElement>(null);
+
+  // Generic file picker for direct conversion actions
+  const pickerInputRef = useRef<HTMLInputElement>(null);
+  const pickerConfigRef = useRef<{
+    accept: string;
+    label: string;
+    title: string;
+    target: string;
+    validExts: string[];
+  } | null>(null);
+
+  const openFilePicker = (config: {
+    accept: string;
+    label: string;
+    title: string;
+    target: string;
+    validExts: string[];
+  }) => {
+    pickerConfigRef.current = config;
+    if (pickerInputRef.current) {
+      pickerInputRef.current.accept = config.accept;
+      pickerInputRef.current.click();
+    }
+  };
 
   const stopProgressTimer = () => {
     if (progressTimer.current) {
