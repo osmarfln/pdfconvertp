@@ -759,18 +759,18 @@ export function PDFEditor() {
   );
 
   const findEraseAtPoint = useCallback(
-    (x: number, y: number) =>
-      annotations
-        .filter(
-          (ann): ann is EraseAnnotation =>
-            ann.page === pageIndex &&
-            ann.type === "erase" &&
-            x >= ann.x &&
-            x <= ann.x + ann.width &&
-            y >= ann.y &&
-            y <= ann.y + ann.height,
-        )
-        .at(-1),
+    (x: number, y: number) => {
+      const matches = annotations.filter(
+        (ann): ann is EraseAnnotation =>
+          ann.page === pageIndex &&
+          ann.type === "erase" &&
+          x >= ann.x &&
+          x <= ann.x + ann.width &&
+          y >= ann.y &&
+          y <= ann.y + ann.height,
+      );
+      return matches[matches.length - 1];
+    },
     [annotations, pageIndex],
   );
 
