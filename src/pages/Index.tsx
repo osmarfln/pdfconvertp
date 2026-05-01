@@ -16,6 +16,7 @@ import { AIPage } from "@/components/pages/AIPage";
 import { ReportsPage } from "@/components/pages/ReportsPage";
 import { ExportPage } from "@/components/pages/ExportPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
+import { PDFEditor } from "@/components/pdf-editor/PDFEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneGate } from "@/components/auth/PhoneGate";
 
@@ -150,6 +151,12 @@ export default function Index() {
           {activeTab === "ai" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <AIPage />
+            </motion.div>
+          )}
+
+          {activeTab === "editor" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <PDFEditor />
             </motion.div>
           )}
 

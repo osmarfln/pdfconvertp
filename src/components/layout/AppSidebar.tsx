@@ -21,12 +21,14 @@ import {
   ChevronRight,
   ShieldCheck,
   Menu,
+  Pencil,
 } from "lucide-react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
   { icon: Upload, label: "Upload", id: "upload" },
   { icon: FileText, label: "Meus Arquivos", id: "files" },
+  { icon: Pencil, label: "Editor PDF", id: "editor" },
   { icon: Wand2, label: "IA & Correção", id: "ai" },
   { icon: GitCompare, label: "Comparação", id: "compare" },
   { icon: BarChart3, label: "Relatórios", id: "reports" },
