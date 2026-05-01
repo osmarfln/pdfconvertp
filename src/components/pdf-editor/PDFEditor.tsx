@@ -27,6 +27,7 @@ import {
   Bold,
   Italic,
   Edit3,
+  Move,
   Eye,
   GitCompare,
   Maximize2,
@@ -86,6 +87,8 @@ interface TextEdit {
   fontKeyOverride?: FontKey;
   fontSizeOverride?: number; // PDF points
   colorOverride?: string;
+  xOffset?: number; // Overlay px from the original editable area
+  yOffset?: number; // Overlay px from the original editable area
 }
 
 interface PdfTextItem {
@@ -177,6 +180,8 @@ type Annotation =
   | EraseAnnotation;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const getFontFamily = (fontKeyOrName?: string) => {
   const name = (fontKeyOrName || "").toLowerCase();
