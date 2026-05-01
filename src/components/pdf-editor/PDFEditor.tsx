@@ -1622,7 +1622,7 @@ export function PDFEditor() {
                   {/* Highlight erased areas to indicate they are clickable for typing */}
                   {tool === "edit-text" &&
                     annotations
-                      .filter((ann) => ann.type === "erase" && ann.page === pageIndex)
+                      .filter((ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex)
                       .map((ann) => (
                         <div
                           key={`erase-hint-${ann.id}`}
