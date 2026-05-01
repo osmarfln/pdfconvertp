@@ -511,18 +511,6 @@ export function PDFEditor() {
     if (tool === "edit-text") {
       const point = getOverlayPoint(e);
       if (!point) return;
-      const erasedTarget = findErasedTextAtPoint(point.x, point.y);
-      const target = erasedTarget ?? findTextAtPoint(point.x, point.y);
-      if (target) {
-        e.preventDefault();
-        e.stopPropagation();
-        updateTextEdit(target.id, {
-          newText: textEdits[target.id]?.newText ?? (erasedTarget || isExtractedTextErased(target) ? "" : target.originalText),
-        });
-        setEditingExtractedId(target.id);
-        return;
-      }
-
       const eraseArea = findEraseAtPoint(point.x, point.y);
       if (eraseArea) {
         e.preventDefault();
@@ -539,36 +527,9 @@ export function PDFEditor() {
         setEditingExtractedId(virtual.id);
         return;
       }
-
-      // Fallback: escrita livre — cria caixa de texto editável no ponto clicado
       e.preventDefault();
       e.stopPropagation();
-      const overlayFontSize = Math.max(12, fontSize * scale);
-      const pdfFontSize = fontSize;
-      const pageHeightPdf = (pageDims.height || 0) / scale;
-      const directId = `tv-${pageIndex}-direct-${uid()}`;
-      const virtualDirect: ExtractedText = {
-        id: directId,
-        page: pageIndex,
-        pdfX: point.x / scale,
-        pdfY: pageHeightPdf - point.y / scale,
-        pdfWidth: 200 / scale,
-        pdfHeight: overlayFontSize / scale,
-        fontSize: pdfFontSize,
-        fontName: fontKey,
-        originalText: "",
-        overlayX: point.x,
-        overlayY: point.y - overlayFontSize / 2,
-        overlayWidth: 200,
-        overlayHeight: overlayFontSize + 6,
-        overlayFontSize,
-      };
-      setExtractedTexts((prev) => [...prev, virtualDirect]);
-      setTextEdits((prev) => ({
-        ...prev,
-        [directId]: { extractedId: directId, page: pageIndex, newText: "" },
-      }));
-      setEditingExtractedId(directId);
+      setEditingExtractedId(null);
       return;
     }
     if (tool === "pan") {
