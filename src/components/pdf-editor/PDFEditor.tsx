@@ -1304,7 +1304,8 @@ export function PDFEditor() {
           <Button size="sm" variant="outline" className="w-full h-8 gap-1" onClick={rotatePage}>
             <RotateCw className="w-3.5 h-3.5" /> Girar página
           </Button>
-        </div>
+          </div>
+        )}
 
         {/* Canvas area */}
         <div className="space-y-3">
