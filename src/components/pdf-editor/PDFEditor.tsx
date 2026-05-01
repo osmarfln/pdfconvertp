@@ -1708,20 +1708,9 @@ export function PDFEditor() {
           })()}
 
           {tool === "edit-text" && (() => {
-            const erasedReadyCount = extractedTexts.filter((t) => {
-              if (t.page !== pageIndex) return false;
-              return annotations.some(
-                (ann): ann is EraseAnnotation =>
-                  ann.type === "erase" &&
-                  ann.page === pageIndex &&
-                  rectanglesIntersect(ann as EraseAnnotation, {
-                    x: t.overlayX - 4,
-                    y: t.overlayY - 4,
-                    width: t.overlayWidth + 8,
-                    height: t.overlayHeight + 10,
-                  }),
-              );
-            }).length;
+            const erasedReadyCount = annotations.filter(
+              (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex,
+            ).length;
             const isTyping = editingExtractedId !== null;
             return (
               <div
