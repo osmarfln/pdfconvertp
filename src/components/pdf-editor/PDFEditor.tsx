@@ -1495,25 +1495,36 @@ export function PDFEditor() {
             if (compareUrls.before) URL.revokeObjectURL(compareUrls.before);
             if (compareUrls.after) URL.revokeObjectURL(compareUrls.after);
             setCompareUrls({});
+            setComparePages([]);
           }
         }}
       >
-        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-4">
+        <DialogContent className="max-w-7xl w-[97vw] h-[92vh] flex flex-col p-4">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
               <GitCompare className="w-5 h-5 text-primary" />
               Comparar — Antes e Depois
               {Object.keys(textEdits).length > 0 && (
                 <span className="ml-2 text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-full">
-                  {Object.keys(textEdits).length} alteração(ões) de texto
+                  {Object.keys(textEdits).length} alteração(ões)
                 </span>
               )}
+              <span className="ml-auto flex items-center gap-3 text-[11px] font-normal text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-destructive/30 border border-destructive/70" />
+                  Original removido
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-emerald-500/30 border border-emerald-500/70" />
+                  Novo conteúdo
+                </span>
+              </span>
             </DialogTitle>
           </DialogHeader>
 
           {Object.keys(textEdits).length > 0 && (
-            <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1.5 max-h-32 overflow-auto">
-              <p className="text-xs font-semibold text-muted-foreground mb-1">Alterações:</p>
+            <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1.5 max-h-28 overflow-auto shrink-0">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Lista de alterações:</p>
               {Object.values(textEdits).map((edit) => {
                 const orig = extractedTexts.find((t) => t.id === edit.extractedId);
                 if (!orig) return null;
@@ -1525,7 +1536,7 @@ export function PDFEditor() {
                     </span>
                     <span className="text-muted-foreground">→</span>
                     <span className="text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      {edit.newText}
+                      {edit.newText || <em className="not-italic opacity-70">(apagado)</em>}
                     </span>
                   </div>
                 );
@@ -1533,19 +1544,104 @@ export function PDFEditor() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0">
-            <div className="flex flex-col min-h-0">
-              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Antes (original)</p>
-              {compareUrls.before && (
-                <iframe src={compareUrls.before} className="flex-1 w-full rounded-lg border border-border bg-white" title="Antes" />
-              )}
-            </div>
-            <div className="flex flex-col min-h-0">
-              <p className="text-xs font-semibold text-primary mb-1.5">Depois (editado)</p>
-              {compareUrls.after && (
-                <iframe src={compareUrls.after} className="flex-1 w-full rounded-lg border border-primary/40 bg-white" title="Depois" />
-              )}
-            </div>
+          <div className="flex-1 min-h-0 overflow-auto rounded-lg bg-secondary/20 border border-border p-3">
+            {compareLoading && (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                Gerando comparação visual…
+              </div>
+            )}
+
+            {!compareLoading && comparePages.length === 0 && (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center px-4">
+                Nenhuma alteração de texto detectada. Edite trechos no PDF para ver o destaque visual aqui.
+              </div>
+            )}
+
+            {!compareLoading && comparePages.length > 0 && (
+              <div className="space-y-6">
+                {comparePages.map((cp) => (
+                  <div key={cp.page} className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                      <FileText className="w-3.5 h-3.5" />
+                      Página {cp.page + 1}
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                        {cp.edits.length} alteração(ões)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* ANTES */}
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-destructive flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-destructive" /> Antes
+                        </p>
+                        <div
+                          className="relative mx-auto bg-white rounded-md shadow-md ring-1 ring-border overflow-hidden"
+                          style={{ width: cp.width, maxWidth: "100%" }}
+                        >
+                          <img
+                            src={cp.beforeImg}
+                            alt={`Antes pág ${cp.page + 1}`}
+                            style={{ width: cp.width, height: cp.height, display: "block" }}
+                          />
+                          {cp.edits.map((e) => (
+                            <div
+                              key={e.id}
+                              title={`Original: "${e.originalText}"`}
+                              className="absolute pointer-events-auto animate-pulse"
+                              style={{
+                                left: e.overlayX - 3,
+                                top: e.overlayY - 3,
+                                width: e.overlayWidth + 6,
+                                height: e.overlayHeight + 6,
+                                background: "hsl(0 84% 60% / 0.28)",
+                                border: "2px solid hsl(0 84% 60% / 0.85)",
+                                boxShadow: "0 0 0 4px hsl(0 84% 60% / 0.18)",
+                                borderRadius: 3,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* DEPOIS */}
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-500 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Depois
+                        </p>
+                        <div
+                          className="relative mx-auto bg-white rounded-md shadow-md ring-1 ring-emerald-500/40 overflow-hidden"
+                          style={{ width: cp.width, maxWidth: "100%" }}
+                        >
+                          <img
+                            src={cp.afterImg}
+                            alt={`Depois pág ${cp.page + 1}`}
+                            style={{ width: cp.width, height: cp.height, display: "block" }}
+                          />
+                          {cp.edits.map((e) => (
+                            <div
+                              key={e.id}
+                              title={`Novo: "${e.newText || "(apagado)"}"`}
+                              className="absolute pointer-events-auto"
+                              style={{
+                                left: e.overlayX - 3,
+                                top: e.overlayY - 3,
+                                width: e.overlayWidth + 6,
+                                height: e.overlayHeight + 6,
+                                background: "hsl(142 71% 45% / 0.22)",
+                                border: "2px solid hsl(142 71% 45% / 0.9)",
+                                boxShadow: "0 0 0 4px hsl(142 71% 45% / 0.15)",
+                                borderRadius: 3,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
