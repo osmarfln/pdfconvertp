@@ -813,7 +813,54 @@ export function PDFEditor() {
     }
   };
 
-  const openCompare = async () => {
+  const openPreview = async () => {
+    if (!pdfBytes) return;
+    setShowPreview(true);
+    setPreviewLoading(true);
+    setPreviewPages([]);
+    try {
+      const out = await buildEditedPdfBytes();
+      setPreviewBytes(out);
+      const doc = await pdfjsLib.getDocument({ data: (out as Uint8Array).slice(0) }).promise;
+      const built: { page: number; img: string; width: number; height: number }[] = [];
+      const RENDER_SCALE = 1.4;
+      for (let i = 0; i < doc.numPages; i++) {
+        const page = await doc.getPage(i + 1);
+        const viewport = page.getViewport({ scale: RENDER_SCALE });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        built.push({
+          page: i,
+          img: canvas.toDataURL("image/png"),
+          width: viewport.width,
+          height: viewport.height,
+        });
+      }
+      setPreviewPages(built);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao gerar pré-visualização");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const downloadPreviewPDF = () => {
+    if (!previewBytes) return;
+    const blob = new Blob([previewBytes as BlobPart], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = pdfName.replace(/\.pdf$/i, "") + "-editado.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast.success("PDF baixado");
+  };
     if (!pdfBytes) return;
     setCompareLoading(true);
     setShowCompare(true);
