@@ -467,6 +467,33 @@ export function PDFEditor() {
       pushHistory();
       const finalized: Annotation = { ...drawingPreview, id: uid() };
       setAnnotations((a) => [...a, finalized]);
+      if (finalized.type === "erase") {
+        const erasedTexts = extractedTexts.filter(
+          (t) =>
+            t.page === pageIndex &&
+            rectanglesIntersect(finalized, {
+              x: t.overlayX - 2,
+              y: t.overlayY - 2,
+              width: t.overlayWidth + 4,
+              height: t.overlayHeight + 6,
+            }),
+        );
+        if (erasedTexts.length) {
+          setTextEdits((prev) => {
+            const next = { ...prev };
+            erasedTexts.forEach((t) => {
+              next[t.id] = {
+                ...(next[t.id] || { extractedId: t.id, page: t.page }),
+                extractedId: t.id,
+                page: t.page,
+                newText: "",
+              };
+            });
+            return next;
+          });
+          toast.success(`${erasedTexts.length} trecho(s) marcado(s) para apagar`);
+        }
+      }
     }
     drawingRef.current = null;
     setDrawingPreview(null);
