@@ -883,6 +883,7 @@ export function PDFEditor() {
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
   const tools: { tool: Tool; icon: any; label: string }[] = [
+    { tool: "pan", icon: Hand, label: "Mão livre / mover PDF" },
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
     { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
     { tool: "text", icon: Type, label: "Adicionar Texto" },
