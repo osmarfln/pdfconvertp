@@ -406,18 +406,25 @@ export function PDFEditor() {
         textContent.items.forEach((it, i: number) => {
           if (!("str" in it)) return;
           const textItem = it as PdfTextItem;
-          const str: string = textItem.str;
-          if (!str || !str.trim()) return;
+          const str: string = textItem.str ?? "";
+          // Keep whitespace-only items too (they often anchor blank/justified
+          // regions where the user might want to type after erasing).
+          if (!str) return;
           const tr = pdfjsLib.Util.transform(viewport.transform, textItem.transform);
-          const fontHeightPx = Math.hypot(tr[2], tr[3]);
-          const widthPx = (textItem.width || 0) * scale;
+          const fontHeightPx = Math.max(Math.hypot(tr[2], tr[3]), 6);
+          // Some glyphs/fonts report width=0 (combining marks, emoji, custom
+          // encodings). Estimate a sensible width so the bbox can still be
+          // hit-tested by the eraser.
+          const reportedWidthPx = (textItem.width || 0) * scale;
+          const fallbackWidthPx = Math.max(str.length, 1) * fontHeightPx * 0.5;
+          const widthPx = Math.max(reportedWidthPx, fallbackWidthPx);
           const overlayX = tr[4];
           const overlayY = tr[5] - fontHeightPx;
           const pdfX = textItem.transform[4];
           const pdfYBaseline = textItem.transform[5];
-          const pdfFontSize = Math.hypot(textItem.transform[2], textItem.transform[3]);
-          const pdfWidth = textItem.width || 0;
-          const pdfHeight = textItem.height || pdfFontSize;
+          const pdfFontSize = Math.max(Math.hypot(textItem.transform[2], textItem.transform[3]), 6);
+          const pdfWidth = Math.max(textItem.width || 0, (widthPx / scale));
+          const pdfHeight = Math.max(textItem.height || 0, pdfFontSize);
           const realFontName = resolveFontName(textItem.fontName);
           items.push({
             id: `t-${pageIndex}-${i}`,
