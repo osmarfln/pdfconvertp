@@ -1044,15 +1044,6 @@ export function PDFEditor() {
             opacity: ann.opacity,
           });
         }
-      } else if (ann.type === "erase") {
-        page.drawRectangle({
-          x: ann.x * sx,
-          y: ph - (ann.y + ann.height) * sy,
-          width: ann.width * sx,
-          height: ann.height * sy,
-          color: rgb(1, 1, 1),
-          opacity: 1,
-        });
       }
     }
     return await doc.save();
