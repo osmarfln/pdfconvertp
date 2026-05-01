@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   LineChart,
@@ -104,7 +104,7 @@ export function AnalyticsCharts({ users }: Props) {
   const [alertHistory, setAlertHistory] = useState<
     { time: string; type: "Backend" | "Internet"; value: number; threshold: number }[]
   >([]);
-  const lastAlertRef = useState<{ sb: number; net: number }>({ sb: 0, net: 0 })[0];
+  const lastAlertRef = useRef<{ sb: number; net: number }>({ sb: 0, net: 0 });
 
   useEffect(() => {
     localStorage.setItem("lat_alerts_enabled", alertsEnabled ? "1" : "0");
@@ -126,8 +126,8 @@ export function AnalyticsCharts({ users }: Props) {
     const now = Date.now();
     const key = type === "Backend" ? "sb" : "net";
     // Deduplica: 1 alerta por tipo a cada 30s
-    if (now - (lastAlertRef as any)[key] < 30000) return;
-    (lastAlertRef as any)[key] = now;
+    if (now - (lastAlertRef.current as any)[key] < 30000) return;
+    (lastAlertRef.current as any)[key] = now;
 
     toast.warning(`Latência alta — ${type}`, {
       description: `${value}ms (limite ${threshold}ms). Conexão pode estar degradada.`,
