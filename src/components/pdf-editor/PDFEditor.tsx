@@ -740,7 +740,7 @@ export function PDFEditor() {
     { tool: "rect", icon: Square, label: "Retângulo" },
     { tool: "ellipse", icon: CircleIcon, label: "Elipse" },
     { tool: "line", icon: Minus, label: "Linha" },
-    { tool: "erase", icon: Eraser, label: "Apagar (cobrir)" },
+    { tool: "erase", icon: Eraser, label: "Borracha / Apagar texto" },
   ];
 
   if (!pdfBytes) {
@@ -835,23 +835,29 @@ export function PDFEditor() {
         <div className="glass rounded-xl p-3 space-y-3 lg:sticky lg:top-2 lg:self-start">
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Ferramentas</Label>
-            <div className="grid grid-cols-4 gap-1.5">
-              {tools.map((t) => (
-                <button
-                  key={t.tool}
-                  onClick={() => setTool(t.tool)}
-                  title={t.label}
-                  className={cn(
-                    "aspect-square rounded-lg flex items-center justify-center transition-colors border",
-                    tool === t.tool
-                      ? "bg-primary/15 border-primary/50 text-primary"
-                      : "bg-secondary/50 border-border hover:bg-secondary text-foreground",
-                  )}
-                >
-                  <t.icon className="w-4 h-4" />
-                </button>
-              ))}
-            </div>
+            <TooltipProvider delayDuration={100}>
+              <div className="grid grid-cols-4 gap-1.5">
+                {tools.map((t) => (
+                  <Tooltip key={t.tool}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setTool(t.tool)}
+                        aria-label={t.label}
+                        className={cn(
+                          "aspect-square rounded-lg flex items-center justify-center transition-colors border",
+                          tool === t.tool
+                            ? "bg-primary/15 border-primary/50 text-primary"
+                            : "bg-secondary/50 border-border hover:bg-secondary text-foreground",
+                        )}
+                      >
+                        <t.icon className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.label}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </TooltipProvider>
           </div>
 
           <Separator />
