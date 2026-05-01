@@ -56,7 +56,32 @@ import { cn } from "@/lib/utils";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-type Tool = "select" | "text" | "rect" | "ellipse" | "line" | "draw" | "highlight" | "erase";
+type Tool = "select" | "text" | "edit-text" | "rect" | "ellipse" | "line" | "draw" | "highlight" | "erase";
+
+interface ExtractedText {
+  id: string;
+  page: number;
+  // Original PDF coordinates (PDF points, origin bottom-left)
+  pdfX: number;
+  pdfY: number;
+  pdfWidth: number;
+  pdfHeight: number;
+  fontSize: number; // PDF points
+  fontName: string;
+  originalText: string;
+  // Overlay coordinates (CSS px, origin top-left) for current zoom
+  overlayX: number;
+  overlayY: number;
+  overlayWidth: number;
+  overlayHeight: number;
+  overlayFontSize: number;
+}
+
+interface TextEdit {
+  extractedId: string;
+  page: number;
+  newText: string;
+}
 
 type FontKey =
   | "Helvetica"
