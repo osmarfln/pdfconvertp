@@ -10,7 +10,6 @@ import {
   Circle as CircleIcon,
   Minus,
   Eraser,
-  Pencil,
   Download,
   Trash2,
   ChevronLeft,
@@ -27,7 +26,6 @@ import {
   FileText,
   Bold,
   Italic,
-  AlignLeft,
   Edit3,
   Eye,
   GitCompare,
@@ -522,44 +520,23 @@ export function PDFEditor() {
           newText: textEdits[target.id]?.newText ?? (erasedTarget || isExtractedTextErased(target) ? "" : target.originalText),
         });
         setEditingExtractedId(target.id);
-      } else {
+        return;
+      }
+
+      const eraseArea = findEraseAtPoint(point.x, point.y);
+      if (eraseArea) {
         e.preventDefault();
         e.stopPropagation();
-        const eraseArea = findEraseAtPoint(point.x, point.y);
-        if (eraseArea) {
-          const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
-          const virtual = existingVirtual ?? createVirtualTextForErase(eraseArea);
-          if (!existingVirtual) {
-            setExtractedTexts((prev) => [...prev, virtual]);
-          }
-          setTextEdits((prev) => ({
-            ...prev,
-            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
-          }));
-          setEditingExtractedId(virtual.id);
-        } else {
-          const directArea: EraseAnnotation = {
-            id: `direct-${uid()}`,
-            page: pageIndex,
-            type: "erase",
-            x: point.x,
-            y: Math.max(0, point.y - fontSize * 1.15),
-            width: Math.min(Math.max(220, fontSize * 12), Math.max(220, pageDims.width - point.x - 8)),
-            height: Math.max(32, fontSize * 1.9),
-            color: "#000000",
-            opacity: 1,
-            pageWidth: pageDims.width,
-            pageHeight: pageDims.height,
-          };
-          const virtual = createVirtualTextForErase(directArea);
+        const existingVirtual = extractedTexts.find((t) => t.id === `tv-${pageIndex}-${eraseArea.id}`);
+        const virtual = existingVirtual ?? createVirtualTextForErase(eraseArea);
+        if (!existingVirtual) {
           setExtractedTexts((prev) => [...prev, virtual]);
-          setTextEdits((prev) => ({
-            ...prev,
-            [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: "" },
-          }));
-          setEditingTextId(null);
-          setEditingExtractedId(virtual.id);
         }
+        setTextEdits((prev) => ({
+          ...prev,
+          [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
+        }));
+        setEditingExtractedId(virtual.id);
       }
       return;
     }
@@ -1249,6 +1226,19 @@ export function PDFEditor() {
     });
   };
 
+  const getEditBoxMetrics = (text: ExtractedText, edit?: TextEdit) => {
+    const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * (text.overlayFontSize / text.fontSize));
+    const content = edit?.newText || text.originalText || " ";
+    const estimatedWidth = content.length * fontPx * 0.58;
+    const maxWidth = Math.max(24, pageDims.width - text.overlayX - 6);
+    const maxHeight = Math.max(18, pageDims.height - text.overlayY - 6);
+    return {
+      width: Math.min(maxWidth, Math.max(24, Math.min(Math.max(text.overlayWidth, estimatedWidth), 520) + 8)),
+      height: Math.min(maxHeight, Math.max(18, text.overlayHeight + 6, fontPx * 1.35)),
+      fontPx,
+    };
+  };
+
 
   const visibleAnns = annotations.filter((a) => a.page === pageIndex);
 
@@ -1279,17 +1269,16 @@ export function PDFEditor() {
       toast.info(
         hasReadyArea
           ? "Modo Editar Texto ativo: clique na área apagada destacada para digitar."
-          : "Modo Editar Texto ativo: clique em qualquer ponto do PDF para escrever por cima.",
+          : "Modo Editar Texto ativo: clique em um texto existente para editar.",
       );
     }
   };
 
   const tools: { tool: Tool; icon: LucideIcon; label: string }[] = [
-    { tool: "pan", icon: Hand, label: "Mão livre / mover PDF" },
+    { tool: "pan", icon: Hand, label: "Mover PDF" },
     { tool: "select", icon: MousePointer2, label: "Selecionar" },
     { tool: "edit-text", icon: Edit3, label: "Editar Texto" },
     { tool: "text", icon: Type, label: "Adicionar Texto" },
-    { tool: "draw", icon: Pencil, label: "Desenhar" },
     { tool: "highlight", icon: Highlighter, label: "Marca-texto" },
     { tool: "rect", icon: Square, label: "Retângulo" },
     { tool: "ellipse", icon: CircleIcon, label: "Elipse" },
@@ -1321,7 +1310,7 @@ export function PDFEditor() {
             Carregue um PDF para editar
           </h3>
           <p className="text-muted-foreground text-sm mb-6 max-w-md mx-auto">
-            Adicione textos com diferentes fontes, desenhe à mão livre, marque, apague trechos e
+            Adicione textos com diferentes fontes, marque, apague trechos e
             insira formas geométricas.
           </p>
           <input
@@ -1627,10 +1616,10 @@ export function PDFEditor() {
                 variant={tool === "pan" ? "default" : "outline"}
                 className="h-8 gap-1.5"
                 onClick={() => selectTool("pan")}
-                title="Mão livre / mover PDF"
+                title="Mover PDF"
               >
                 <Hand className="w-4 h-4" />
-                Mão livre
+                Mover PDF
               </Button>
               <Button
                 size="icon"
@@ -1769,7 +1758,7 @@ export function PDFEditor() {
                     <span>
                       {erasedReadyCount > 0
                         ? "Clique em qualquer área apagada (destacada em amarelo) para escrever em cima com a fonte original."
-                        : "Use a Borracha para apagar um trecho — depois clique no espaço apagado para digitar o novo texto."}
+                        : "Clique em um texto do PDF para abrir uma caixa do mesmo tamanho e editar por cima."}
                     </span>
                   </>
                 )}
@@ -1961,6 +1950,7 @@ export function PDFEditor() {
                         const isEditing = editingExtractedId === t.id;
                         const textIsErased = isExtractedTextErased(t);
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
+                        const metrics = getEditBoxMetrics(t, edit);
                         return (
                           <div
                             key={t.id}
@@ -1980,8 +1970,8 @@ export function PDFEditor() {
                               position: "absolute",
                               left: t.overlayX,
                               top: t.overlayY,
-                              minWidth: Math.max(t.overlayWidth, 30),
-                              height: t.overlayHeight + 4,
+                              width: metrics.width,
+                              height: metrics.height,
                               cursor: "text",
                             }}
                             className={cn(
@@ -2010,8 +2000,8 @@ export function PDFEditor() {
                                     }
                                   }}
                                   style={{
-                                    fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
-                                    lineHeight: 1,
+                                    fontSize: metrics.fontPx,
+                                    lineHeight: `${metrics.height}px`,
                                     width: "100%",
                                     height: "100%",
                                     background: "white",
@@ -2191,8 +2181,8 @@ export function PDFEditor() {
                                 style={{
                                   background: changed && value ? "white" : undefined,
                                   color: edit?.colorOverride || (changed ? "black" : "transparent"),
-                                  fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
-                                  lineHeight: 1,
+                                  fontSize: metrics.fontPx,
+                                  lineHeight: `${metrics.height}px`,
                                   padding: "0 2px",
                                   fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
                                   fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
