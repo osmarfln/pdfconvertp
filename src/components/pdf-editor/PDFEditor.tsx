@@ -2000,8 +2000,8 @@ export function PDFEditor() {
                                     }
                                   }}
                                   style={{
-                                    fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
-                                    lineHeight: 1,
+                                    fontSize: metrics.fontPx,
+                                    lineHeight: `${metrics.height}px`,
                                     width: "100%",
                                     height: "100%",
                                     background: "white",
@@ -2181,8 +2181,8 @@ export function PDFEditor() {
                                 style={{
                                   background: changed && value ? "white" : undefined,
                                   color: edit?.colorOverride || (changed ? "black" : "transparent"),
-                                  fontSize: (edit?.fontSizeOverride ?? t.fontSize) * (t.overlayFontSize / t.fontSize),
-                                  lineHeight: 1,
+                                  fontSize: metrics.fontPx,
+                                  lineHeight: `${metrics.height}px`,
                                   padding: "0 2px",
                                   fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
                                   fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
