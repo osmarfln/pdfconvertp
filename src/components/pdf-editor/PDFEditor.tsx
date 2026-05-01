@@ -1270,9 +1270,11 @@ export function PDFEditor() {
         });
       }
       const hasReadyArea = eraseAreas.length > 0 || extractedTexts.some((t) => t.page === pageIndex && isExtractedTextErased(t));
-      if (hasReadyArea) {
-        toast.info("Modo Editar Texto ativo: clique na área apagada destacada para digitar.");
-      }
+      toast.info(
+        hasReadyArea
+          ? "Modo Editar Texto ativo: clique na área apagada destacada para digitar."
+          : "Modo Editar Texto ativo: clique em qualquer ponto do PDF para escrever por cima.",
+      );
     }
   };
 
