@@ -1654,6 +1654,10 @@ export function PDFEditor() {
                   onMouseDown={onCanvasMouseDown}
                   onMouseMove={onCanvasMouseMove}
                   onMouseUp={onCanvasMouseUp}
+                  onMouseLeave={() => {
+                    setHoveredEraseId(null);
+                    setHoveredErasedTextId(null);
+                  }}
                   className="absolute inset-0"
                   style={{
                     touchAction: tool === "pan" ? "none" : undefined,
@@ -1689,21 +1693,31 @@ export function PDFEditor() {
                   {tool === "edit-text" &&
                     annotations
                       .filter((ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === pageIndex)
-                      .map((ann) => (
-                        <div
-                          key={`erase-hint-${ann.id}`}
-                          className="absolute pointer-events-none rounded-sm animate-pulse"
-                          style={{
-                            left: ann.x,
-                            top: ann.y,
-                            width: ann.width,
-                            height: ann.height,
-                            border: "1.5px dashed hsl(var(--warning))",
-                            background: "hsl(var(--warning) / 0.12)",
-                            boxShadow: "0 0 0 1px hsl(var(--warning) / 0.3)",
-                          }}
-                        />
-                      ))}
+                      .map((ann) => {
+                        const isHovered = hoveredEraseId === ann.id;
+                        return (
+                          <div
+                            key={`erase-hint-${ann.id}`}
+                            className={cn("absolute pointer-events-none rounded-sm", isHovered && "animate-pulse")}
+                            style={{
+                              left: ann.x,
+                              top: ann.y,
+                              width: ann.width,
+                              height: ann.height,
+                              border: `1.5px dashed hsl(var(${isHovered ? "--primary" : "--warning"}))`,
+                              background: isHovered ? "hsl(var(--primary) / 0.12)" : "hsl(var(--warning) / 0.12)",
+                              boxShadow: isHovered ? "0 0 0 2px hsl(var(--primary) / 0.25)" : "0 0 0 1px hsl(var(--warning) / 0.3)",
+                            }}
+                          >
+                            {isHovered && editingExtractedId === null && (
+                              <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold text-primary bg-background/95 border border-primary/40 rounded px-1.5 py-0.5 shadow-lg whitespace-nowrap">
+                                <span className="inline-block h-4 w-px bg-primary animate-pulse" />
+                                Clique para digitar
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
 
                   {/* Editable extracted text overlays */}
                   {tool === "edit-text" &&
