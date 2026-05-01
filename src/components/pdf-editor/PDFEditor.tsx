@@ -1791,7 +1791,12 @@ export function PDFEditor() {
 
                             ) : (
                               <button
-                                onClick={() => setEditingExtractedId(t.id)}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? "" });
+                                  setEditingExtractedId(t.id);
+                                }}
                                 title={`Clique para editar: "${t.originalText}"`}
                                 className={cn(
                                   "w-full h-full text-left cursor-text overflow-visible whitespace-nowrap transition-colors",
