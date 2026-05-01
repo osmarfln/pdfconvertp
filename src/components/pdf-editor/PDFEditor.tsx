@@ -1003,6 +1003,20 @@ export function PDFEditor() {
             </div>
           </div>
 
+          {tool === "edit-text" && (
+            <div className="glass rounded-xl px-3 py-2 text-xs text-muted-foreground flex items-center gap-2 border border-primary/30">
+              <Edit3 className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span>
+                Clique sobre qualquer trecho de texto do PDF para editar. As alterações ficam destacadas e são aplicadas ao salvar.
+              </span>
+              {Object.keys(textEdits).length > 0 && (
+                <span className="ml-auto bg-primary/15 text-primary px-2 py-0.5 rounded-full font-medium">
+                  {Object.keys(textEdits).length} alteração(ões)
+                </span>
+              )}
+            </div>
+          )}
+
           <ScrollArea className="glass rounded-xl p-3 max-h-[calc(100vh-260px)]">
             <div className="flex justify-center">
               <div
