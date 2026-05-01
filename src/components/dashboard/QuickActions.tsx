@@ -348,7 +348,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
             whileTap={{ scale: 0.97 }}
             onClick={() => handleAction(action.label)}
             disabled={processingAction === action.label}
-            className="flex flex-col items-center gap-2 p-4 rounded-lg bg-secondary/40 backdrop-blur-md hover:bg-destructive/20 border border-border/40 hover:border-destructive/40 transition-all disabled:opacity-50"
+            className="flex flex-col items-center gap-2 p-4 rounded-lg bg-secondary/40 backdrop-blur-md hover:bg-destructive/20 border border-border/40 hover:border-destructive/40 transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_0_24px_-6px_hsl(var(--destructive)/0.35)] disabled:opacity-50"
           >
             <div className={`p-2.5 rounded-lg ${action.color}`}>
               {processingAction === action.label ? (
