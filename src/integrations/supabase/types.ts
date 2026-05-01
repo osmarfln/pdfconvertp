@@ -90,6 +90,7 @@ export type Database = {
           error_message: string | null
           file_size: number | null
           id: string
+          is_backup: boolean
           original_format: string
           original_name: string
           original_path: string | null
@@ -104,6 +105,7 @@ export type Database = {
           error_message?: string | null
           file_size?: number | null
           id?: string
+          is_backup?: boolean
           original_format: string
           original_name: string
           original_path?: string | null
@@ -118,6 +120,7 @@ export type Database = {
           error_message?: string | null
           file_size?: number | null
           id?: string
+          is_backup?: boolean
           original_format?: string
           original_name?: string
           original_path?: string | null
