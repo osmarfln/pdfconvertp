@@ -2117,16 +2117,10 @@ export function PDFEditor() {
                                   updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
                                   setEditingExtractedId(t.id);
                                 }}
-                                title={`Clique para editar: "${t.originalText}"`}
-                                className={cn(
-                                  "w-full h-full text-left cursor-text overflow-visible whitespace-nowrap transition-colors",
-                                  changed
-                                    ? "border border-primary/60 bg-primary/10"
-                                    : "border border-dashed border-primary/25 bg-primary/[0.03] hover:border-primary/70 hover:bg-primary/10",
-                                )}
+                                title={value ? `Clique para editar: "${value}"` : "Clique para digitar"}
+                                className="w-full h-full text-left cursor-text overflow-visible whitespace-nowrap bg-transparent border-0"
                                 style={{
-                                  background: changed && value ? "white" : undefined,
-                                  color: edit?.colorOverride || (changed ? "black" : "transparent"),
+                                  color: edit?.colorOverride || "black",
                                   fontSize: metrics.fontPx,
                                   lineHeight: `${metrics.height}px`,
                                   padding: "0 2px",
@@ -2138,7 +2132,11 @@ export function PDFEditor() {
                                       : "normal",
                                 }}
                               >
-                                {showHoverPlaceholder ? <span className="text-primary animate-pulse">| Digite aqui</span> : changed ? value : ""}
+                                {showHoverPlaceholder ? (
+                                  <span className="text-primary/70 italic">Digite aqui</span>
+                                ) : (
+                                  value || ""
+                                )}
                               </button>
                             )}
                           </div>
