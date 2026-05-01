@@ -1189,8 +1189,8 @@ export function PDFEditor() {
             const orig = extractedTexts.find((t) => t.id === e.extractedId)!;
             return {
               id: e.extractedId,
-              overlayX: orig.overlayX * ratio,
-              overlayY: orig.overlayY * ratio,
+              overlayX: (orig.overlayX + (e.xOffset ?? 0)) * ratio,
+              overlayY: (orig.overlayY + (e.yOffset ?? 0)) * ratio,
               overlayWidth: Math.max(orig.overlayWidth * ratio, 8),
               overlayHeight: orig.overlayHeight * ratio,
               originalText: orig.originalText,
