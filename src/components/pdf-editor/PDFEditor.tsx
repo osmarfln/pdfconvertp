@@ -537,7 +537,38 @@ export function PDFEditor() {
           [virtual.id]: { extractedId: virtual.id, page: pageIndex, newText: prev[virtual.id]?.newText ?? "" },
         }));
         setEditingExtractedId(virtual.id);
+        return;
       }
+
+      // Fallback: escrita livre — cria caixa de texto editável no ponto clicado
+      e.preventDefault();
+      e.stopPropagation();
+      const overlayFontSize = Math.max(12, fontSize * scale);
+      const pdfFontSize = fontSize;
+      const pageHeightPdf = (pageDims.height || 0) / scale;
+      const directId = `tv-${pageIndex}-direct-${uid()}`;
+      const virtualDirect: ExtractedText = {
+        id: directId,
+        page: pageIndex,
+        pdfX: point.x / scale,
+        pdfY: pageHeightPdf - point.y / scale,
+        pdfWidth: 200 / scale,
+        pdfHeight: overlayFontSize / scale,
+        fontSize: pdfFontSize,
+        fontName: fontKey,
+        originalText: "",
+        overlayX: point.x,
+        overlayY: point.y - overlayFontSize / 2,
+        overlayWidth: 200,
+        overlayHeight: overlayFontSize + 6,
+        overlayFontSize,
+      };
+      setExtractedTexts((prev) => [...prev, virtualDirect]);
+      setTextEdits((prev) => ({
+        ...prev,
+        [directId]: { extractedId: directId, page: pageIndex, newText: "" },
+      }));
+      setEditingExtractedId(directId);
       return;
     }
     if (tool === "pan") {
