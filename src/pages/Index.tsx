@@ -118,17 +118,7 @@ export default function Index() {
               </div>
               <StatsCards />
               <QuickActions onNavigate={setActiveTab} />
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-                <div className="lg:col-span-2">
-                  <FileList />
-                </div>
-                <div>
-                  <div className="glass rounded-xl p-4 md:p-5">
-                    <h3 className="font-display font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Upload Rápido</h3>
-                    <UploadZone />
-                  </div>
-                </div>
-              </div>
+              <FileList />
             </motion.div>
           )}
 

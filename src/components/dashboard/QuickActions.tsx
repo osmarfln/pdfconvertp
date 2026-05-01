@@ -14,7 +14,7 @@ interface QuickActionsProps {
 }
 
 export function QuickActions({ onNavigate }: QuickActionsProps) {
-  const { conversions, convertFile, compressFile } = useFileConversions();
+  const { conversions, convertFile, compressFile, uploadFile } = useFileConversions();
   const [processingAction, setProcessingAction] = useState<string | null>(null);
   const { healthy, reason, checking, recheck } = useILovePDFHealth();
   const [progress, setProgress] = useState<ConversionProgressState>(initialProgressState);
@@ -27,6 +27,30 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
 
   // Edit PDF (open in editor)
   const editPdfInputRef = useRef<HTMLInputElement>(null);
+
+  // Generic file picker for direct conversion actions
+  const pickerInputRef = useRef<HTMLInputElement>(null);
+  const pickerConfigRef = useRef<{
+    accept: string;
+    label: string;
+    title: string;
+    target: string;
+    validExts: string[];
+  } | null>(null);
+
+  const openFilePicker = (config: {
+    accept: string;
+    label: string;
+    title: string;
+    target: string;
+    validExts: string[];
+  }) => {
+    pickerConfigRef.current = config;
+    if (pickerInputRef.current) {
+      pickerInputRef.current.accept = config.accept;
+      pickerInputRef.current.click();
+    }
+  };
 
   const stopProgressTimer = () => {
     if (progressTimer.current) {
@@ -170,8 +194,13 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
     }
 
     if (label === "JPG → PDF") {
-      // Open file picker; preview shown in dialog before converting
       jpgInputRef.current?.click();
+      return;
+    }
+
+    if (label === "Mesclar PDF") {
+      onNavigate?.("files");
+      toast.info("Selecione os PDFs na página de arquivos para mesclar.");
       return;
     }
 
@@ -182,88 +211,104 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
     }
 
     if (label === "Word → PDF") {
-      if (docFiles.length === 0) {
-        toast.info("Envie um arquivo DOCX, XLSX ou PPTX primeiro.");
-        return;
-      }
-      setProcessingAction(label);
-      const file = docFiles[0];
-      await runConversionWithProgress("Word → PDF", file.original_name, async () => {
-        await convertFile(file.id, file.original_path!, "pdf");
-      }, file.file_size, file.original_format, file.original_path);
-      setProcessingAction(null);
+      openFilePicker({
+        accept: ".docx,.xlsx,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        label,
+        title: "Word → PDF",
+        target: "pdf",
+        validExts: ["docx", "xlsx", "pptx"],
+      });
       return;
     }
 
     if (label === "PDF → Word") {
-      if (pdfFiles.length === 0) {
-        toast.info("Envie um PDF primeiro.");
-        return;
-      }
-      setProcessingAction(label);
-      const file = pdfFiles[0];
-      await runConversionWithProgress("PDF → Word", file.original_name, async () => {
-        await convertFile(file.id, file.original_path!, "docx");
-      }, file.file_size, file.original_format, file.original_path);
-      setProcessingAction(null);
+      openFilePicker({
+        accept: "application/pdf,.pdf",
+        label,
+        title: "PDF → Word",
+        target: "docx",
+        validExts: ["pdf"],
+      });
       return;
     }
 
     if (label === "PDF → JPG") {
-      if (pdfFiles.length === 0) {
-        toast.info("Envie um PDF primeiro.");
-        return;
-      }
-      setProcessingAction(label);
-      const file = pdfFiles[0];
-      await runConversionWithProgress("PDF → JPG", file.original_name, async () => {
-        await convertFile(file.id, file.original_path!, "jpg");
-      }, file.file_size, file.original_format, file.original_path);
-      setProcessingAction(null);
+      openFilePicker({
+        accept: "application/pdf,.pdf",
+        label,
+        title: "PDF → JPG",
+        target: "jpg",
+        validExts: ["pdf"],
+      });
       return;
     }
-
-    // JPG → PDF is handled before the health check (opens dialog with preview)
 
     if (label === "Comprimir") {
-      if (pdfFiles.length === 0) {
-        toast.info("Envie um PDF primeiro.");
-        return;
-      }
-      setProcessingAction(label);
-      await compressFile(pdfFiles[0].original_path!);
-      setProcessingAction(null);
-      return;
-    }
-
-    if (label === "Mesclar PDF") {
-      onNavigate?.("files");
-      toast.info("Selecione os PDFs na página de arquivos para mesclar.");
+      openFilePicker({
+        accept: "application/pdf,.pdf",
+        label,
+        title: "Comprimir PDF",
+        target: "compress",
+        validExts: ["pdf"],
+      });
       return;
     }
 
     if (label === "Dividir PDF") {
-      if (pdfFiles.length === 0) {
-        toast.info("Envie um PDF primeiro.");
-        return;
-      }
-      setProcessingAction(label);
-      const file = pdfFiles[0];
-      try {
-        const { data, error } = await supabase.functions.invoke("convert-file", {
-          body: { action: "split", filePath: file.original_path },
-        });
-        if (error) throw error;
-        if (!data?.success) throw new Error(data?.error || "Split failed");
-        toast.success("PDF dividido com sucesso!");
-      } catch (err: any) {
-        toast.error("Erro ao dividir: " + err.message);
-      }
-      setProcessingAction(null);
+      openFilePicker({
+        accept: "application/pdf,.pdf",
+        label,
+        title: "Dividir PDF",
+        target: "split",
+        validExts: ["pdf"],
+      });
+      return;
+    }
+  };
+
+  const handlePickedFile = async (file: File) => {
+    const cfg = pickerConfigRef.current;
+    if (!cfg) return;
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!cfg.validExts.includes(ext)) {
+      toast.error(`Formato inválido. Selecione: ${cfg.validExts.join(", ").toUpperCase()}`);
       return;
     }
 
+    setProcessingAction(cfg.label);
+    try {
+      // Upload first
+      const conv = await uploadFile(file);
+      if (!conv || !conv.original_path) {
+        setProcessingAction(null);
+        return;
+      }
+
+      if (cfg.target === "compress") {
+        await runConversionWithProgress(cfg.title, file.name, async () => {
+          await compressFile(conv.original_path!);
+        }, file.size, ext, conv.original_path);
+      } else if (cfg.target === "split") {
+        await runConversionWithProgress(cfg.title, file.name, async () => {
+          const { data, error } = await supabase.functions.invoke("convert-file", {
+            body: { action: "split", filePath: conv.original_path },
+          });
+          if (error) throw error;
+          if (!data?.success) throw new Error(data?.error || "Split failed");
+        }, file.size, ext, conv.original_path);
+      } else {
+        await runConversionWithProgress(cfg.title, file.name, async () => {
+          await convertFile(conv.id, conv.original_path!, cfg.target);
+        }, file.size, ext, conv.original_path);
+      }
+    } catch (err: any) {
+      toast.error("Erro: " + (err?.message || "desconhecido"));
+    } finally {
+      setProcessingAction(null);
+      pickerConfigRef.current = null;
+    }
   };
+
 
   const actions = [
     { icon: FileOutput, label: "Word → PDF", desc: "Converter documentos", color: "bg-primary/10 text-primary" },
@@ -323,6 +368,16 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       />
 
       {/* Hidden file inputs */}
+      <input
+        ref={pickerInputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) handlePickedFile(f);
+        }}
+      />
       <input
         ref={jpgInputRef}
         type="file"
