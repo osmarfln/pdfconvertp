@@ -119,12 +119,17 @@ export default function Index() {
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
           {activeTab === "dashboard" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative space-y-4 md:space-y-6">
-              {/* Plano de fundo do dashboard - 25% opacidade (75% transparente) */}
+              {/* Plano de fundo do dashboard - mais transparente e centralizado */}
               <div
                 aria-hidden
-                className="pointer-events-none fixed inset-0 z-0 bg-center bg-no-repeat bg-contain opacity-25"
-                style={{ backgroundImage: `url(${dashboardBg})` }}
-              />
+                className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center"
+              >
+                <img
+                  src={dashboardBg}
+                  alt=""
+                  className="max-w-[55%] max-h-[70%] object-contain opacity-10"
+                />
+              </div>
               <div className="relative z-10 space-y-4 md:space-y-6">
                 <div>
                   <h2 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-foreground">
