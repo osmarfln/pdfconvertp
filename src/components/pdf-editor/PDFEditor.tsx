@@ -1261,7 +1261,7 @@ export function PDFEditor() {
       toast.info(
         hasReadyArea
           ? "Modo Editar Texto ativo: clique na área apagada destacada para digitar."
-          : "Modo Editar Texto ativo: clique em um texto existente para editar.",
+          : "Modo Editar Texto ativo: apague uma área com a borracha antes de digitar.",
       );
     }
   };
