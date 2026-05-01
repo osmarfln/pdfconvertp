@@ -31,6 +31,8 @@ import {
   Edit3,
   Eye,
   GitCompare,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   Dialog,
@@ -245,6 +247,26 @@ export function PDFEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [pageRotation, setPageRotation] = useState<Record<number, number>>({});
+  const editorRootRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await editorRootRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      toast.error("Tela cheia não suportada neste navegador");
+    }
+  }, []);
 
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
@@ -948,7 +970,13 @@ export function PDFEditor() {
   }
 
   return (
-    <div className="space-y-4">
+    <div
+      ref={editorRootRef}
+      className={cn(
+        "space-y-4",
+        isFullscreen && "bg-background p-4 overflow-auto h-screen w-screen"
+      )}
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="min-w-0">
@@ -974,6 +1002,10 @@ export function PDFEditor() {
           />
           <Button variant="outline" size="sm" onClick={openCompare} className="gap-2">
             <GitCompare className="w-4 h-4" /> Antes/Depois
+          </Button>
+          <Button variant="outline" size="sm" onClick={toggleFullscreen} className="gap-2" title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}>
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            {isFullscreen ? "Sair tela cheia" : "Tela cheia"}
           </Button>
           <Button variant="glow" size="sm" onClick={exportPDF} disabled={exporting} className="gap-2">
             <Download className="w-4 h-4" />
@@ -1248,7 +1280,10 @@ export function PDFEditor() {
 
           <div
             ref={scrollContainerRef}
-            className="glass rounded-xl p-3 max-h-[calc(100vh-260px)] overflow-auto"
+            className={cn(
+              "glass rounded-xl p-3 overflow-auto",
+              isFullscreen ? "max-h-[calc(100vh-160px)]" : "max-h-[calc(100vh-260px)]"
+            )}
           >
             <div className="flex justify-center min-w-max">
               <div

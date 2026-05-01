@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   LineChart,
@@ -19,7 +19,12 @@ import {
   RadialBarChart,
   RadialBar,
 } from "recharts";
-import { Activity, Wifi, Gauge, Users, TrendingUp, Signal } from "lucide-react";
+import { Activity, Wifi, Gauge, Users, TrendingUp, Signal, Bell, BellOff, Settings2, AlertTriangle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface UserSlim {
   is_blocked: boolean;
@@ -83,6 +88,76 @@ export function AnalyticsCharts({ users }: Props) {
   const [currentSupabase, setCurrentSupabase] = useState(0);
   const [currentInternet, setCurrentInternet] = useState(0);
 
+  // ===== Alertas configuráveis de latência =====
+  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(() => {
+    return localStorage.getItem("lat_alerts_enabled") !== "0";
+  });
+  const [browserNotif, setBrowserNotif] = useState<boolean>(() => {
+    return localStorage.getItem("lat_alerts_browser") === "1";
+  });
+  const [thresholdBackend, setThresholdBackend] = useState<number>(() => {
+    return Number(localStorage.getItem("lat_threshold_backend")) || 500;
+  });
+  const [thresholdInternet, setThresholdInternet] = useState<number>(() => {
+    return Number(localStorage.getItem("lat_threshold_internet")) || 800;
+  });
+  const [alertHistory, setAlertHistory] = useState<
+    { time: string; type: "Backend" | "Internet"; value: number; threshold: number }[]
+  >([]);
+  const lastAlertRef = useRef<{ sb: number; net: number }>({ sb: 0, net: 0 });
+
+  useEffect(() => {
+    localStorage.setItem("lat_alerts_enabled", alertsEnabled ? "1" : "0");
+  }, [alertsEnabled]);
+  useEffect(() => {
+    localStorage.setItem("lat_alerts_browser", browserNotif ? "1" : "0");
+    if (browserNotif && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, [browserNotif]);
+  useEffect(() => {
+    localStorage.setItem("lat_threshold_backend", String(thresholdBackend));
+  }, [thresholdBackend]);
+  useEffect(() => {
+    localStorage.setItem("lat_threshold_internet", String(thresholdInternet));
+  }, [thresholdInternet]);
+
+  const fireAlert = (type: "Backend" | "Internet", value: number, threshold: number) => {
+    const now = Date.now();
+    const key = type === "Backend" ? "sb" : "net";
+    // Deduplica: 1 alerta por tipo a cada 30s
+    if (now - (lastAlertRef.current as any)[key] < 30000) return;
+    (lastAlertRef.current as any)[key] = now;
+
+    toast.warning(`Latência alta — ${type}`, {
+      description: `${value}ms (limite ${threshold}ms). Conexão pode estar degradada.`,
+      icon: <AlertTriangle className="w-4 h-4" />,
+    });
+
+    setAlertHistory((prev) =>
+      [
+        {
+          time: new Date().toLocaleTimeString("pt-BR"),
+          type,
+          value,
+          threshold,
+        },
+        ...prev,
+      ].slice(0, 8)
+    );
+
+    if (browserNotif && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(`Latência alta — ${type}`, {
+          body: `${value}ms acima do limite (${threshold}ms)`,
+          icon: "/favicon.ico",
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     const measure = async () => {
@@ -99,6 +174,13 @@ export function AnalyticsCharts({ users }: Props) {
         const next = [...prev, { time, supabase: Math.max(sb, 0), internet: Math.max(net, 0) }];
         return next.slice(-20);
       });
+
+      if (alertsEnabled) {
+        if (sb > 0 && sb > thresholdBackend) fireAlert("Backend", sb, thresholdBackend);
+        if (net > 0 && net > thresholdInternet) fireAlert("Internet", net, thresholdInternet);
+        if (sb < 0) fireAlert("Backend", 0, thresholdBackend);
+        if (net < 0) fireAlert("Internet", 0, thresholdInternet);
+      }
     };
     measure();
     const id = setInterval(measure, 4000);
@@ -106,7 +188,7 @@ export function AnalyticsCharts({ users }: Props) {
       mounted = false;
       clearInterval(id);
     };
-  }, []);
+  }, [alertsEnabled, thresholdBackend, thresholdInternet, browserNotif]);
 
   const userStatusData = useMemo(() => {
     const active = users.filter((u) => !u.is_blocked).length;
@@ -298,6 +380,133 @@ export function AnalyticsCharts({ users }: Props) {
             />
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Configuração de alertas de latência */}
+      <div className="glass rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Settings2 className="w-4 h-4 text-primary" />
+          <h3 className="font-display font-semibold text-foreground text-sm">
+            Alertas de latência
+          </h3>
+          <div className="ml-auto flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              {alertsEnabled ? (
+                <Bell className="w-3.5 h-3.5 text-success" />
+              ) : (
+                <BellOff className="w-3.5 h-3.5 text-muted-foreground" />
+              )}
+              <Label htmlFor="alerts-on" className="text-xs cursor-pointer">
+                Ativar alertas
+              </Label>
+              <Switch
+                id="alerts-on"
+                checked={alertsEnabled}
+                onCheckedChange={setAlertsEnabled}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="alerts-browser" className="text-xs cursor-pointer">
+                Notificações do navegador
+              </Label>
+              <Switch
+                id="alerts-browser"
+                checked={browserNotif}
+                onCheckedChange={setBrowserNotif}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Limite Backend (ms) — atual: <span className="text-foreground font-semibold">{currentSupabase < 0 ? "—" : `${currentSupabase}ms`}</span>
+            </Label>
+            <Input
+              type="number"
+              min={50}
+              max={10000}
+              value={thresholdBackend}
+              onChange={(e) => setThresholdBackend(Math.max(50, Number(e.target.value) || 0))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Limite Internet (ms) — atual: <span className="text-foreground font-semibold">{currentInternet < 0 ? "—" : `${currentInternet}ms`}</span>
+            </Label>
+            <Input
+              type="number"
+              min={50}
+              max={10000}
+              value={thresholdInternet}
+              onChange={(e) => setThresholdInternet(Math.max(50, Number(e.target.value) || 0))}
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => {
+              setThresholdBackend(500);
+              setThresholdInternet(800);
+              toast.success("Limites restaurados ao padrão");
+            }}
+          >
+            Restaurar padrão
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => {
+              fireAlert("Backend", currentSupabase, thresholdBackend);
+            }}
+          >
+            Testar alerta
+          </Button>
+          {alertHistory.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs ml-auto"
+              onClick={() => setAlertHistory([])}
+            >
+              Limpar histórico
+            </Button>
+          )}
+        </div>
+
+        {alertHistory.length > 0 && (
+          <div className="rounded-lg border border-border bg-secondary/20 p-2 max-h-40 overflow-auto">
+            <div className="text-[10px] text-muted-foreground mb-1 px-1">
+              Últimos alertas disparados
+            </div>
+            <ul className="space-y-1">
+              {alertHistory.map((a, i) => (
+                <li
+                  key={i}
+                  className="flex items-center gap-2 text-xs px-2 py-1 rounded bg-destructive/5"
+                >
+                  <AlertTriangle className="w-3 h-3 text-destructive shrink-0" />
+                  <span className="text-muted-foreground">{a.time}</span>
+                  <span className="font-medium text-foreground">{a.type}</span>
+                  <span className="ml-auto text-destructive font-semibold">
+                    {a.value}ms
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    (limite {a.threshold}ms)
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Saúde da conexão (radial) + Status usuários (pizza) */}
