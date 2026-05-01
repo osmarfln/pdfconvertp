@@ -397,6 +397,4 @@ function FileListGrid({
     </div>
   );
 }
-    </div>
-  );
-}
+
