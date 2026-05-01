@@ -243,8 +243,17 @@ export function useFileConversions() {
   }, []);
 
   const deleteConversion = useCallback(async (id: string, originalPath?: string | null, convertedPath?: string | null) => {
-    // Delete files from storage
-    const pathsToDelete = [originalPath, convertedPath].filter(Boolean) as string[];
+    // Only delete files from storage if no other record (e.g. backup) still references them
+    const candidates = [originalPath, convertedPath].filter(Boolean) as string[];
+    const pathsToDelete: string[] = [];
+    for (const path of candidates) {
+      const { count } = await supabase
+        .from("file_conversions")
+        .select("id", { count: "exact", head: true })
+        .neq("id", id)
+        .or(`original_path.eq.${path},converted_path.eq.${path}`);
+      if (!count || count === 0) pathsToDelete.push(path);
+    }
     if (pathsToDelete.length > 0) {
       await supabase.storage.from("documents").remove(pathsToDelete);
     }
