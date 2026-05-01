@@ -189,6 +189,11 @@ export function PDFEditor() {
   const [opacity, setOpacity] = useState(1);
 
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [extractedTexts, setExtractedTexts] = useState<ExtractedText[]>([]);
+  const [textEdits, setTextEdits] = useState<Record<string, TextEdit>>({});
+  const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
+  const [compareUrls, setCompareUrls] = useState<{ before?: string; after?: string }>({});
   const [history, setHistory] = useState<Annotation[][]>([]);
   const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
