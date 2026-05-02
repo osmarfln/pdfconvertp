@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import { motion } from "framer-motion";
 import { PDFDocument, PDFFont, rgb, StandardFonts, degrees } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
