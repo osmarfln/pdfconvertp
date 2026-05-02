@@ -226,6 +226,7 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
       return new Response(JSON.stringify({ success: true, hasErrors: errors.length > 0, errors }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
 
     if (action === "ocr") {
       // Synchronous OCR (legacy, still works for quick jobs)
