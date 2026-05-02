@@ -314,10 +314,20 @@ export function TextComparison() {
           <p className="text-muted-foreground mt-1">Cole seu texto, corrija com IA e veja as diferenças destacadas.</p>
         </div>
         {hasDiffs && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="glass" size="sm" onClick={() => setShowInline(!showInline)}>
               <ArrowLeftRight className="w-4 h-4 mr-1" />
               {showInline ? "Lado a lado" : "Inline"}
+            </Button>
+            <Button
+              variant="glow"
+              size="sm"
+              onClick={handleApplyAI}
+              disabled={isApplying || stats?.totalErrors === 0}
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              {isApplying ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+              {isApplying ? "Aplicando..." : "Corrigir com IA"}
             </Button>
             <Button variant="glass" size="sm" onClick={handleCopy}>
               <Copy className="w-4 h-4 mr-1" />
