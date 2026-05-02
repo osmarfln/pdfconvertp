@@ -8,6 +8,7 @@ import { FileList } from "@/components/dashboard/FileList";
 import { UploadZone } from "@/components/dashboard/UploadZone";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AIChatWidget } from "@/components/chat/AIChatWidget";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 import { TextComparison } from "@/components/comparison/TextComparison";
 import { AdminPanel } from "@/components/admin/AdminPanel";
@@ -116,7 +117,7 @@ export default function Index() {
           window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
         }} />
 
-        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-24 md:pb-6 space-y-4 md:space-y-6">
           {activeTab === "dashboard" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative space-y-4 md:space-y-6">
               {/* Plano de fundo do dashboard - mais transparente e centralizado */}
@@ -208,6 +209,7 @@ export default function Index() {
       </div>
 
       <AIChatWidget />
+      <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }
