@@ -65,12 +65,6 @@ export function LandingHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-4">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-xs font-medium text-primary">
-            Plataforma completa de PDF + IA
-          </span>
-        </div>
         <h1 className="font-display font-bold text-3xl md:text-5xl text-foreground leading-tight">
           Transforme seus{" "}
           <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">

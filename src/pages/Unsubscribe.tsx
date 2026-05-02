@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Loader2, MailX, CheckCircle2, AlertCircle } from "lucide-react";
+import { AppFooter } from "@/components/layout/AppFooter";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -59,8 +60,9 @@ export default function Unsubscribe() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-2xl text-center">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 shadow-2xl text-center">
         <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
           {state === "done" || state === "already" ? (
             <CheckCircle2 className="w-8 h-8 text-primary" />
@@ -132,7 +134,10 @@ export default function Unsubscribe() {
             </p>
           </>
         )}
+        </div>
       </div>
+      <AppFooter />
     </div>
   );
 }
+

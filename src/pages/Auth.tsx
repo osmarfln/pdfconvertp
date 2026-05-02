@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import logoBg from "@/assets/logo-bg.png";
 import { LandingHero } from "@/components/auth/LandingHero";
+import { AppFooter } from "@/components/layout/AppFooter";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -236,6 +237,7 @@ export default function Auth() {
             </div>
           </motion.div>
         </div>
+        <AppFooter />
       </div>
     </div>
   );
