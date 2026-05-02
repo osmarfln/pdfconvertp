@@ -49,7 +49,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const notifyAdminOnce = (u: User) => {
+      const key = `login-notified-${u.id}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+      // Fire-and-forget — never block UI
+      supabase.functions
+        .invoke("notify-admin-login", { body: {} })
+        .catch((e) => console.warn("notify-admin-login failed", e));
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -58,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = session.user;
         setTimeout(async () => {
           await ensureProfile(u);
+          if (event === "SIGNED_IN") notifyAdminOnce(u);
           const { data } = await supabase
             .from("user_roles")
             .select("role")
