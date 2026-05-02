@@ -232,6 +232,119 @@ export function TextComparison() {
     drawSection("TEXTO ORIGINAL", originalText, [200, 60, 60]);
     drawSection("TEXTO CORRIGIDO", correctedText, [34, 150, 90]);
 
+    // ===== Section: Trechos alterados =====
+    // Group consecutive segments of the same change type into a single change entry.
+    type Change = { type: "modified" | "added" | "removed"; original: string; corrected: string };
+    const changes: Change[] = [];
+    let buf: Change | null = null;
+    for (const seg of diffs) {
+      if (seg.type === "unchanged") {
+        if (buf) { changes.push(buf); buf = null; }
+        continue;
+      }
+      if (!buf || buf.type !== seg.type) {
+        if (buf) changes.push(buf);
+        buf = { type: seg.type, original: seg.original || "", corrected: seg.corrected || "" };
+      } else {
+        buf.original += seg.original || "";
+        buf.corrected += seg.corrected || "";
+      }
+    }
+    if (buf) changes.push(buf);
+    // Filter out whitespace-only changes
+    const meaningfulChanges = changes.filter(
+      (c) => (c.original.trim().length > 0) || (c.corrected.trim().length > 0),
+    );
+
+    // Section header
+    ensure(40);
+    doc.setFillColor(120, 80, 200);
+    doc.rect(margin, y - 12, pw - margin * 2, 18, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(`TRECHOS ALTERADOS (${meaningfulChanges.length})`, margin + 6, y);
+    y += 18;
+
+    if (meaningfulChanges.length === 0) {
+      doc.setTextColor(80, 80, 80);
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(10);
+      ensure(14);
+      doc.text("Nenhuma alteração identificada.", margin, y);
+      y += 16;
+    } else {
+      const labelMap: Record<Change["type"], { label: string; color: [number, number, number] }> = {
+        modified: { label: "MODIFICADO", color: [217, 119, 6] },   // amber
+        added: { label: "ADICIONADO", color: [34, 150, 90] },      // green
+        removed: { label: "REMOVIDO", color: [200, 60, 60] },      // red
+      };
+
+      meaningfulChanges.forEach((c, idx) => {
+        const { label, color } = labelMap[c.type];
+        ensure(50);
+
+        // Item header (numbered + colored badge)
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(40, 40, 40);
+        doc.text(`#${idx + 1}`, margin, y);
+
+        doc.setFillColor(...color);
+        doc.roundedRect(margin + 22, y - 9, 70, 12, 2, 2, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.text(label, margin + 24, y);
+        y += 14;
+
+        const drawLabeledBlock = (
+          lbl: string,
+          text: string,
+          col: [number, number, number],
+        ) => {
+          if (!text || !text.trim()) return;
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(...col);
+          ensure(12);
+          doc.text(lbl, margin + 8, y);
+          y += 11;
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(30, 30, 30);
+          const lines = doc.splitTextToSize(text.trim(), pw - margin * 2 - 16);
+          // Background tint for the snippet block
+          const blockH = lines.length * 12 + 6;
+          ensure(blockH);
+          doc.setFillColor(col[0], col[1], col[2], 0.08 as any);
+          // jsPDF doesn't accept opacity here; use a light fill via setFillColor variant
+          doc.setFillColor(
+            Math.min(255, col[0] + 200),
+            Math.min(255, col[1] + 200),
+            Math.min(255, col[2] + 200),
+          );
+          doc.rect(margin + 8, y - 9, pw - margin * 2 - 16, blockH, "F");
+          doc.setTextColor(30, 30, 30);
+          for (const line of lines) {
+            doc.text(line, margin + 12, y);
+            y += 12;
+          }
+          y += 4;
+        };
+
+        if (c.type === "modified") {
+          drawLabeledBlock("De:", c.original, [200, 60, 60]);
+          drawLabeledBlock("Para:", c.corrected, [34, 150, 90]);
+        } else if (c.type === "removed") {
+          drawLabeledBlock("Trecho removido:", c.original, [200, 60, 60]);
+        } else {
+          drawLabeledBlock("Trecho adicionado:", c.corrected, [34, 150, 90]);
+        }
+        y += 6;
+      });
+    }
+
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
