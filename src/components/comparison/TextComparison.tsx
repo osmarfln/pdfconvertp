@@ -137,7 +137,40 @@ export function TextComparison() {
     }
   };
 
-  const handleExportPDF = () => {
+  // Apply AI suggestions: promote corrected -> original, re-run AI to verify no remaining issues
+  const handleApplyAI = async () => {
+    if (!correctedText.trim()) return;
+    setIsApplying(true);
+    try {
+      const newOriginal = correctedText;
+      setOriginalText(newOriginal);
+
+      const { data, error } = await supabase.functions.invoke("ai-correct", {
+        body: { action: "correct", text: newOriginal, tone },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro ao aplicar correções");
+
+      const corrected = data.correctedText || newOriginal;
+      setCorrectedText(corrected);
+      const diffResult = computeDiff(newOriginal, corrected);
+      setDiffs(diffResult);
+      const newStats = computeStats(diffResult);
+      setStats(newStats);
+
+      if (newStats.totalErrors === 0) {
+        toast.success("✓ Correções aplicadas! Nenhum erro restante.");
+      } else {
+        toast.success(`Correções aplicadas. Ainda restam ${newStats.totalErrors} ajuste(s) sugerido(s).`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao aplicar correções");
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
     if (!correctedText) return;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pw = doc.internal.pageSize.getWidth();
