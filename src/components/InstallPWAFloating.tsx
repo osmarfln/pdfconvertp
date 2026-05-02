@@ -12,7 +12,7 @@ export function InstallPWAFloating() {
   const isStandalone =
     typeof window !== "undefined" &&
     (window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true);
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 600);
