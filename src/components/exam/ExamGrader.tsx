@@ -212,7 +212,13 @@ function generateGradingPDF(g: GradingResult, studentName: string) {
   return doc;
 }
 
+// Round grade to nearest 0.5 (décimos de meio ponto)
+function roundToHalf(n: number): number {
+  return Math.round(n * 2) / 2;
+}
+
 export function ExamGrader() {
+  const { user } = useAuth();
   const [subject, setSubject] = useState("portugues");
   const [studentName, setStudentName] = useState("");
   const [examTitle, setExamTitle] = useState("");
