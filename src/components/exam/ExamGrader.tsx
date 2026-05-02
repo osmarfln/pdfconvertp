@@ -84,6 +84,26 @@ async function pdfToImages(file: File): Promise<{ base64: string; mime: string }
   return out;
 }
 
+// Token-level diff for highlighting wrong portions of the student's answer.
+function diffTokens(student: string, correct: string): { token: string; diff: boolean }[] {
+  if (!student) return [];
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w]/g, "");
+  const correctSet = new Set(
+    (correct || "")
+      .split(/(\s+|[.,;:!?])/)
+      .map((t) => norm(t))
+      .filter(Boolean),
+  );
+  const tokens = student.split(/(\s+|[.,;:!?])/);
+  return tokens.map((t) => {
+    if (/^\s+$/.test(t) || /^[.,;:!?]$/.test(t)) return { token: t, diff: false };
+    const n = norm(t);
+    if (!n) return { token: t, diff: false };
+    return { token: t, diff: !correctSet.has(n) };
+  });
+}
+
 function generateGradingPDF(g: GradingResult, studentName: string) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
