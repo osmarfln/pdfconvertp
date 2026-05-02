@@ -734,9 +734,21 @@ export function AIPage() {
                     <span className="text-sm font-medium text-foreground">Texto Corrigido</span>
                   </div>
                   {corrected && (
-                    <Button variant="ghost" size="sm" onClick={handleCopy} className="text-xs">
-                      Copiar
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={handleCopy} className="text-xs">
+                        Copiar
+                      </Button>
+                      <Button
+                        variant="glow"
+                        size="sm"
+                        onClick={handleSaveBackup}
+                        disabled={savingBackup}
+                        className="text-xs"
+                      >
+                        {savingBackup ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                        Salvar PDF (Backup)
+                      </Button>
+                    </div>
                   )}
                 </div>
                 <div className="min-h-[300px] bg-secondary border border-border rounded-md p-3 text-sm text-foreground/80 overflow-y-auto">
