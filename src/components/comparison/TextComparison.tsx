@@ -345,6 +345,16 @@ export function TextComparison() {
       {!hasDiffs && (
         <div className="space-y-4">
           <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Nome da comparação (opcional)</label>
+            <input
+              type="text"
+              value={comparisonName}
+              onChange={(e) => setComparisonName(e.target.value)}
+              placeholder="Ex: Parecer jurídico cliente X"
+              className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground">Texto para comparar</span>
