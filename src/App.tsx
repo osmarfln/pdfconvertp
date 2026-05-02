@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { SplashScreen } from "@/components/SplashScreen";
+import { InstallPWAFloating } from "@/components/InstallPWAFloating";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -54,6 +55,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+        {!showSplash && <InstallPWAFloating />}
         <BrowserRouter>
           <AuthProvider>
             <NotificationProvider>
