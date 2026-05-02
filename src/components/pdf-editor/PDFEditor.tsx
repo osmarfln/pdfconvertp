@@ -2656,22 +2656,7 @@ export function PDFEditor() {
                                     onMouseDown={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      moveTextRef.current = {
-                                        extractedId: t.id,
-                                        eraseArea: eraseArea ?? {
-                                          x: t.overlayX,
-                                          y: t.overlayY,
-                                          width: pageDims.width - t.overlayX,
-                                          height: pageDims.height - t.overlayY,
-                                        },
-                                        startClientX: e.clientX,
-                                        startClientY: e.clientY,
-                                        startOffsetX: xOffset,
-                                        startOffsetY: yOffset,
-                                        boxWidth: metrics.width,
-                                        boxHeight: metrics.height,
-                                      };
-                                      setIsMovingText(true);
+                                      startTextMove(e.clientX, e.clientY);
                                     }}
                                     className="h-7 w-7 rounded border border-border bg-secondary/50 hover:bg-secondary flex items-center justify-center cursor-move"
                                     title="Mover texto (arraste)"
