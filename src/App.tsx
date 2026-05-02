@@ -68,6 +68,7 @@ const App = () => {
             <NotificationProvider>
               <Routes>
                 <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
