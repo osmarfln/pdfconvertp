@@ -169,19 +169,27 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-md transition-colors min-w-0",
+                  "relative flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0",
                   isActive
-                    ? "text-primary"
+                    ? "text-primary bg-primary/10 scale-105"
                     : "text-muted-foreground hover:text-foreground active:bg-sidebar-accent",
                 )}
               >
+                {isActive && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8)] animate-fade-in" />
+                )}
                 <item.icon
                   className={cn(
-                    "w-[18px] h-[18px] shrink-0",
-                    isActive && "drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)]",
+                    "w-[18px] h-[18px] shrink-0 transition-transform duration-300",
+                    isActive && "drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)] scale-110",
                   )}
                 />
-                <span className="text-[9.5px] font-medium leading-none truncate max-w-full">
+                <span
+                  className={cn(
+                    "text-[9.5px] leading-none truncate max-w-full transition-all",
+                    isActive ? "font-semibold" : "font-medium",
+                  )}
+                >
                   {item.label}
                 </span>
               </button>
@@ -191,10 +199,28 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
           {/* Botão de Conversões rápidas */}
           <button
             onClick={() => setQuickOpen(true)}
-            className="flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-md text-primary min-w-0 active:bg-sidebar-accent"
+            className={cn(
+              "relative flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0",
+              quickOpen
+                ? "text-primary bg-primary/10 scale-105"
+                : "text-primary active:bg-sidebar-accent",
+            )}
           >
-            <Zap className="w-[18px] h-[18px] shrink-0 drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)]" />
-            <span className="text-[9.5px] font-medium leading-none truncate max-w-full">
+            {quickOpen && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8)] animate-fade-in" />
+            )}
+            <Zap
+              className={cn(
+                "w-[18px] h-[18px] shrink-0 drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)] transition-transform duration-300",
+                quickOpen && "scale-110",
+              )}
+            />
+            <span
+              className={cn(
+                "text-[9.5px] leading-none truncate max-w-full",
+                quickOpen ? "font-semibold" : "font-medium",
+              )}
+            >
               Converter
             </span>
           </button>
