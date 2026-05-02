@@ -63,10 +63,9 @@ Deno.serve(async (req) => {
     if (insertErr) console.error("[notify-admin-login] insert login error", insertErr);
 
     // ---- DEDUPLICATION (cooldown) ----
-    // Notify the admin again on each new login, but never more than once
-    // per hour for the same user — protects against React StrictMode double
-    // mounts, page reloads, and OAuth re-redirects.
-    const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+    // Notify the admin on each real login, while still blocking rapid duplicate
+    // calls caused by React StrictMode, page reloads, or OAuth redirects.
+    const COOLDOWN_MS = 30 * 1000; // 30 seconds
     const { data: existingNotif } = await admin
       .from("admin_login_notifications")
       .select("id, email_sent, attempts, notified_at")
@@ -110,48 +109,56 @@ Deno.serve(async (req) => {
       console.error("[notify-admin-login] upsert dedup row failed", upsertErr);
     }
 
-    // Send notification email to admin via transactional email system.
-    // We use supabase.functions.invoke() from the service-role client so the
-    // gateway receives a properly signed JWT. Calling fetch() with the raw
-    // service_role key as Bearer fails with UNAUTHORIZED_INVALID_JWT_FORMAT
-    // under the new signing-keys system.
+    // Send notification email to admin via the app email system.
+    // Use the verified user's JWT at the gateway; the target function performs
+    // its internal writes with its own service credentials.
     let emailSent = false;
     let lastError: string | null = null;
     try {
-      // Idempotency key includes the current hour bucket so each new login
-      // session produces a fresh email, while rapid retries within the same
-      // hour are still deduplicated by the transactional system.
-      const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
-      const idempotencyKey = `admin-login-user-${user.id}-${hourBucket}`;
+      const idempotencyKey = `admin-login-${loginRow?.id || `${user.id}-${Date.now()}`}`;
 
-      const { data: invokeData, error: invokeErr } = await admin.functions.invoke(
-        "send-transactional-email",
-        {
-          body: {
-            templateName: "admin-login-notification",
-            recipientEmail: ADMIN_EMAIL,
-            idempotencyKey,
-            templateData: {
-              userName: displayName,
-              userEmail: user.email,
-              provider,
-              loginAt: new Date().toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              }) + " (Brasília)",
-            },
-          },
+      const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+          apikey: anonKey,
         },
-      );
+        body: JSON.stringify({
+          templateName: "admin-login-notification",
+          recipientEmail: ADMIN_EMAIL,
+          idempotencyKey,
+          templateData: {
+            userName: displayName,
+            userEmail: user.email,
+            provider,
+            loginAt: new Date().toLocaleString("pt-BR", {
+              timeZone: "America/Sao_Paulo",
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }) + " (Brasília)",
+          },
+        }),
+      });
 
-      if (invokeErr) {
-        lastError = invokeErr.message || String(invokeErr);
+      const responseText = await emailResponse.text();
+      let invokeData: any = null;
+      try {
+        invokeData = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        invokeData = responseText;
+      }
+
+      if (!emailResponse.ok) {
+        lastError = `HTTP ${emailResponse.status}: ${responseText || emailResponse.statusText}`;
         console.warn("[notify-admin-login] invoke error:", lastError, invokeData);
+      } else if (invokeData?.success === false) {
+        lastError = invokeData.reason || "email not sent";
+        console.warn("[notify-admin-login] email skipped:", lastError, invokeData);
       } else {
         emailSent = true;
         console.log(
