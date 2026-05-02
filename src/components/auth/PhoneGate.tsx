@@ -32,18 +32,42 @@ export function PhoneGate({ userId, onComplete }: PhoneGateProps) {
     if (!isValid) return;
     setSaving(true);
     const fullPhone = `+55${ddd}${number}`;
-    const { error } = await supabase
+
+    // Get user email to ensure we can create the profile if it doesn't exist
+    const { data: { user } } = await supabase.auth.getUser();
+    const email = user?.email ?? null;
+
+    // Try update first
+    const { data: updated, error: updateError } = await supabase
       .from("profiles")
       .update({ phone: fullPhone } as any)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .select("user_id");
 
-    if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Telefone salvo!", description: "Bem-vindo à plataforma." });
-      onComplete();
+    if (updateError) {
+      console.error("[PhoneGate] update error:", updateError);
+      toast({ title: "Erro ao salvar", description: updateError.message, variant: "destructive" });
+      setSaving(false);
+      return;
     }
+
+    // If no row was updated, the profile doesn't exist yet — create it
+    if (!updated || updated.length === 0) {
+      const { error: insertError } = await supabase
+        .from("profiles")
+        .insert({ user_id: userId, email, phone: fullPhone } as any);
+
+      if (insertError) {
+        console.error("[PhoneGate] insert error:", insertError);
+        toast({ title: "Erro ao salvar", description: insertError.message, variant: "destructive" });
+        setSaving(false);
+        return;
+      }
+    }
+
+    toast({ title: "Telefone salvo!", description: "Bem-vindo à plataforma." });
     setSaving(false);
+    onComplete();
   };
 
   return (
