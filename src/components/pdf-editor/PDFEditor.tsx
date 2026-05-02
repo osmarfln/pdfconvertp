@@ -2207,7 +2207,7 @@ export function PDFEditor() {
                                 {/* Floating style panel — anchored to original text height to avoid jumping when font/size changes */}
                                 <div
                                   className="absolute z-20 left-0 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
-                                  style={{ top: t.height + 4 }}
+                                  style={{ top: t.overlayHeight + 4 }}
                                   onClick={(e) => e.stopPropagation()}
                                   onMouseDown={(e) => e.stopPropagation()}
                                 >
