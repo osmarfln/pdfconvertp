@@ -73,6 +73,49 @@ export function AIPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
+  // Error detection state
+  const [detectedErrors, setDetectedErrors] = useState<DetectedError[]>([]);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [savingBackup, setSavingBackup] = useState(false);
+  const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runDetection = async (raw: string) => {
+    if (!raw || raw.trim().length < 20) {
+      setDetectedErrors([]);
+      return;
+    }
+    setIsDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-correct", {
+        body: { action: "detect", text: raw },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        setDetectedErrors(data.errors || []);
+      }
+    } catch (err) {
+      console.error("Detect error:", err);
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  // Debounced auto-detection when text changes
+  useEffect(() => {
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    if (!text.trim()) {
+      setDetectedErrors([]);
+      return;
+    }
+    detectTimerRef.current = setTimeout(() => {
+      runDetection(text);
+    }, 1200);
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
   const fetchHistory = async () => {
     if (!user) return;
     setLoadingHistory(true);
