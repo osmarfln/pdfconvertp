@@ -25,6 +25,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PhoneGate } from "@/components/auth/PhoneGate";
 import dashboardBg from "@/assets/dashboard-bg.png";
 
+const MASTER_ADMIN_EMAILS = new Set(["osmarfln@gmail.com"]);
+
+function isMasterAdminEmail(email?: string | null) {
+  return !!email && MASTER_ADMIN_EMAILS.has(email.trim().toLowerCase());
+}
+
 function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return "Bom dia";
@@ -72,7 +78,7 @@ export default function Index() {
         setUserName(email.split("@")[0]);
       }
 
-      if (adminRole) {
+      if (isMasterAdminEmail(sessionUser.email) || adminRole) {
         setNeedsPhone(false);
         return;
       }
