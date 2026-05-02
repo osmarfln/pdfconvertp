@@ -240,8 +240,44 @@ export function TextComparison() {
       doc.text(`Página ${i}/${pageCount} • PDF Convert Pro`, pw - margin, ph - 16, { align: "right" });
     }
 
-    doc.save(`comparacao_${Date.now()}.pdf`);
+    // Local download
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const baseName = (comparisonName?.trim() || "comparacao")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w.-]/g, "_").replace(/_+/g, "_");
+    const fileName = `${baseName}_${dateStr}.pdf`;
+    doc.save(fileName);
     toast.success("PDF baixado!");
+
+    // Save backup to "Meus Arquivos"
+    if (user?.id) {
+      try {
+        const blob = doc.output("blob");
+        const filePath = `${user.id}/backups/${Date.now()}_${fileName}`;
+        const { error: upErr } = await supabase.storage
+          .from("documents")
+          .upload(filePath, blob, { contentType: "application/pdf" });
+        if (upErr) throw upErr;
+
+        const { error: insErr } = await supabase.from("file_conversions").insert({
+          user_id: user.id,
+          original_name: fileName,
+          original_format: "pdf",
+          target_format: "pdf",
+          status: "completed",
+          original_path: filePath,
+          converted_path: filePath,
+          file_size: blob.size,
+          is_backup: true,
+        });
+        if (insErr) throw insErr;
+        toast.success("Backup salvo em Meus Arquivos");
+      } catch (err: any) {
+        console.error("Backup error:", err);
+        toast.error("PDF baixado, mas falhou ao salvar backup");
+      }
+    }
   };
 
   const renderOriginal = () =>
