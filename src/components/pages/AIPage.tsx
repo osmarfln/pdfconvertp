@@ -586,9 +586,14 @@ export function AIPage() {
                 </SelectContent>
               </Select>
 
-              <Button variant="glow" onClick={handleCorrect} disabled={!text.trim() || isProcessing}>
+              <Button
+                variant="glow"
+                onClick={handleCorrect}
+                disabled={!text.trim() || isProcessing}
+                className={detectedErrors.length > 0 ? "animate-pulse ring-2 ring-destructive/60" : ""}
+              >
                 {isProcessing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Wand2 className="w-4 h-4 mr-1.5" />}
-                {isProcessing ? "Corrigindo..." : "Corrigir com IA"}
+                {isProcessing ? "Corrigindo..." : detectedErrors.length > 0 ? `Corrigir ${detectedErrors.length} erro${detectedErrors.length > 1 ? "s" : ""} com IA` : "Corrigir com IA"}
               </Button>
 
               <Button variant="glass" onClick={() => fileInputRef.current?.click()} disabled={isOcrProcessing}>
