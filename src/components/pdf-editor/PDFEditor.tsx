@@ -95,6 +95,7 @@ interface TextEdit {
   xOffset?: number; // Overlay px from the original editable area
   yOffset?: number; // Overlay px from the original editable area
   align?: "left" | "center" | "right";
+  rotation?: number; // degrees, clockwise
 }
 
 interface PdfTextItem {
