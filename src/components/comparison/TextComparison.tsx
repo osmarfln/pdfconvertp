@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeftRight, Copy, Download, CheckCircle2, XCircle, RotateCcw, Wand2, Loader2, FileText } from "lucide-react";
+import { ArrowLeftRight, Copy, Download, CheckCircle2, XCircle, RotateCcw, Wand2, Loader2, FileText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DiffSegment {
   type: "unchanged" | "added" | "removed" | "modified";
