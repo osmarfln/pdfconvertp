@@ -2256,22 +2256,40 @@ export function PDFEditor() {
                                   )}
                                   <Select
                                     value={edit?.fontKeyOverride ?? "__auto__"}
-                                    onValueChange={(v) =>
+                                    onValueChange={(v) => {
+                                      const opt = FONT_OPTIONS.find((f) => f.key === v);
+                                      ensureWebFontLoaded(opt?.webFontHref);
                                       updateTextEdit(t.id, {
                                         fontKeyOverride: v === "__auto__" ? undefined : (v as FontKey),
-                                      })
-                                    }
+                                      });
+                                    }}
                                   >
-                                    <SelectTrigger className="h-7 w-[130px] text-xs">
+                                    <SelectTrigger className="h-7 w-[170px] text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__auto__">Auto ({t.fontName.slice(0, 14)})</SelectItem>
-                                      {FONT_OPTIONS.map((f) => (
-                                        <SelectItem key={f.key} value={f.key}>
-                                          {f.label}
-                                        </SelectItem>
-                                      ))}
+                                    <SelectContent className="max-h-80">
+                                      <SelectItem value="__auto__">Auto ({t.fontName.slice(0, 16)})</SelectItem>
+                                      {(["Padrão PDF", "Sans-serif", "Serif", "Monospace", "Display", "Manuscrita"] as const).map((cat) => {
+                                        const items = FONT_OPTIONS.filter((f) => f.category === cat);
+                                        if (!items.length) return null;
+                                        return (
+                                          <Fragment key={cat}>
+                                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-secondary/40 sticky top-0">
+                                              {cat}
+                                            </div>
+                                            {items.map((f) => {
+                                              ensureWebFontLoaded(f.webFontHref);
+                                              return (
+                                                <SelectItem key={f.key} value={f.key}>
+                                                  <span style={{ fontFamily: f.cssFamily, fontWeight: f.cssWeight ?? "normal", fontStyle: f.cssStyle ?? "normal" }}>
+                                                    {f.label}
+                                                  </span>
+                                                </SelectItem>
+                                              );
+                                            })}
+                                          </Fragment>
+                                        );
+                                      })}
                                     </SelectContent>
                                   </Select>
                                   {/* Font size: spinner + wheel + drag to resize */}
