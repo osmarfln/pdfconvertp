@@ -1559,7 +1559,7 @@ export function PDFEditor() {
   };
 
   const getEditBoxMetrics = (text: ExtractedText, edit?: TextEdit) => {
-    const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * (text.overlayFontSize / text.fontSize));
+    const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * scale);
     const eraseArea = getEraseAreaForVirtualText(text);
     const isEraseAreaText = !!eraseArea;
     if (isEraseAreaText) {
