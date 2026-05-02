@@ -9,6 +9,8 @@ import { UploadZone } from "@/components/dashboard/UploadZone";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AIChatWidget } from "@/components/chat/AIChatWidget";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { BenefitsSection } from "@/components/dashboard/BenefitsSection";
+import { polishText } from "@/lib/textPolish";
 
 import { TextComparison } from "@/components/comparison/TextComparison";
 import { AdminPanel } from "@/components/admin/AdminPanel";
@@ -137,11 +139,14 @@ export default function Index() {
                     {getGreeting()}, {displayName} 👋
                   </h2>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    Gerencie seus documentos e use a ferramenta para otimizar seus textos PDF — seu melhor amigo, CONVERT PDF PRO.
+                    {polishText(
+                      "Gerencie seus documentos e use a ferramenta para otimizar seus textos PDF - seu melhor amigo , CONVERT PDF PRO."
+                    )}
                   </p>
                 </div>
                 <StatsCards />
                 <QuickActions onNavigate={setActiveTab} />
+                <BenefitsSection />
                 <FileList />
               </div>
             </motion.div>
