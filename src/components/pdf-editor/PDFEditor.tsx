@@ -588,14 +588,23 @@ export function PDFEditor() {
     let cancelled = false;
     (async () => {
       try {
-        const doc = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+        setLoadProgress({ phase: "parse", percent: 0 });
+        const task = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
+        task.onProgress = (p: { loaded: number; total: number }) => {
+          if (cancelled) return;
+          const pct = p.total ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : 0;
+          setLoadProgress({ phase: "parse", percent: pct });
+        };
+        const doc = await task.promise;
         if (cancelled) return;
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setPageIndex(0);
+        setLoadProgress({ phase: "render", percent: 0 });
       } catch (e) {
         toast.error("Erro ao abrir PDF");
         console.error(e);
+        setLoadProgress(null);
       }
     })();
     return () => {
