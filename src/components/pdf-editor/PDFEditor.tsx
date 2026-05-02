@@ -95,6 +95,7 @@ interface TextEdit {
   xOffset?: number; // Overlay px from the original editable area
   yOffset?: number; // Overlay px from the original editable area
   align?: "left" | "center" | "right";
+  rotation?: number; // degrees, clockwise
 }
 
 interface PdfTextItem {
@@ -1120,6 +1121,7 @@ export function PDFEditor() {
           size: fontSize,
           font,
           color: rgb(c.r, c.g, c.b),
+          rotate: edit.rotation ? degrees(-edit.rotation) : undefined,
         });
       }
     }
@@ -1374,6 +1376,7 @@ export function PDFEditor() {
         xOffset: existing?.xOffset,
         yOffset: existing?.yOffset,
         align: existing?.align,
+        rotation: existing?.rotation,
         ...patch,
       };
       const isUnchanged =
@@ -1384,7 +1387,8 @@ export function PDFEditor() {
         !merged.colorOverride &&
         !merged.xOffset &&
         !merged.yOffset &&
-        !merged.align;
+        !merged.align &&
+        !merged.rotation;
       if (isUnchanged) {
         const { [extractedId]: _, ...rest } = prev;
         return rest;
@@ -2169,6 +2173,8 @@ export function PDFEditor() {
                               width: metrics.width,
                               height: metrics.height,
                               cursor: "text",
+                              transform: edit?.rotation ? `rotate(${edit.rotation}deg)` : undefined,
+                              transformOrigin: "0% 100%",
                             }}
                             className="group"
                           >
@@ -2208,6 +2214,77 @@ export function PDFEditor() {
                                      fontStyle: getFontStyle(edit?.fontKeyOverride),
                                   }}
                                 />
+                                {/* Rotation handle */}
+                                <div
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+                                    const cx = rect.left + rect.width / 2;
+                                    const cy = rect.top + rect.height / 2;
+                                    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+                                    const startRot = edit?.rotation ?? 0;
+                                    const onMove = (ev: MouseEvent) => {
+                                      const a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI;
+                                      let next = startRot + (a - startAngle);
+                                      if (ev.shiftKey) next = Math.round(next / 15) * 15;
+                                      next = ((next + 180) % 360 + 360) % 360 - 180;
+                                      updateTextEdit(t.id, { rotation: next });
+                                    };
+                                    const onUp = () => {
+                                      window.removeEventListener("mousemove", onMove);
+                                      window.removeEventListener("mouseup", onUp);
+                                    };
+                                    window.addEventListener("mousemove", onMove);
+                                    window.addEventListener("mouseup", onUp);
+                                  }}
+                                  title="Girar (segure Shift para 15°)"
+                                  className="absolute -top-7 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-primary border-2 border-background shadow-md cursor-grab active:cursor-grabbing z-30 flex items-center justify-center"
+                                  style={{ touchAction: "none" }}
+                                >
+                                  <RotateCw className="w-3 h-3 text-primary-foreground" />
+                                </div>
+                                {/* Resize corner handles — drag to change font size */}
+                                {(["nw", "ne", "sw", "se"] as const).map((corner) => {
+                                  const pos: Record<string, string> = {
+                                    nw: "top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize",
+                                    ne: "top-0 right-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize",
+                                    sw: "bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize",
+                                    se: "bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize",
+                                  };
+                                  return (
+                                    <div
+                                      key={corner}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const startY = e.clientY;
+                                        const startX = e.clientX;
+                                        const startSize = edit?.fontSizeOverride ?? t.fontSize;
+                                        const scaleFactor = t.overlayFontSize / Math.max(0.01, t.fontSize);
+                                        const sign = corner === "se" || corner === "ne" ? 1 : -1;
+                                        const onMove = (ev: MouseEvent) => {
+                                          const dy = (ev.clientX - startX) + (corner.includes("s") ? (ev.clientY - startY) : -(ev.clientY - startY));
+                                          const deltaPx = sign * dy * 0.5;
+                                          const nextPx = Math.max(4, startSize * scaleFactor + deltaPx);
+                                          const nextSize = clamp(nextPx / scaleFactor, 4, 144);
+                                          updateTextEdit(t.id, { fontSizeOverride: nextSize });
+                                        };
+                                        const onUp = () => {
+                                          window.removeEventListener("mousemove", onMove);
+                                          window.removeEventListener("mouseup", onUp);
+                                        };
+                                        window.addEventListener("mousemove", onMove);
+                                        window.addEventListener("mouseup", onUp);
+                                      }}
+                                      className={cn(
+                                        "absolute w-2.5 h-2.5 bg-background border-2 border-primary rounded-sm z-30",
+                                        pos[corner],
+                                      )}
+                                      title="Arraste para redimensionar"
+                                    />
+                                  );
+                                })}
                                 {/* Floating style panel — draggable; anchored to original text height to avoid jumping when font/size changes */}
                                 <div
                                   className="absolute z-20 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
@@ -2308,6 +2385,42 @@ export function PDFEditor() {
                                         </button>
                                       );
                                     })}
+                                  </div>
+                                  {/* Rotation controls */}
+                                  <div className="flex items-center gap-0.5 border border-border rounded bg-secondary/30 p-0.5">
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const cur = edit?.rotation ?? 0;
+                                        updateTextEdit(t.id, { rotation: cur - 15 });
+                                      }}
+                                      className="h-6 w-6 rounded hover:bg-secondary flex items-center justify-center"
+                                      title="Girar -15°"
+                                    >
+                                      <RotateCw className="w-3.5 h-3.5 -scale-x-100" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => updateTextEdit(t.id, { rotation: 0 })}
+                                      className="h-6 px-1 rounded hover:bg-secondary text-[10px] font-mono min-w-[34px]"
+                                      title="Resetar rotação"
+                                    >
+                                      {Math.round(edit?.rotation ?? 0)}°
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const cur = edit?.rotation ?? 0;
+                                        updateTextEdit(t.id, { rotation: cur + 15 });
+                                      }}
+                                      className="h-6 w-6 rounded hover:bg-secondary flex items-center justify-center"
+                                      title="Girar +15°"
+                                    >
+                                      <RotateCw className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                   <Select
                                     value={edit?.fontKeyOverride ?? "__auto__"}
