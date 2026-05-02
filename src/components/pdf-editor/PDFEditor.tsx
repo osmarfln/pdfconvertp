@@ -2384,6 +2384,42 @@ export function PDFEditor() {
                                       );
                                     })}
                                   </div>
+                                  {/* Rotation controls */}
+                                  <div className="flex items-center gap-0.5 border border-border rounded bg-secondary/30 p-0.5">
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const cur = edit?.rotation ?? 0;
+                                        updateTextEdit(t.id, { rotation: cur - 15 });
+                                      }}
+                                      className="h-6 w-6 rounded hover:bg-secondary flex items-center justify-center"
+                                      title="Girar -15°"
+                                    >
+                                      <RotateCw className="w-3.5 h-3.5 -scale-x-100" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => updateTextEdit(t.id, { rotation: 0 })}
+                                      className="h-6 px-1 rounded hover:bg-secondary text-[10px] font-mono min-w-[34px]"
+                                      title="Resetar rotação"
+                                    >
+                                      {Math.round(edit?.rotation ?? 0)}°
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const cur = edit?.rotation ?? 0;
+                                        updateTextEdit(t.id, { rotation: cur + 15 });
+                                      }}
+                                      className="h-6 w-6 rounded hover:bg-secondary flex items-center justify-center"
+                                      title="Girar +15°"
+                                    >
+                                      <RotateCw className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                   <Select
                                     value={edit?.fontKeyOverride ?? "__auto__"}
                                     onValueChange={(v) => {
