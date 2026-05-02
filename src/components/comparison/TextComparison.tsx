@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 interface DiffSegment {
   type: "unchanged" | "added" | "removed" | "modified";
@@ -132,18 +133,78 @@ export function TextComparison() {
     }
   };
 
-  const handleExport = () => {
-    if (!correctedText || !originalText) return;
-    const content = `=== TEXTO ORIGINAL ===\n\n${originalText}\n\n=== TEXTO CORRIGIDO ===\n\n${correctedText}\n\n=== ESTATÍSTICAS ===\nErros corrigidos: ${stats?.totalErrors || 0}\nOrtografia: ${stats?.spelling || 0}\nGramática: ${stats?.grammar || 0}\nRedundância: ${stats?.redundancy || 0}\nScore: ${stats?.score || 0}%`;
-    
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `comparacao_${Date.now()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Relatório exportado!");
+  const handleExportPDF = () => {
+    if (!correctedText) return;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pw = doc.internal.pageSize.getWidth();
+    const ph = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    let y = margin;
+
+    const ensure = (h: number) => {
+      if (y + h > ph - margin) { doc.addPage(); y = margin; }
+    };
+
+    // Header
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, pw, 60, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("COMPARAÇÃO DE TEXTOS", margin, 28);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Tom: ${tone} • ${new Date().toLocaleDateString("pt-BR")}`, margin, 46);
+    y = 80;
+
+    // Stats
+    if (stats) {
+      doc.setTextColor(20, 20, 20);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        `Erros: ${stats.totalErrors}  •  Ortografia: ${stats.spelling}  •  Gramática: ${stats.grammar}  •  Score: ${stats.score}%`,
+        margin,
+        y,
+      );
+      y += 20;
+    }
+
+    const drawSection = (title: string, body: string, color: [number, number, number]) => {
+      ensure(30);
+      doc.setFillColor(...color);
+      doc.rect(margin, y - 12, pw - margin * 2, 18, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text(title, margin + 6, y);
+      y += 16;
+
+      doc.setTextColor(30, 30, 30);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const lines = doc.splitTextToSize(body || "—", pw - margin * 2);
+      for (const line of lines) {
+        ensure(14);
+        doc.text(line, margin, y);
+        y += 13;
+      }
+      y += 10;
+    };
+
+    drawSection("TEXTO ORIGINAL", originalText, [200, 60, 60]);
+    drawSection("TEXTO CORRIGIDO", correctedText, [34, 150, 90]);
+
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Página ${i}/${pageCount} • PDF Convert Pro`, pw - margin, ph - 16, { align: "right" });
+    }
+
+    doc.save(`comparacao_${Date.now()}.pdf`);
+    toast.success("PDF baixado!");
   };
 
   const renderOriginal = () =>
@@ -187,11 +248,11 @@ export function TextComparison() {
             </Button>
             <Button variant="glass" size="sm" onClick={handleCopy}>
               <Copy className="w-4 h-4 mr-1" />
-              Copiar
+              Copiar texto corrigido
             </Button>
-            <Button variant="glow" size="sm" onClick={handleExport}>
+            <Button variant="glow" size="sm" onClick={handleExportPDF}>
               <Download className="w-4 h-4 mr-1" />
-              Exportar
+              Baixar PDF
             </Button>
           </div>
         )}
