@@ -111,10 +111,10 @@ Deno.serve(async (req) => {
     }
 
     // Send notification email to admin via transactional email system.
-    // We call the function via direct HTTP (not supabase.functions.invoke) so we
-    // can pass the service_role key explicitly as both Authorization Bearer and
-    // apikey. This avoids the gateway's UNAUTHORIZED_INVALID_JWT_FORMAT error
-    // that occurs when invoke() sends the wrong token after key rotation.
+    // We use supabase.functions.invoke() from the service-role client so the
+    // gateway receives a properly signed JWT. Calling fetch() with the raw
+    // service_role key as Bearer fails with UNAUTHORIZED_INVALID_JWT_FORMAT
+    // under the new signing-keys system.
     let emailSent = false;
     let lastError: string | null = null;
     try {
@@ -123,16 +123,11 @@ Deno.serve(async (req) => {
       // hour are still deduplicated by the transactional system.
       const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
       const idempotencyKey = `admin-login-user-${user.id}-${hourBucket}`;
-      const resp = await fetch(
-        `${supabaseUrl}/functions/v1/send-transactional-email`,
+
+      const { data: invokeData, error: invokeErr } = await admin.functions.invoke(
+        "send-transactional-email",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
-            apikey: serviceKey,
-          },
-          body: JSON.stringify({
+          body: {
             templateName: "admin-login-notification",
             recipientEmail: ADMIN_EMAIL,
             idempotencyKey,
@@ -150,18 +145,18 @@ Deno.serve(async (req) => {
                 hour12: false,
               }) + " (Brasília)",
             },
-          }),
+          },
         },
       );
-      if (resp.ok) {
+
+      if (invokeErr) {
+        lastError = invokeErr.message || String(invokeErr);
+        console.warn("[notify-admin-login] invoke error:", lastError, invokeData);
+      } else {
         emailSent = true;
         console.log(
           `[notify-admin-login] SENT user=${user.id} email=${user.email} provider=${provider}`,
         );
-      } else {
-        const text = await resp.text().catch(() => "");
-        lastError = `HTTP ${resp.status}: ${text.slice(0, 500)}`;
-        console.warn("[notify-admin-login] send-transactional-email error:", lastError);
       }
     } catch (e: any) {
       lastError = e?.message || String(e);
