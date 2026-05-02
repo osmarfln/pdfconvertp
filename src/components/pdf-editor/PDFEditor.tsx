@@ -453,17 +453,19 @@ export function PDFEditor() {
       event.preventDefault();
       const dx = event.clientX - current.startClientX;
       const dy = event.clientY - current.startClientY;
-      const maxX = Math.max(0, current.eraseArea.width - current.boxWidth);
-      const maxY = Math.max(0, current.eraseArea.height - current.boxHeight);
-      let nextX = clamp(current.startOffsetX + dx, 0, maxX);
-      let nextY = clamp(current.startOffsetY + dy, 0, maxY);
+      const baseX = current.eraseArea.x; // overlay px of the editable area's origin
+      const baseY = current.eraseArea.y;
+      const minX = -baseX;
+      const maxX = Math.max(minX, pageDims.width - baseX - current.boxWidth);
+      const minY = -baseY;
+      const maxY = Math.max(minY, pageDims.height - baseY - current.boxHeight);
+      let nextX = clamp(current.startOffsetX + dx, minX, maxX);
+      let nextY = clamp(current.startOffsetY + dy, minY, maxY);
 
       // Smart guides: snap to other text edges/centers + page center.
       // Threshold is in overlay px and stays constant in pixels regardless
       // of zoom (≈ 6 px). Hold Alt to disable snap.
       const SNAP = 6;
-      const baseX = current.eraseArea.x; // overlay px of the editable area
-      const baseY = current.eraseArea.y;
       const others = extractedTexts.filter(
         (t) => t.page === pageIndex && t.id !== current.extractedId,
       );
@@ -502,7 +504,7 @@ export function PDFEditor() {
           });
         });
         if (Math.abs(bestDx) <= SNAP) {
-          nextX = clamp(nextX + bestShift, 0, maxX);
+          nextX = clamp(nextX + bestShift, minX, maxX);
           // Recompute matched guides at the snapped position
           [
             baseX + nextX,
@@ -532,7 +534,7 @@ export function PDFEditor() {
           });
         });
         if (Math.abs(bestDy) <= SNAP) {
-          nextY = clamp(nextY + bestShiftY, 0, maxY);
+          nextY = clamp(nextY + bestShiftY, minY, maxY);
           [
             baseY + nextY,
             baseY + nextY + current.boxHeight / 2,
