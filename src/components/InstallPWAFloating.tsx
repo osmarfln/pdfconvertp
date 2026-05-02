@@ -15,21 +15,12 @@ export function InstallPWAFloating() {
       (window.navigator as any).standalone === true);
 
   useEffect(() => {
-    try {
-      if (sessionStorage.getItem("pwa-banner-dismissed") === "true") {
-        setDismissed(true);
-        return;
-      }
-    } catch {}
     const t = setTimeout(() => setShow(true), 600);
     return () => clearTimeout(t);
   }, []);
 
   const handleDismiss = () => {
     setDismissed(true);
-    try {
-      sessionStorage.setItem("pwa-banner-dismissed", "true");
-    } catch {}
   };
 
   const handleInstall = async () => {
