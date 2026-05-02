@@ -422,7 +422,7 @@ export function AIChatWidget() {
             initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
             whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary flex items-center justify-center glow z-50 shadow-2xl"
+            className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] right-4 sm:bottom-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary flex items-center justify-center glow z-50 shadow-2xl"
           >
             <MessageCircle className="w-6 h-6 text-primary-foreground" />
           </motion.button>
