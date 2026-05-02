@@ -9,6 +9,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import logoBg from "@/assets/logo-bg.png";
+import { LandingHero } from "@/components/auth/LandingHero";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -67,29 +68,42 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden">
       {/* Background image */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${logoBg})` }}
       />
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-background/85 backdrop-blur-sm" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md relative z-10"
-      >
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <img src={logoBg} alt="PDF Convert Pro" className="w-16 h-16 rounded-xl object-cover" />
+      <div className="relative z-10 min-h-screen flex flex-col">
+        {/* Top brand */}
+        <header className="px-4 sm:px-8 py-5 flex items-center gap-3">
+          <img src={logoBg} alt="PDF Convert Pro" className="w-11 h-11 rounded-xl object-cover" />
           <div>
-            <h1 className="font-display font-bold text-2xl text-foreground">PDF Convert Pro</h1>
-            <p className="text-xs text-muted-foreground">Processamento inteligente de documentos</p>
+            <h1 className="font-display font-bold text-lg sm:text-xl text-foreground leading-tight">
+              PDF Convert Pro
+            </h1>
+            <p className="text-[11px] text-muted-foreground">
+              Processamento inteligente de documentos
+            </p>
           </div>
-        </div>
+        </header>
 
-        <div className="glass rounded-2xl p-8 space-y-6">
+        {/* Two-column hero + auth */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 px-4 sm:px-8 pb-10 max-w-7xl w-full mx-auto items-start lg:items-center">
+          {/* Left: Landing */}
+          <div className="order-2 lg:order-1">
+            <LandingHero />
+          </div>
+
+          {/* Right: Auth form */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="order-1 lg:order-2 w-full max-w-md mx-auto lg:ml-auto lg:mr-0"
+          >
+            <div className="glass rounded-2xl p-6 sm:p-8 space-y-6">
           <div className="text-center">
             <h2 className="text-xl font-display font-bold text-foreground">
               {isLogin ? "Entrar na plataforma" : "Criar sua conta"}
@@ -219,8 +233,11 @@ export default function Auth() {
               {isLogin ? "Cadastre-se" : "Entrar"}
             </button>
           </p>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
+
