@@ -162,7 +162,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
         aria-label="Navegação rápida"
       >
-        <div className="grid grid-flow-col auto-cols-fr items-stretch px-1 pt-1.5 pb-1 min-h-[60px]">
+        <div className="grid grid-flow-col auto-cols-fr items-stretch gap-0.5 px-1.5 pt-2 pb-1.5 min-h-[64px]">
           {items.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -170,7 +170,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "relative flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0",
+                  "relative flex flex-col items-center justify-center gap-1 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0 leading-none",
                   isActive
                     ? "text-primary bg-primary/10 scale-105"
                     : "text-muted-foreground hover:text-foreground active:bg-sidebar-accent",
@@ -187,7 +187,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
                 />
                 <span
                   className={cn(
-                    "text-[9.5px] leading-none truncate max-w-full transition-all",
+                    "text-[10px] leading-[1.1] truncate max-w-full transition-all",
                     isActive ? "font-semibold" : "font-medium",
                   )}
                 >
@@ -201,7 +201,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
           <button
             onClick={() => setQuickOpen(true)}
             className={cn(
-              "relative flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0",
+              "relative flex flex-col items-center justify-center gap-1 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0 leading-none",
               quickOpen
                 ? "text-primary bg-primary/10 scale-105"
                 : "text-primary active:bg-sidebar-accent",
@@ -218,7 +218,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
             />
             <span
               className={cn(
-                "text-[9.5px] leading-none truncate max-w-full",
+                "text-[10px] leading-[1.1] truncate max-w-full",
                 quickOpen ? "font-semibold" : "font-medium",
               )}
             >
