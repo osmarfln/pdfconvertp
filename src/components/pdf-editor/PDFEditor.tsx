@@ -2199,23 +2199,9 @@ export function PDFEditor() {
                                     outline: "none",
                                     padding: "0 4px",
                                     textAlign: edit?.align ?? "left",
-                                    fontFamily: (() => {
-                                      const fk = edit?.fontKeyOverride;
-                                      if (fk?.startsWith("Times")) return "Times, serif";
-                                      if (fk?.startsWith("Courier")) return "Courier, monospace";
-                                      if (fk?.startsWith("Helvetica")) return "Helvetica, Arial, sans-serif";
-                                      return t.fontName.toLowerCase().includes("times")
-                                        ? "Times, serif"
-                                        : t.fontName.toLowerCase().includes("courier")
-                                          ? "Courier, monospace"
-                                          : "Helvetica, Arial, sans-serif";
-                                    })(),
-                                    fontWeight: edit?.fontKeyOverride?.includes("Bold") ? "bold" : "normal",
-                                    fontStyle:
-                                      edit?.fontKeyOverride?.includes("Oblique") ||
-                                      edit?.fontKeyOverride?.includes("Italic")
-                                        ? "italic"
-                                        : "normal",
+                                     fontFamily: getFontFamily(edit?.fontKeyOverride || t.fontName),
+                                     fontWeight: getFontWeight(edit?.fontKeyOverride),
+                                     fontStyle: getFontStyle(edit?.fontKeyOverride),
                                   }}
                                 />
                                 {/* Floating style panel */}
