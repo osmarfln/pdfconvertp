@@ -201,7 +201,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
           <button
             onClick={() => setQuickOpen(true)}
             className={cn(
-              "relative flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0",
+              "relative flex flex-col items-center justify-center gap-1 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0 leading-none",
               quickOpen
                 ? "text-primary bg-primary/10 scale-105"
                 : "text-primary active:bg-sidebar-accent",
