@@ -25,8 +25,6 @@ const navItems = [
   { icon: LayoutDashboard, label: "Início", id: "dashboard" },
   { icon: FileText, label: "Arquivos", id: "files" },
   { icon: Pencil, label: "Editor", id: "editor" },
-  { icon: Wand2, label: "IA", id: "ai" },
-  { icon: GitCompare, label: "Comparar", id: "compare" },
 ];
 
 type QuickAction = {
