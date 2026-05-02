@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Insert login record (drives realtime counter in admin panel)
+    // Always record the raw login event (drives realtime counter in admin panel)
     const { data: loginRow, error: insertErr } = await admin
       .from("user_logins")
       .insert({
@@ -60,12 +60,57 @@ Deno.serve(async (req) => {
       .select("id")
       .maybeSingle();
 
-    if (insertErr) console.error("insert login error", insertErr);
+    if (insertErr) console.error("[notify-admin-login] insert login error", insertErr);
+
+    // ---- DEDUPLICATION ----
+    // Only notify the admin ONCE per user, ever. Subsequent logins are skipped.
+    const { data: existingNotif } = await admin
+      .from("admin_login_notifications")
+      .select("id, email_sent, attempts")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingNotif?.email_sent) {
+      console.log(
+        `[notify-admin-login] SKIP (already notified) user=${user.id} email=${user.email}`,
+      );
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          deduplicated: true,
+          reason: "admin already notified for this user",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Reserve the slot via UPSERT before sending — atomic guard against
+    // two simultaneous logins racing to send the email.
+    const { error: upsertErr } = await admin
+      .from("admin_login_notifications")
+      .upsert(
+        {
+          user_id: user.id,
+          user_email: user.email,
+          display_name: displayName,
+          provider,
+          email_sent: false,
+          attempts: (existingNotif?.attempts || 0) + 1,
+        },
+        { onConflict: "user_id" },
+      );
+
+    if (upsertErr) {
+      console.error("[notify-admin-login] upsert dedup row failed", upsertErr);
+    }
 
     // Send notification email to admin via transactional email system
     let emailSent = false;
+    let lastError: string | null = null;
     try {
-      const idempotencyKey = `admin-login-${loginRow?.id || crypto.randomUUID()}`;
+      // Idempotency key tied to user, NOT login event — guarantees the
+      // transactional system also dedupes if this is somehow called again.
+      const idempotencyKey = `admin-login-user-${user.id}`;
       const { error: invokeErr } = await admin.functions.invoke(
         "send-transactional-email",
         {
@@ -82,14 +127,32 @@ Deno.serve(async (req) => {
           },
         },
       );
-      if (!invokeErr) emailSent = true;
-      else console.warn("send-transactional-email error:", invokeErr);
-    } catch (e) {
-      console.warn("transactional email failed", e);
+      if (!invokeErr) {
+        emailSent = true;
+        console.log(
+          `[notify-admin-login] SENT user=${user.id} email=${user.email} provider=${provider}`,
+        );
+      } else {
+        lastError = String(invokeErr);
+        console.warn("[notify-admin-login] send-transactional-email error:", invokeErr);
+      }
+    } catch (e: any) {
+      lastError = e?.message || String(e);
+      console.warn("[notify-admin-login] transactional email failed", e);
     }
 
+    // Persist the final state (email_sent + last_error) so we know if we can retry later
+    await admin
+      .from("admin_login_notifications")
+      .update({
+        email_sent: emailSent,
+        last_error: lastError,
+        notified_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id);
+
     return new Response(
-      JSON.stringify({ ok: true, emailSent }),
+      JSON.stringify({ ok: true, emailSent, deduplicated: false, loginId: loginRow?.id }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e: any) {

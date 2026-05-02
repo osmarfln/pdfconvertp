@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_login_notifications: {
+        Row: {
+          attempts: number
+          display_name: string | null
+          email_sent: boolean
+          id: string
+          last_error: string | null
+          notified_at: string
+          provider: string | null
+          user_email: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          display_name?: string | null
+          email_sent?: boolean
+          id?: string
+          last_error?: string | null
+          notified_at?: string
+          provider?: string | null
+          user_email?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          display_name?: string | null
+          email_sent?: boolean
+          id?: string
+          last_error?: string | null
+          notified_at?: string
+          provider?: string | null
+          user_email?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       correction_history: {
         Row: {
           corrected_text: string
