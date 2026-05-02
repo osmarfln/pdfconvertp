@@ -2346,6 +2346,25 @@ export function PDFEditor() {
                         const maxOffsetY = Math.max(minOffsetY, pageDims.height - baseY - metrics.height);
                         const xOffset = clamp(edit?.xOffset ?? 0, minOffsetX, maxOffsetX);
                         const yOffset = clamp(edit?.yOffset ?? 0, minOffsetY, maxOffsetY);
+                        const areaForMove = eraseArea ?? {
+                          x: t.overlayX,
+                          y: t.overlayY,
+                          width: pageDims.width - t.overlayX,
+                          height: pageDims.height - t.overlayY,
+                        };
+                        const startTextMove = (clientX: number, clientY: number) => {
+                          moveTextRef.current = {
+                            extractedId: t.id,
+                            eraseArea: areaForMove,
+                            startClientX: clientX,
+                            startClientY: clientY,
+                            startOffsetX: xOffset,
+                            startOffsetY: yOffset,
+                            boxWidth: metrics.width,
+                            boxHeight: metrics.height,
+                          };
+                          setIsMovingText(true);
+                        };
                         return (
                           <div
                             key={t.id}
