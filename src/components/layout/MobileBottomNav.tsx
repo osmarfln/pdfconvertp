@@ -3,22 +3,18 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
-  Upload,
   FileText,
   Wand2,
   Pencil,
   GitCompare,
-  ShieldCheck,
 } from "lucide-react";
 
 const allItems = [
   { icon: LayoutDashboard, label: "Início", id: "dashboard", adminOnly: false },
-  { icon: Upload, label: "Upload", id: "upload", adminOnly: false },
   { icon: FileText, label: "Arquivos", id: "files", adminOnly: false },
   { icon: Pencil, label: "Editor", id: "editor", adminOnly: false },
   { icon: Wand2, label: "IA", id: "ai", adminOnly: false },
   { icon: GitCompare, label: "Comparar", id: "compare", adminOnly: false },
-  { icon: ShieldCheck, label: "Admin", id: "admin", adminOnly: true },
 ];
 
 interface MobileBottomNavProps {
