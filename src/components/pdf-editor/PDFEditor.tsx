@@ -454,14 +454,106 @@ export function PDFEditor() {
       const dy = event.clientY - current.startClientY;
       const maxX = Math.max(0, current.eraseArea.width - current.boxWidth);
       const maxY = Math.max(0, current.eraseArea.height - current.boxHeight);
+      let nextX = clamp(current.startOffsetX + dx, 0, maxX);
+      let nextY = clamp(current.startOffsetY + dy, 0, maxY);
+
+      // Smart guides: snap to other text edges/centers + page center.
+      // Threshold is in overlay px and stays constant in pixels regardless
+      // of zoom (≈ 6 px). Hold Alt to disable snap.
+      const SNAP = 6;
+      const baseX = current.eraseArea.x; // overlay px of the editable area
+      const baseY = current.eraseArea.y;
+      const others = extractedTexts.filter(
+        (t) => t.page === pageIndex && t.id !== current.extractedId,
+      );
+      const targetsV: number[] = [pageDims.width / 2, 0, pageDims.width];
+      const targetsH: number[] = [pageDims.height / 2, 0, pageDims.height];
+      others.forEach((t) => {
+        const ed = textEdits[t.id];
+        const ea = annotations.find(
+          (a): a is EraseAnnotation =>
+            a.type === "erase" && a.page === t.page && t.id === `tv-${t.page}-${a.id}`,
+        );
+        const ox = (ea?.x ?? t.overlayX) + (ed?.xOffset ?? 0);
+        const oy = (ea?.y ?? t.overlayY) + (ed?.yOffset ?? 0);
+        const ow = ea?.width ?? t.overlayWidth;
+        const oh = ea?.height ?? t.overlayHeight;
+        targetsV.push(ox, ox + ow / 2, ox + ow);
+        targetsH.push(oy, oy + oh / 2, oy + oh);
+      });
+      const matchedV: number[] = [];
+      const matchedH: number[] = [];
+      if (!event.altKey) {
+        const myEdges = [
+          { mine: baseX + nextX, kind: "left" },
+          { mine: baseX + nextX + current.boxWidth / 2, kind: "cx" },
+          { mine: baseX + nextX + current.boxWidth, kind: "right" },
+        ];
+        let bestDx = SNAP + 1;
+        let bestShift = 0;
+        myEdges.forEach((e) => {
+          targetsV.forEach((tv) => {
+            const d = tv - e.mine;
+            if (Math.abs(d) < Math.abs(bestDx)) {
+              bestDx = d;
+              bestShift = d;
+            }
+          });
+        });
+        if (Math.abs(bestDx) <= SNAP) {
+          nextX = clamp(nextX + bestShift, 0, maxX);
+          // Recompute matched guides at the snapped position
+          [
+            baseX + nextX,
+            baseX + nextX + current.boxWidth / 2,
+            baseX + nextX + current.boxWidth,
+          ].forEach((m) => {
+            targetsV.forEach((tv) => {
+              if (Math.abs(tv - m) < 0.5) matchedV.push(tv);
+            });
+          });
+        }
+
+        const myEdgesH = [
+          baseY + nextY,
+          baseY + nextY + current.boxHeight / 2,
+          baseY + nextY + current.boxHeight,
+        ];
+        let bestDy = SNAP + 1;
+        let bestShiftY = 0;
+        myEdgesH.forEach((m) => {
+          targetsH.forEach((th) => {
+            const d = th - m;
+            if (Math.abs(d) < Math.abs(bestDy)) {
+              bestDy = d;
+              bestShiftY = d;
+            }
+          });
+        });
+        if (Math.abs(bestDy) <= SNAP) {
+          nextY = clamp(nextY + bestShiftY, 0, maxY);
+          [
+            baseY + nextY,
+            baseY + nextY + current.boxHeight / 2,
+            baseY + nextY + current.boxHeight,
+          ].forEach((m) => {
+            targetsH.forEach((th) => {
+              if (Math.abs(th - m) < 0.5) matchedH.push(th);
+            });
+          });
+        }
+      }
+      setSmartGuides({ v: matchedV, h: matchedH });
+
       updateTextEdit(current.extractedId, {
-        xOffset: clamp(current.startOffsetX + dx, 0, maxX),
-        yOffset: clamp(current.startOffsetY + dy, 0, maxY),
+        xOffset: nextX,
+        yOffset: nextY,
       });
     };
     const stopMoveText = () => {
       moveTextRef.current = null;
       setIsMovingText(false);
+      setSmartGuides({ v: [], h: [] });
     };
     window.addEventListener("mousemove", moveText, { passive: false });
     window.addEventListener("mouseup", stopMoveText);
@@ -469,7 +561,7 @@ export function PDFEditor() {
       window.removeEventListener("mousemove", moveText);
       window.removeEventListener("mouseup", stopMoveText);
     };
-  }, [isMovingText]);
+  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height]);
 
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
