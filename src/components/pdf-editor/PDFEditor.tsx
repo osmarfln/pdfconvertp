@@ -756,8 +756,18 @@ export function PDFEditor() {
       toast.error("Selecione um arquivo PDF");
       return;
     }
+    setLoadProgress({ phase: "read", percent: 0 });
     const reader = new FileReader();
+    reader.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setLoadProgress({
+          phase: "read",
+          percent: Math.min(100, Math.round((e.loaded / e.total) * 100)),
+        });
+      }
+    };
     reader.onload = (e) => {
+      setLoadProgress({ phase: "parse", percent: 0 });
       setPdfBytes(e.target?.result as ArrayBuffer);
       setPdfName(file.name);
       setAnnotations([]);
@@ -767,6 +777,10 @@ export function PDFEditor() {
       setRedoStack([]);
       setTool("pan");
       toast.success("PDF carregado");
+    };
+    reader.onerror = () => {
+      setLoadProgress(null);
+      toast.error("Erro ao ler arquivo");
     };
     reader.readAsArrayBuffer(file);
   };
