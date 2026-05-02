@@ -362,7 +362,27 @@ export function AIPage() {
     e.target.value = "";
   };
 
-  const handleClear = () => { setText(""); setCorrected(""); };
+  const handleClear = () => { setText(""); setCorrected(""); setDetectedErrors([]); };
+
+  const handleSaveBackup = async () => {
+    if (!user || !corrected.trim()) return;
+    setSavingBackup(true);
+    try {
+      const title = `Texto corrigido — ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      const id = await saveCorrectedTextAsBackup({ userId: user.id, title, text: corrected });
+      if (id) {
+        toast.success("Salvo em Meus Arquivos → Backup como PDF!");
+        addNotification({ title: "Backup criado", message: "Texto corrigido salvo como PDF em Meus Arquivos", type: "correction" });
+      } else {
+        toast.error("Não foi possível salvar o backup.");
+      }
+    } catch (err: any) {
+      console.error("Save backup error:", err);
+      toast.error(err.message || "Erro ao salvar backup");
+    } finally {
+      setSavingBackup(false);
+    }
+  };
 
   const handleCopy = () => {
     if (corrected) {
