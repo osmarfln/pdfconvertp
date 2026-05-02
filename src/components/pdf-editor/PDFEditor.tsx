@@ -386,6 +386,12 @@ export function PDFEditor() {
   const [drawingPreview, setDrawingPreview] = useState<Annotation | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isMovingText, setIsMovingText] = useState(false);
+  const [smartGuides, setSmartGuides] = useState<{
+    v: number[]; // vertical guide x positions in overlay px
+    h: number[]; // horizontal guide y positions in overlay px
+    angleSnap?: number; // snapped angle (deg) being shown
+    sizeSnap?: number; // snapped font size (pt) being shown
+  }>({ v: [], h: [] });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
@@ -448,14 +454,106 @@ export function PDFEditor() {
       const dy = event.clientY - current.startClientY;
       const maxX = Math.max(0, current.eraseArea.width - current.boxWidth);
       const maxY = Math.max(0, current.eraseArea.height - current.boxHeight);
+      let nextX = clamp(current.startOffsetX + dx, 0, maxX);
+      let nextY = clamp(current.startOffsetY + dy, 0, maxY);
+
+      // Smart guides: snap to other text edges/centers + page center.
+      // Threshold is in overlay px and stays constant in pixels regardless
+      // of zoom (≈ 6 px). Hold Alt to disable snap.
+      const SNAP = 6;
+      const baseX = current.eraseArea.x; // overlay px of the editable area
+      const baseY = current.eraseArea.y;
+      const others = extractedTexts.filter(
+        (t) => t.page === pageIndex && t.id !== current.extractedId,
+      );
+      const targetsV: number[] = [pageDims.width / 2, 0, pageDims.width];
+      const targetsH: number[] = [pageDims.height / 2, 0, pageDims.height];
+      others.forEach((t) => {
+        const ed = textEdits[t.id];
+        const ea = annotations.find(
+          (a): a is EraseAnnotation =>
+            a.type === "erase" && a.page === t.page && t.id === `tv-${t.page}-${a.id}`,
+        );
+        const ox = (ea?.x ?? t.overlayX) + (ed?.xOffset ?? 0);
+        const oy = (ea?.y ?? t.overlayY) + (ed?.yOffset ?? 0);
+        const ow = ea?.width ?? t.overlayWidth;
+        const oh = ea?.height ?? t.overlayHeight;
+        targetsV.push(ox, ox + ow / 2, ox + ow);
+        targetsH.push(oy, oy + oh / 2, oy + oh);
+      });
+      const matchedV: number[] = [];
+      const matchedH: number[] = [];
+      if (!event.altKey) {
+        const myEdges = [
+          { mine: baseX + nextX, kind: "left" },
+          { mine: baseX + nextX + current.boxWidth / 2, kind: "cx" },
+          { mine: baseX + nextX + current.boxWidth, kind: "right" },
+        ];
+        let bestDx = SNAP + 1;
+        let bestShift = 0;
+        myEdges.forEach((e) => {
+          targetsV.forEach((tv) => {
+            const d = tv - e.mine;
+            if (Math.abs(d) < Math.abs(bestDx)) {
+              bestDx = d;
+              bestShift = d;
+            }
+          });
+        });
+        if (Math.abs(bestDx) <= SNAP) {
+          nextX = clamp(nextX + bestShift, 0, maxX);
+          // Recompute matched guides at the snapped position
+          [
+            baseX + nextX,
+            baseX + nextX + current.boxWidth / 2,
+            baseX + nextX + current.boxWidth,
+          ].forEach((m) => {
+            targetsV.forEach((tv) => {
+              if (Math.abs(tv - m) < 0.5) matchedV.push(tv);
+            });
+          });
+        }
+
+        const myEdgesH = [
+          baseY + nextY,
+          baseY + nextY + current.boxHeight / 2,
+          baseY + nextY + current.boxHeight,
+        ];
+        let bestDy = SNAP + 1;
+        let bestShiftY = 0;
+        myEdgesH.forEach((m) => {
+          targetsH.forEach((th) => {
+            const d = th - m;
+            if (Math.abs(d) < Math.abs(bestDy)) {
+              bestDy = d;
+              bestShiftY = d;
+            }
+          });
+        });
+        if (Math.abs(bestDy) <= SNAP) {
+          nextY = clamp(nextY + bestShiftY, 0, maxY);
+          [
+            baseY + nextY,
+            baseY + nextY + current.boxHeight / 2,
+            baseY + nextY + current.boxHeight,
+          ].forEach((m) => {
+            targetsH.forEach((th) => {
+              if (Math.abs(th - m) < 0.5) matchedH.push(th);
+            });
+          });
+        }
+      }
+      setSmartGuides({ v: matchedV, h: matchedH });
+
       updateTextEdit(current.extractedId, {
-        xOffset: clamp(current.startOffsetX + dx, 0, maxX),
-        yOffset: clamp(current.startOffsetY + dy, 0, maxY),
+        xOffset: nextX,
+        yOffset: nextY,
       });
     };
     const stopMoveText = () => {
       moveTextRef.current = null;
       setIsMovingText(false);
+      setSmartGuides({ v: [], h: [] });
     };
     window.addEventListener("mousemove", moveText, { passive: false });
     window.addEventListener("mouseup", stopMoveText);
@@ -463,7 +561,7 @@ export function PDFEditor() {
       window.removeEventListener("mousemove", moveText);
       window.removeEventListener("mouseup", stopMoveText);
     };
-  }, [isMovingText]);
+  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height]);
 
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
@@ -2029,6 +2127,45 @@ export function PDFEditor() {
                 }}
               >
                 <canvas ref={canvasRef} className="block bg-white select-none" />
+                {/* Smart guides overlay (alignment lines + snap badges) */}
+                {(smartGuides.v.length > 0 || smartGuides.h.length > 0 || smartGuides.angleSnap !== undefined || smartGuides.sizeSnap !== undefined) && (
+                  <div className="pointer-events-none absolute inset-0 z-40">
+                    {smartGuides.v.map((x, i) => (
+                      <div
+                        key={`gv-${i}-${x}`}
+                        className="absolute top-0 bottom-0"
+                        style={{
+                          left: x,
+                          width: 1,
+                          background: "hsl(var(--primary))",
+                          boxShadow: "0 0 4px hsl(var(--primary) / 0.7)",
+                        }}
+                      />
+                    ))}
+                    {smartGuides.h.map((y, i) => (
+                      <div
+                        key={`gh-${i}-${y}`}
+                        className="absolute left-0 right-0"
+                        style={{
+                          top: y,
+                          height: 1,
+                          background: "hsl(var(--primary))",
+                          boxShadow: "0 0 4px hsl(var(--primary) / 0.7)",
+                        }}
+                      />
+                    ))}
+                    {smartGuides.angleSnap !== undefined && (
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-mono shadow-lg">
+                        {Math.round(smartGuides.angleSnap)}°
+                      </div>
+                    )}
+                    {smartGuides.sizeSnap !== undefined && (
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-mono shadow-lg">
+                        {smartGuides.sizeSnap}pt
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div
                   ref={overlayRef}
                   onMouseDown={onCanvasMouseDown}
@@ -2227,18 +2364,35 @@ export function PDFEditor() {
                                     const onMove = (ev: MouseEvent) => {
                                       const a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI;
                                       let next = startRot + (a - startAngle);
-                                      if (ev.shiftKey) next = Math.round(next / 15) * 15;
+                                      // Auto-snap when within 3° of common angles
+                                      // unless Alt is held (disable snap).
+                                      const SNAPS = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, -15, -30, -45, -60, -75, -90, -105, -120, -135, -150, -165, -180];
+                                      let snapped: number | undefined;
+                                      if (ev.shiftKey) {
+                                        next = Math.round(next / 15) * 15;
+                                        snapped = next;
+                                      } else if (!ev.altKey) {
+                                        for (const s of SNAPS) {
+                                          if (Math.abs(((next - s + 540) % 360) - 180) < 3) {
+                                            next = s;
+                                            snapped = s;
+                                            break;
+                                          }
+                                        }
+                                      }
                                       next = ((next + 180) % 360 + 360) % 360 - 180;
                                       updateTextEdit(t.id, { rotation: next });
+                                      setSmartGuides((g) => ({ ...g, angleSnap: snapped }));
                                     };
                                     const onUp = () => {
                                       window.removeEventListener("mousemove", onMove);
                                       window.removeEventListener("mouseup", onUp);
+                                      setSmartGuides((g) => ({ ...g, angleSnap: undefined }));
                                     };
                                     window.addEventListener("mousemove", onMove);
                                     window.addEventListener("mouseup", onUp);
                                   }}
-                                  title="Girar (segure Shift para 15°)"
+                                  title="Girar (snap automático em ângulos comuns; Alt desativa, Shift força 15°)"
                                   className="absolute -top-7 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-primary border-2 border-background shadow-md cursor-grab active:cursor-grabbing z-30 flex items-center justify-center"
                                   style={{ touchAction: "none" }}
                                 >
@@ -2271,12 +2425,34 @@ export function PDFEditor() {
                                             (corner.includes("s") ? (ev.clientY - startY) : -(ev.clientY - startY));
                                           const deltaPt = sign * dCombined * pxToPt * 0.5;
                                           let nextSize = clamp(startSize + deltaPt, 4, 144);
-                                          if (ev.shiftKey) nextSize = Math.round(nextSize); // snap to 1pt
+                                          // Snap to common sizes + sizes used by
+                                          // other texts on the page (within ~0.6pt).
+                                          let snapped: number | undefined;
+                                          if (ev.shiftKey) {
+                                            nextSize = Math.round(nextSize);
+                                            snapped = nextSize;
+                                          } else if (!ev.altKey) {
+                                            const targets = new Set<number>([8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72]);
+                                            extractedTexts.forEach((other) => {
+                                              if (other.id === t.id) return;
+                                              const sz = textEdits[other.id]?.fontSizeOverride ?? other.fontSize;
+                                              targets.add(Math.round(sz * 10) / 10);
+                                            });
+                                            for (const s of targets) {
+                                              if (Math.abs(nextSize - s) <= 0.6) {
+                                                nextSize = s;
+                                                snapped = s;
+                                                break;
+                                              }
+                                            }
+                                          }
                                           updateTextEdit(t.id, { fontSizeOverride: nextSize });
+                                          setSmartGuides((g) => ({ ...g, sizeSnap: snapped }));
                                         };
                                         const onUp = () => {
                                           window.removeEventListener("mousemove", onMove);
                                           window.removeEventListener("mouseup", onUp);
+                                          setSmartGuides((g) => ({ ...g, sizeSnap: undefined }));
                                         };
                                         window.addEventListener("mousemove", onMove);
                                         window.addEventListener("mouseup", onUp);
