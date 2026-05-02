@@ -15,12 +15,8 @@ export function InstallPWAFloating() {
   const isStandalone = typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 
   useEffect(() => {
-    const showTimer = setTimeout(() => setShow(true), 2000);
-    const hideTimer = setTimeout(() => {
-      setDismissed(true);
-      try { sessionStorage.setItem("pwa-banner-dismissed", "true"); } catch {}
-    }, 6000); // 2s delay + 4s visible
-    return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
+    // Aparece imediatamente ao abrir a página
+    setShow(true);
   }, []);
 
   const handleDismiss = () => {
@@ -60,10 +56,10 @@ export function InstallPWAFloating() {
               <Download className="w-7 h-7 text-primary" />
             </div>
             <h4 className="font-display font-bold text-foreground text-base">
-              📲 Instale nosso aplicativo
+              📲 Instale o nosso app
             </h4>
             <p className="text-sm text-muted-foreground">
-              Conversão PDF rápida direto no seu celular ou desktop!
+              <span className="font-semibold text-foreground">Conversor PDF Universal</span> — clique aqui!
             </p>
 
             <button
@@ -71,7 +67,7 @@ export function InstallPWAFloating() {
               className="mt-2 w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-[0_0_20px_-4px_hsl(var(--primary)/0.5)]"
             >
               <Download className="w-4 h-4" />
-              Instalar App
+              Clique aqui para instalar
             </button>
           </div>
         </div>
