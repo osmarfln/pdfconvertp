@@ -48,24 +48,43 @@ export default function Index() {
   const [userId, setUserId] = useState("");
 
   useEffect(() => {
+    const applyUserState = async (sessionUser: any) => {
+      setUserId(sessionUser.id);
+
+      const [{ data: profile }, { data: adminRole }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("display_name, phone")
+          .eq("user_id", sessionUser.id)
+          .maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", sessionUser.id)
+          .eq("role", "admin")
+          .maybeSingle(),
+      ]);
+
+      if (profile?.display_name) {
+        setUserName(profile.display_name.split(" ")[0]);
+      } else {
+        const email = sessionUser.email || "";
+        setUserName(email.split("@")[0]);
+      }
+
+      if (adminRole) {
+        setNeedsPhone(false);
+        return;
+      }
+
+      const phoneDigits = String((profile as any)?.phone || "").replace(/\D/g, "");
+      setNeedsPhone(phoneDigits.length < 10);
+    };
+
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        setUserId(session.user.id);
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("display_name, phone")
-          .eq("user_id", session.user.id)
-          .single();
-
-        if (profile?.display_name) {
-          setUserName(profile.display_name.split(" ")[0]);
-        } else {
-          const email = session.user.email || "";
-          setUserName(email.split("@")[0]);
-        }
-
-        setNeedsPhone(!(profile as any)?.phone);
+        await applyUserState(session.user);
       } else {
         setNeedsPhone(false);
       }
@@ -75,20 +94,11 @@ export default function Index() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        setUserId(session.user.id);
-        supabase
-          .from("profiles")
-          .select("display_name, phone")
-          .eq("user_id", session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data?.display_name) {
-              setUserName(data.display_name.split(" ")[0]);
-            }
-            setNeedsPhone(!(data as any)?.phone);
-          });
+        setTimeout(() => applyUserState(session.user), 0);
       } else {
         setUserName("");
+        setUserId("");
+        setNeedsPhone(false);
       }
     });
 
