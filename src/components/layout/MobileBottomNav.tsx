@@ -218,7 +218,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
             />
             <span
               className={cn(
-                "text-[9.5px] leading-none truncate max-w-full",
+                "text-[10px] leading-[1.1] truncate max-w-full",
                 quickOpen ? "font-semibold" : "font-medium",
               )}
             >
