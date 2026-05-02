@@ -104,26 +104,100 @@ interface PdfTextItem {
   fontName?: string;
 }
 
-type FontKey =
-  | "Helvetica"
-  | "HelveticaBold"
-  | "HelveticaOblique"
-  | "TimesRoman"
-  | "TimesRomanBold"
-  | "TimesRomanItalic"
-  | "Courier"
-  | "CourierBold";
+type FontKey = string;
 
-const FONT_OPTIONS: { key: FontKey; label: string; standard: StandardFonts }[] = [
-  { key: "Helvetica", label: "Helvetica", standard: StandardFonts.Helvetica },
-  { key: "HelveticaBold", label: "Helvetica Bold", standard: StandardFonts.HelveticaBold },
-  { key: "HelveticaOblique", label: "Helvetica Italic", standard: StandardFonts.HelveticaOblique },
-  { key: "TimesRoman", label: "Times Roman", standard: StandardFonts.TimesRoman },
-  { key: "TimesRomanBold", label: "Times Roman Bold", standard: StandardFonts.TimesRomanBold },
-  { key: "TimesRomanItalic", label: "Times Roman Italic", standard: StandardFonts.TimesRomanItalic },
-  { key: "Courier", label: "Courier", standard: StandardFonts.Courier },
-  { key: "CourierBold", label: "Courier Bold", standard: StandardFonts.CourierBold },
+interface FontOption {
+  key: string;
+  label: string;
+  category: "Padrão PDF" | "Sans-serif" | "Serif" | "Monospace" | "Display" | "Manuscrita";
+  standard?: StandardFonts; // built-in pdf-lib font
+  googleUrl?: string; // TTF/OTF URL for embedding via fontkit
+  cssFamily: string; // for editor preview (CSS font-family)
+  cssWeight?: number | string;
+  cssStyle?: "normal" | "italic";
+  webFontHref?: string; // Google Fonts CSS URL for @font-face
+}
+
+const FONT_OPTIONS: FontOption[] = [
+  // ===== Padrão PDF (sempre embutidas, leves) =====
+  { key: "Helvetica", label: "Helvetica", category: "Padrão PDF", standard: StandardFonts.Helvetica, cssFamily: "Helvetica, Arial, sans-serif" },
+  { key: "HelveticaBold", label: "Helvetica Bold", category: "Padrão PDF", standard: StandardFonts.HelveticaBold, cssFamily: "Helvetica, Arial, sans-serif", cssWeight: 700 },
+  { key: "HelveticaOblique", label: "Helvetica Italic", category: "Padrão PDF", standard: StandardFonts.HelveticaOblique, cssFamily: "Helvetica, Arial, sans-serif", cssStyle: "italic" },
+  { key: "HelveticaBoldOblique", label: "Helvetica Bold Italic", category: "Padrão PDF", standard: StandardFonts.HelveticaBoldOblique, cssFamily: "Helvetica, Arial, sans-serif", cssWeight: 700, cssStyle: "italic" },
+  { key: "TimesRoman", label: "Times Roman", category: "Padrão PDF", standard: StandardFonts.TimesRoman, cssFamily: "'Times New Roman', Times, serif" },
+  { key: "TimesRomanBold", label: "Times Roman Bold", category: "Padrão PDF", standard: StandardFonts.TimesRomanBold, cssFamily: "'Times New Roman', Times, serif", cssWeight: 700 },
+  { key: "TimesRomanItalic", label: "Times Roman Italic", category: "Padrão PDF", standard: StandardFonts.TimesRomanItalic, cssFamily: "'Times New Roman', Times, serif", cssStyle: "italic" },
+  { key: "TimesRomanBoldItalic", label: "Times Roman Bold Italic", category: "Padrão PDF", standard: StandardFonts.TimesRomanBoldItalic, cssFamily: "'Times New Roman', Times, serif", cssWeight: 700, cssStyle: "italic" },
+  { key: "Courier", label: "Courier", category: "Padrão PDF", standard: StandardFonts.Courier, cssFamily: "Courier, monospace" },
+  { key: "CourierBold", label: "Courier Bold", category: "Padrão PDF", standard: StandardFonts.CourierBold, cssFamily: "Courier, monospace", cssWeight: 700 },
+  { key: "CourierOblique", label: "Courier Italic", category: "Padrão PDF", standard: StandardFonts.CourierOblique, cssFamily: "Courier, monospace", cssStyle: "italic" },
+  { key: "CourierBoldOblique", label: "Courier Bold Italic", category: "Padrão PDF", standard: StandardFonts.CourierBoldOblique, cssFamily: "Courier, monospace", cssWeight: 700, cssStyle: "italic" },
+
+  // ===== Sans-serif (Google Fonts) =====
+  { key: "Roboto", label: "Roboto", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxKKTU1Kg.ttf", cssFamily: "'Roboto', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" },
+  { key: "RobotoBold", label: "Roboto Bold", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc4.ttf", cssFamily: "'Roboto', sans-serif", cssWeight: 700, webFontHref: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" },
+  { key: "OpenSans", label: "Open Sans", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/opensans/v40/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVc.ttf", cssFamily: "'Open Sans', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" },
+  { key: "OpenSansBold", label: "Open Sans Bold", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/opensans/v40/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgs7X0B4gaVc.ttf", cssFamily: "'Open Sans', sans-serif", cssWeight: 700, webFontHref: "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" },
+  { key: "Lato", label: "Lato", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/lato/v24/S6uyw4BMUTPHjx4wXiWtFCc.ttf", cssFamily: "'Lato', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" },
+  { key: "LatoBold", label: "Lato Bold", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/lato/v24/S6u9w4BMUTPHh6UVSwiPGQ3q5d0.ttf", cssFamily: "'Lato', sans-serif", cssWeight: 700, webFontHref: "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" },
+  { key: "Montserrat", label: "Montserrat", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aXp-p7K4KLg.ttf", cssFamily: "'Montserrat', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" },
+  { key: "MontserratBold", label: "Montserrat Bold", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aXp-r7K4KLg.ttf", cssFamily: "'Montserrat', sans-serif", cssWeight: 700, webFontHref: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" },
+  { key: "Poppins", label: "Poppins", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.ttf", cssFamily: "'Poppins', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" },
+  { key: "PoppinsBold", label: "Poppins Bold", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLCz7Z1xlFd2JQEk.ttf", cssFamily: "'Poppins', sans-serif", cssWeight: 700, webFontHref: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" },
+  { key: "Inter", label: "Inter", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50ojIa1ZL7.ttf", cssFamily: "'Inter', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" },
+  { key: "Raleway", label: "Raleway", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/raleway/v34/1Ptug8zYS_SKggPNyC0ITw.ttf", cssFamily: "'Raleway', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Raleway:wght@400;700&display=swap" },
+  { key: "Oswald", label: "Oswald", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/oswald/v53/TK3_WkUHHAIjg75cFRf3bXL8LICs1_FvgUFoZAaRliE.ttf", cssFamily: "'Oswald', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap" },
+  { key: "Nunito", label: "Nunito", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDLshRTM9jw.ttf", cssFamily: "'Nunito', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" },
+  { key: "Ubuntu", label: "Ubuntu", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/ubuntu/v20/4iCs6KVjbNBYlgo6eAT3v02QFg.ttf", cssFamily: "'Ubuntu', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&display=swap" },
+  { key: "Quicksand", label: "Quicksand", category: "Sans-serif", googleUrl: "https://fonts.gstatic.com/s/quicksand/v30/6xK-dSZaM9iE8KbpRA_LJ3z8mH9BOJvgkP8o18G0wx40QDw.ttf", cssFamily: "'Quicksand', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;700&display=swap" },
+
+  // ===== Serif (Google Fonts) =====
+  { key: "Merriweather", label: "Merriweather", category: "Serif", googleUrl: "https://fonts.gstatic.com/s/merriweather/v30/u-440qyriQwlOrhSvowK_l5-fCZJ.ttf", cssFamily: "'Merriweather', serif", webFontHref: "https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap" },
+  { key: "MerriweatherBold", label: "Merriweather Bold", category: "Serif", googleUrl: "https://fonts.gstatic.com/s/merriweather/v30/u-4n0qyriQwlOrhSvowK_l52xwNZWMf6hPvhPQ.ttf", cssFamily: "'Merriweather', serif", cssWeight: 700, webFontHref: "https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap" },
+  { key: "PlayfairDisplay", label: "Playfair Display", category: "Serif", googleUrl: "https://fonts.gstatic.com/s/playfairdisplay/v37/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvUDQ.ttf", cssFamily: "'Playfair Display', serif", webFontHref: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" },
+  { key: "Lora", label: "Lora", category: "Serif", googleUrl: "https://fonts.gstatic.com/s/lora/v35/0QI6MX1D_JOuGQbT0gvTJPa787weuyJGmKxemMeZ.ttf", cssFamily: "'Lora', serif", webFontHref: "https://fonts.googleapis.com/css2?family=Lora:wght@400;700&display=swap" },
+  { key: "PTSerif", label: "PT Serif", category: "Serif", googleUrl: "https://fonts.gstatic.com/s/ptserif/v18/EJRVQgYoZZY2vCFuvAFWzr-_dSb_.ttf", cssFamily: "'PT Serif', serif", webFontHref: "https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&display=swap" },
+  { key: "Cormorant", label: "Cormorant Garamond", category: "Serif", googleUrl: "https://fonts.gstatic.com/s/cormorantgaramond/v18/co3bmX5slCNuHLi8bLeY9MK7whWMhyjornFLsS6V7w.ttf", cssFamily: "'Cormorant Garamond', serif", webFontHref: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&display=swap" },
+
+  // ===== Monospace (Google Fonts) =====
+  { key: "RobotoMono", label: "Roboto Mono", category: "Monospace", googleUrl: "https://fonts.gstatic.com/s/robotomono/v23/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_3vqPS-pK.ttf", cssFamily: "'Roboto Mono', monospace", webFontHref: "https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" },
+  { key: "SourceCodePro", label: "Source Code Pro", category: "Monospace", googleUrl: "https://fonts.gstatic.com/s/sourcecodepro/v23/HI_diYsKILxRpg3hIP6sJ7fM7PqlPevW.ttf", cssFamily: "'Source Code Pro', monospace", webFontHref: "https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap" },
+  { key: "JetBrainsMono", label: "JetBrains Mono", category: "Monospace", googleUrl: "https://fonts.gstatic.com/s/jetbrainsmono/v20/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.ttf", cssFamily: "'JetBrains Mono', monospace", webFontHref: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" },
+
+  // ===== Display =====
+  { key: "Bebas", label: "Bebas Neue", category: "Display", googleUrl: "https://fonts.gstatic.com/s/bebasneue/v14/JTUSjIg69CK48gW7PXoo9Wlhyw.ttf", cssFamily: "'Bebas Neue', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" },
+  { key: "Anton", label: "Anton", category: "Display", googleUrl: "https://fonts.gstatic.com/s/anton/v25/1Ptgg87LROyAm0K08i4gS7lu.ttf", cssFamily: "'Anton', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Anton&display=swap" },
+  { key: "Righteous", label: "Righteous", category: "Display", googleUrl: "https://fonts.gstatic.com/s/righteous/v17/1cXxaUPXBpj2rGoU7C9mj3uEicG01A.ttf", cssFamily: "'Righteous', sans-serif", webFontHref: "https://fonts.googleapis.com/css2?family=Righteous&display=swap" },
+
+  // ===== Manuscrita =====
+  { key: "Pacifico", label: "Pacifico", category: "Manuscrita", googleUrl: "https://fonts.gstatic.com/s/pacifico/v22/FwZY7-Qmy14u9lezJ-6H6MmBp0u-.ttf", cssFamily: "'Pacifico', cursive", webFontHref: "https://fonts.googleapis.com/css2?family=Pacifico&display=swap" },
+  { key: "DancingScript", label: "Dancing Script", category: "Manuscrita", googleUrl: "https://fonts.gstatic.com/s/dancingscript/v25/If2cXTr6YS-zF4S-kcSWSVi_swfsmLklo3-XlnY9.ttf", cssFamily: "'Dancing Script', cursive", webFontHref: "https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" },
+  { key: "GreatVibes", label: "Great Vibes", category: "Manuscrita", googleUrl: "https://fonts.gstatic.com/s/greatvibes/v18/RWmMoKWR9v4ksMfaWd_JN9XLiaQ.ttf", cssFamily: "'Great Vibes', cursive", webFontHref: "https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" },
+  { key: "Caveat", label: "Caveat", category: "Manuscrita", googleUrl: "https://fonts.gstatic.com/s/caveat/v18/WnznHAc5bAfYB2QRah7pcpNvOx-pjfJ9.ttf", cssFamily: "'Caveat', cursive", webFontHref: "https://fonts.googleapis.com/css2?family=Caveat&display=swap" },
+  { key: "Satisfy", label: "Satisfy", category: "Manuscrita", googleUrl: "https://fonts.gstatic.com/s/satisfy/v21/rP2Hp2yn6lkG50LoOZSCHBeHFl0.ttf", cssFamily: "'Satisfy', cursive", webFontHref: "https://fonts.googleapis.com/css2?family=Satisfy&display=swap" },
 ];
+
+// Inject Google Fonts stylesheets once for editor preview
+const injectedFontHrefs = new Set<string>();
+function ensureWebFontLoaded(href?: string) {
+  if (!href || typeof document === "undefined" || injectedFontHrefs.has(href)) return;
+  injectedFontHrefs.add(href);
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.appendChild(link);
+}
+
+// Cache for downloaded TTF buffers (for PDF embedding)
+const customFontBytesCache = new Map<string, ArrayBuffer>();
+async function fetchFontBytes(url: string): Promise<ArrayBuffer> {
+  if (customFontBytesCache.has(url)) return customFontBytesCache.get(url)!;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Falha ao baixar fonte: ${url}`);
+  const buf = await res.arrayBuffer();
+  customFontBytesCache.set(url, buf);
+  return buf;
+}
 
 interface BaseAnnotation {
   id: string;
