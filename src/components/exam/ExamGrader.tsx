@@ -227,12 +227,20 @@ export function ExamGrader() {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState("");
   const [result, setResult] = useState<GradingResult | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   // Per-page progress tracking
   const [pageProgress, setPageProgress] = useState<PageProgress[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [, forceTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const tickRef = useRef<number | null>(null);
+
+  // Apply 0.5-step rounding for the displayed grade
+  const displayResult = useMemo(() => {
+    if (!result) return null;
+    return { ...result, grade: roundToHalf(result.grade) };
+  }, [result]);
 
   const reset = () => {
     setFiles([]);
