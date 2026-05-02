@@ -84,6 +84,26 @@ async function pdfToImages(file: File): Promise<{ base64: string; mime: string }
   return out;
 }
 
+// Token-level diff for highlighting wrong portions of the student's answer.
+function diffTokens(student: string, correct: string): { token: string; diff: boolean }[] {
+  if (!student) return [];
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w]/g, "");
+  const correctSet = new Set(
+    (correct || "")
+      .split(/(\s+|[.,;:!?])/)
+      .map((t) => norm(t))
+      .filter(Boolean),
+  );
+  const tokens = student.split(/(\s+|[.,;:!?])/);
+  return tokens.map((t) => {
+    if (/^\s+$/.test(t) || /^[.,;:!?]$/.test(t)) return { token: t, diff: false };
+    const n = norm(t);
+    if (!n) return { token: t, diff: false };
+    return { token: t, diff: !correctSet.has(n) };
+  });
+}
+
 function generateGradingPDF(g: GradingResult, studentName: string) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -790,12 +810,56 @@ export function ExamGrader() {
                 <p className="text-sm text-muted-foreground">{q.question_text}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   <div className={`rounded-lg p-2 border ${q.is_correct === "correct" ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
-                    <p className="text-xs text-muted-foreground">Resposta do aluno</p>
-                    <p className="text-foreground">{q.student_answer || "—"}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Resposta do aluno
+                      {q.is_correct !== "correct" && q.is_correct !== "blank" && q.student_answer && (
+                        <span className="ml-2 text-[10px] text-destructive">(trechos em vermelho = erro)</span>
+                      )}
+                    </p>
+                    <p className="text-foreground leading-relaxed">
+                      {q.student_answer
+                        ? (q.is_correct === "correct" || q.is_correct === "blank"
+                          ? q.student_answer
+                          : diffTokens(q.student_answer, q.correct_answer).map((seg, idx) =>
+                              seg.diff ? (
+                                <mark
+                                  key={idx}
+                                  className="bg-destructive/30 text-destructive rounded px-0.5 underline decoration-destructive decoration-wavy"
+                                >
+                                  {seg.token}
+                                </mark>
+                              ) : (
+                                <span key={idx}>{seg.token}</span>
+                              ),
+                            ))
+                        : "—"}
+                    </p>
                   </div>
                   <div className="rounded-lg p-2 border border-success/30 bg-success/5">
-                    <p className="text-xs text-muted-foreground">Resposta correta</p>
-                    <p className="text-foreground">{q.correct_answer || "—"}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Resposta correta
+                      {q.is_correct !== "correct" && q.student_answer && q.correct_answer && (
+                        <span className="ml-2 text-[10px] text-success">(em verde = o que faltava)</span>
+                      )}
+                    </p>
+                    <p className="text-foreground leading-relaxed">
+                      {q.correct_answer
+                        ? (q.is_correct === "correct" || !q.student_answer
+                          ? q.correct_answer
+                          : diffTokens(q.correct_answer, q.student_answer).map((seg, idx) =>
+                              seg.diff ? (
+                                <mark
+                                  key={idx}
+                                  className="bg-success/30 text-success rounded px-0.5 font-medium"
+                                >
+                                  {seg.token}
+                                </mark>
+                              ) : (
+                                <span key={idx}>{seg.token}</span>
+                              ),
+                            ))
+                        : "—"}
+                    </p>
                   </div>
                 </div>
                 {q.feedback && (

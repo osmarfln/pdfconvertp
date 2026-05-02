@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeftRight, Copy, Download, CheckCircle2, XCircle, RotateCcw, Wand2, Loader2, FileText } from "lucide-react";
+import { ArrowLeftRight, Copy, Download, CheckCircle2, XCircle, RotateCcw, Wand2, Loader2, FileText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DiffSegment {
   type: "unchanged" | "added" | "removed" | "modified";
@@ -90,13 +91,16 @@ function computeStats(diffs: DiffSegment[]) {
 }
 
 export function TextComparison() {
+  const { user } = useAuth();
   const [originalText, setOriginalText] = useState("");
   const [correctedText, setCorrectedText] = useState("");
   const [diffs, setDiffs] = useState<DiffSegment[]>([]);
   const [stats, setStats] = useState<ReturnType<typeof computeStats> | null>(null);
   const [showInline, setShowInline] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
   const [tone, setTone] = useState("profissional");
+  const [comparisonName, setComparisonName] = useState("");
 
   const handleCorrectAndCompare = async () => {
     if (!originalText.trim()) return;
@@ -133,7 +137,40 @@ export function TextComparison() {
     }
   };
 
-  const handleExportPDF = () => {
+  // Apply AI suggestions: promote corrected -> original, re-run AI to verify no remaining issues
+  const handleApplyAI = async () => {
+    if (!correctedText.trim()) return;
+    setIsApplying(true);
+    try {
+      const newOriginal = correctedText;
+      setOriginalText(newOriginal);
+
+      const { data, error } = await supabase.functions.invoke("ai-correct", {
+        body: { action: "correct", text: newOriginal, tone },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro ao aplicar correções");
+
+      const corrected = data.correctedText || newOriginal;
+      setCorrectedText(corrected);
+      const diffResult = computeDiff(newOriginal, corrected);
+      setDiffs(diffResult);
+      const newStats = computeStats(diffResult);
+      setStats(newStats);
+
+      if (newStats.totalErrors === 0) {
+        toast.success("✓ Correções aplicadas! Nenhum erro restante.");
+      } else {
+        toast.success(`Correções aplicadas. Ainda restam ${newStats.totalErrors} ajuste(s) sugerido(s).`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao aplicar correções");
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
     if (!correctedText) return;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pw = doc.internal.pageSize.getWidth();
@@ -203,8 +240,44 @@ export function TextComparison() {
       doc.text(`Página ${i}/${pageCount} • PDF Convert Pro`, pw - margin, ph - 16, { align: "right" });
     }
 
-    doc.save(`comparacao_${Date.now()}.pdf`);
+    // Local download
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const baseName = (comparisonName?.trim() || "comparacao")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w.-]/g, "_").replace(/_+/g, "_");
+    const fileName = `${baseName}_${dateStr}.pdf`;
+    doc.save(fileName);
     toast.success("PDF baixado!");
+
+    // Save backup to "Meus Arquivos"
+    if (user?.id) {
+      try {
+        const blob = doc.output("blob");
+        const filePath = `${user.id}/backups/${Date.now()}_${fileName}`;
+        const { error: upErr } = await supabase.storage
+          .from("documents")
+          .upload(filePath, blob, { contentType: "application/pdf" });
+        if (upErr) throw upErr;
+
+        const { error: insErr } = await supabase.from("file_conversions").insert({
+          user_id: user.id,
+          original_name: fileName,
+          original_format: "pdf",
+          target_format: "pdf",
+          status: "completed",
+          original_path: filePath,
+          converted_path: filePath,
+          file_size: blob.size,
+          is_backup: true,
+        });
+        if (insErr) throw insErr;
+        toast.success("Backup salvo em Meus Arquivos");
+      } catch (err: any) {
+        console.error("Backup error:", err);
+        toast.error("PDF baixado, mas falhou ao salvar backup");
+      }
+    }
   };
 
   const renderOriginal = () =>
@@ -241,10 +314,20 @@ export function TextComparison() {
           <p className="text-muted-foreground mt-1">Cole seu texto, corrija com IA e veja as diferenças destacadas.</p>
         </div>
         {hasDiffs && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="glass" size="sm" onClick={() => setShowInline(!showInline)}>
               <ArrowLeftRight className="w-4 h-4 mr-1" />
               {showInline ? "Lado a lado" : "Inline"}
+            </Button>
+            <Button
+              variant="glow"
+              size="sm"
+              onClick={handleApplyAI}
+              disabled={isApplying || stats?.totalErrors === 0}
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              {isApplying ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+              {isApplying ? "Aplicando..." : "Corrigir com IA"}
             </Button>
             <Button variant="glass" size="sm" onClick={handleCopy}>
               <Copy className="w-4 h-4 mr-1" />
@@ -261,6 +344,16 @@ export function TextComparison() {
       {/* Input area */}
       {!hasDiffs && (
         <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Nome da comparação (opcional)</label>
+            <input
+              type="text"
+              value={comparisonName}
+              onChange={(e) => setComparisonName(e.target.value)}
+              placeholder="Ex: Parecer jurídico cliente X"
+              className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" />
