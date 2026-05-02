@@ -118,9 +118,11 @@ Deno.serve(async (req) => {
     let emailSent = false;
     let lastError: string | null = null;
     try {
-      // Idempotency key tied to user, NOT login event — guarantees the
-      // transactional system also dedupes if this is somehow called again.
-      const idempotencyKey = `admin-login-user-${user.id}`;
+      // Idempotency key includes the current hour bucket so each new login
+      // session produces a fresh email, while rapid retries within the same
+      // hour are still deduplicated by the transactional system.
+      const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+      const idempotencyKey = `admin-login-user-${user.id}-${hourBucket}`;
       const resp = await fetch(
         `${supabaseUrl}/functions/v1/send-transactional-email`,
         {
