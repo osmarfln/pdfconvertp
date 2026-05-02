@@ -91,13 +91,16 @@ function computeStats(diffs: DiffSegment[]) {
 }
 
 export function TextComparison() {
+  const { user } = useAuth();
   const [originalText, setOriginalText] = useState("");
   const [correctedText, setCorrectedText] = useState("");
   const [diffs, setDiffs] = useState<DiffSegment[]>([]);
   const [stats, setStats] = useState<ReturnType<typeof computeStats> | null>(null);
   const [showInline, setShowInline] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
   const [tone, setTone] = useState("profissional");
+  const [comparisonName, setComparisonName] = useState("");
 
   const handleCorrectAndCompare = async () => {
     if (!originalText.trim()) return;
