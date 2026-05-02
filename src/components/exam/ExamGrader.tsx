@@ -425,11 +425,62 @@ export function ExamGrader() {
   };
 
   const handleDownloadPDF = () => {
-    if (!result) return;
-    const pdf = generateGradingPDF(result, studentName);
+    if (!displayResult) return;
+    const pdf = generateGradingPDF(displayResult, studentName);
     const filename = `correcao_${(studentName || "aluno").replace(/\s+/g, "_")}_${Date.now()}.pdf`;
     pdf.save(filename);
     toast.success("PDF da correção baixado!");
+  };
+
+  const handleSaveToFiles = async () => {
+    if (!displayResult || !user?.id) {
+      toast.error("Você precisa estar autenticado para salvar.");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const pdf = generateGradingPDF(displayResult, studentName);
+      const pdfBlob = pdf.output("blob");
+      const examName = examTitle?.trim() || `Prova ${SUBJECTS.find((s) => s.value === subject)?.label || ""}`.trim();
+      const studentPart = studentName?.trim() ? `_${studentName.trim().replace(/\s+/g, "_")}` : "";
+      const safeName = `${examName}${studentPart}_nota_${displayResult.grade.toFixed(1)}`
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w.-]/g, "_")
+        .replace(/_+/g, "_");
+      const fileName = `${safeName}.pdf`;
+      const filePath = `${user.id}/exams/${Date.now()}_${fileName}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("documents")
+        .upload(filePath, pdfBlob, { contentType: "application/pdf" });
+      if (upErr) throw upErr;
+
+      const { data, error: insErr } = await supabase
+        .from("file_conversions")
+        .insert({
+          user_id: user.id,
+          original_name: fileName,
+          original_format: "pdf",
+          target_format: "pdf",
+          status: "completed",
+          original_path: filePath,
+          converted_path: filePath,
+          file_size: pdfBlob.size,
+          is_backup: false,
+        })
+        .select("id")
+        .single();
+      if (insErr) throw insErr;
+
+      setSavedId((data as any)?.id ?? "saved");
+      toast.success("Prova salva em Meus Arquivos!");
+    } catch (err: any) {
+      console.error("Save exam error:", err);
+      toast.error(err.message || "Erro ao salvar a prova");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const statusIcon = (s: string) => {
