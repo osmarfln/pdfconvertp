@@ -18,6 +18,12 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+const MASTER_ADMIN_EMAILS = new Set(["osmarfln@gmail.com"]);
+
+function isMasterAdminEmail(email?: string | null) {
+  return !!email && MASTER_ADMIN_EMAILS.has(email.trim().toLowerCase());
+}
+
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -83,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .eq("user_id", u.id)
             .eq("role", "admin")
             .maybeSingle();
-          setIsAdmin(!!data);
+          setIsAdmin(isMasterAdminEmail(u.email) || !!data);
         }, 0);
       } else {
         setIsAdmin(false);
@@ -101,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq("user_id", session.user.id)
           .eq("role", "admin")
           .maybeSingle();
-        setIsAdmin(!!data);
+        setIsAdmin(isMasterAdminEmail(session.user.email) || !!data);
       }
     });
 
