@@ -2158,6 +2158,27 @@ export function PDFEditor() {
                 }}
               >
                 <canvas ref={canvasRef} className="block bg-white select-none" />
+                {/* Loading progress overlay */}
+                {loadProgress && (
+                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-3 px-6 py-5 rounded-xl border border-border bg-card shadow-2xl min-w-[260px]">
+                      <div className="text-sm font-medium text-foreground">
+                        {loadProgress.phase === "read" && "Lendo arquivo..."}
+                        {loadProgress.phase === "parse" && "Processando PDF..."}
+                        {loadProgress.phase === "render" && "Renderizando página..."}
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-200 ease-out"
+                          style={{ width: `${loadProgress.percent}%` }}
+                        />
+                      </div>
+                      <div className="text-xs font-mono text-muted-foreground tabular-nums">
+                        {loadProgress.percent}%
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* Smart guides overlay (alignment lines + snap badges) */}
                 {(smartGuides.v.length > 0 || smartGuides.h.length > 0 || smartGuides.angleSnap !== undefined || smartGuides.sizeSnap !== undefined) && (
                   <div className="pointer-events-none absolute inset-0 z-40">
