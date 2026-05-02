@@ -2171,6 +2171,8 @@ export function PDFEditor() {
                               width: metrics.width,
                               height: metrics.height,
                               cursor: "text",
+                              transform: edit?.rotation ? `rotate(${edit.rotation}deg)` : undefined,
+                              transformOrigin: "0% 100%",
                             }}
                             className="group"
                           >
