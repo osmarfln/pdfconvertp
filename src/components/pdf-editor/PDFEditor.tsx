@@ -308,6 +308,7 @@ function hexToRgb01(hex: string) {
 
 export function PDFEditor() {
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
+  const [loadProgress, setLoadProgress] = useState<{ phase: "read" | "parse" | "render"; percent: number } | null>(null);
   const [pdfName, setPdfName] = useState<string>("");
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
