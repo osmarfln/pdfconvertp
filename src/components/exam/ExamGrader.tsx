@@ -249,6 +249,7 @@ export function ExamGrader() {
     setStage("");
     setPageProgress([]);
     setStartedAt(null);
+    setSavedId(null);
   };
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
