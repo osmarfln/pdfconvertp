@@ -2344,8 +2344,8 @@ export function PDFEditor() {
                         const maxOffsetX = Math.max(minOffsetX, pageDims.width - baseX - metrics.width);
                         const minOffsetY = -baseY;
                         const maxOffsetY = Math.max(minOffsetY, pageDims.height - baseY - metrics.height);
-                        const xOffset = clamp(edit?.xOffset ?? 0, minOffsetX, maxOffsetX);
-                        const yOffset = clamp(edit?.yOffset ?? 0, minOffsetY, maxOffsetY);
+                        const xOffset = clamp((edit?.xOffset ?? 0) * scale, minOffsetX, maxOffsetX);
+                        const yOffset = clamp((edit?.yOffset ?? 0) * scale, minOffsetY, maxOffsetY);
                         const areaForMove = eraseArea ?? {
                           x: t.overlayX,
                           y: t.overlayY,
