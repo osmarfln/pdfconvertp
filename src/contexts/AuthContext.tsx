@@ -27,17 +27,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    const ensureProfile = async (u: User) => {
+      try {
+        const { data: existing } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("user_id", u.id)
+          .maybeSingle();
+        if (!existing) {
+          await supabase.from("profiles").insert({
+            user_id: u.id,
+            email: u.email,
+            display_name:
+              (u.user_metadata as any)?.full_name ||
+              (u.user_metadata as any)?.name ||
+              (u.email ? u.email.split("@")[0] : "Usuário"),
+          });
+        }
+      } catch (e) {
+        console.warn("ensureProfile failed", e);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       // Defer role check to avoid deadlocks inside the auth callback
       if (session?.user) {
+        const u = session.user;
         setTimeout(async () => {
+          await ensureProfile(u);
           const { data } = await supabase
             .from("user_roles")
             .select("role")
-            .eq("user_id", session.user.id)
+            .eq("user_id", u.id)
             .eq("role", "admin")
             .maybeSingle();
           setIsAdmin(!!data);
