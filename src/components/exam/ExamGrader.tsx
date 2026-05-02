@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X, Clock, Gauge } from "lucide-react";
+import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X, Clock, Gauge, AlertTriangle, Save } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
