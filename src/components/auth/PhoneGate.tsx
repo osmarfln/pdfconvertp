@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Phone, Shield, AlertTriangle } from "lucide-react";
+import { Phone, Shield, AlertTriangle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,10 @@ export function PhoneGate({ userId, onComplete }: PhoneGateProps) {
   const isValidDdd = /^\d{2}$/.test(ddd);
   const isValidNumber = /^\d{8,9}$/.test(number);
   const isValid = isValidDdd && isValidNumber;
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   const formatDisplay = () => {
     if (!ddd && !number) return "";
@@ -153,6 +157,16 @@ export function PhoneGate({ userId, onComplete }: PhoneGateProps) {
             onClick={handleSave}
           >
             {saving ? "Salvando..." : "Salvar e acessar a plataforma"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-muted-foreground hover:text-foreground"
+            onClick={handleSignOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Entrar com outro e-mail
           </Button>
         </div>
       </motion.div>
