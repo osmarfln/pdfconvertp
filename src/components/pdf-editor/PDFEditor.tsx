@@ -1592,7 +1592,17 @@ export function PDFEditor() {
   };
 
 
-  const visibleAnns = annotations.filter((a) => a.page === pageIndex);
+  const scaleAnnotationForDisplay = (ann: Annotation): Annotation => {
+    const sx = ann.pageWidth && pageDims.width ? pageDims.width / ann.pageWidth : 1;
+    const sy = ann.pageHeight && pageDims.height ? pageDims.height / ann.pageHeight : 1;
+    if (ann.type === "erase") return scaleEraseArea(ann);
+    if (ann.type === "text") return { ...ann, x: ann.x * sx, y: ann.y * sy, fontSize: ann.fontSize * sy, pageWidth: pageDims.width, pageHeight: pageDims.height };
+    if (ann.type === "rect" || ann.type === "ellipse" || ann.type === "highlight") return { ...ann, x: ann.x * sx, y: ann.y * sy, width: ann.width * sx, height: ann.height * sy, strokeWidth: ann.strokeWidth * Math.max(sx, sy), pageWidth: pageDims.width, pageHeight: pageDims.height };
+    if (ann.type === "line") return { ...ann, x1: ann.x1 * sx, y1: ann.y1 * sy, x2: ann.x2 * sx, y2: ann.y2 * sy, strokeWidth: ann.strokeWidth * Math.max(sx, sy), pageWidth: pageDims.width, pageHeight: pageDims.height };
+    return { ...ann, points: ann.points.map((p) => ({ x: p.x * sx, y: p.y * sy })), strokeWidth: ann.strokeWidth * Math.max(sx, sy), pageWidth: pageDims.width, pageHeight: pageDims.height };
+  };
+
+  const visibleAnns = annotations.filter((a) => a.page === pageIndex).map(scaleAnnotationForDisplay);
 
   const selectTool = (nextTool: Tool) => {
     setTool(nextTool);
