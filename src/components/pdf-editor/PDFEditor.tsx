@@ -2261,13 +2261,17 @@ export function PDFEditor() {
                                         const startY = e.clientY;
                                         const startX = e.clientX;
                                         const startSize = edit?.fontSizeOverride ?? t.fontSize;
-                                        const scaleFactor = t.overlayFontSize / Math.max(0.01, t.fontSize);
                                         const sign = corner === "se" || corner === "ne" ? 1 : -1;
+                                        // Convert client px → PDF points so behavior is
+                                        // consistent across zoom levels.
+                                        const pxToPt = 1 / Math.max(0.01, scale);
                                         const onMove = (ev: MouseEvent) => {
-                                          const dy = (ev.clientX - startX) + (corner.includes("s") ? (ev.clientY - startY) : -(ev.clientY - startY));
-                                          const deltaPx = sign * dy * 0.5;
-                                          const nextPx = Math.max(4, startSize * scaleFactor + deltaPx);
-                                          const nextSize = clamp(nextPx / scaleFactor, 4, 144);
+                                          const dCombined =
+                                            (ev.clientX - startX) +
+                                            (corner.includes("s") ? (ev.clientY - startY) : -(ev.clientY - startY));
+                                          const deltaPt = sign * dCombined * pxToPt * 0.5;
+                                          let nextSize = clamp(startSize + deltaPt, 4, 144);
+                                          if (ev.shiftKey) nextSize = Math.round(nextSize); // snap to 1pt
                                           updateTextEdit(t.id, { fontSizeOverride: nextSize });
                                         };
                                         const onUp = () => {
