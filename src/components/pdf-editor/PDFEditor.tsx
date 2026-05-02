@@ -1121,6 +1121,7 @@ export function PDFEditor() {
           size: fontSize,
           font,
           color: rgb(c.r, c.g, c.b),
+          rotate: edit.rotation ? degrees(-edit.rotation) : undefined,
         });
       }
     }
