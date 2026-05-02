@@ -477,10 +477,11 @@ export function PDFEditor() {
           (a): a is EraseAnnotation =>
             a.type === "erase" && a.page === t.page && t.id === `tv-${t.page}-${a.id}`,
         );
-        const ox = (ea?.x ?? t.overlayX) + (ed?.xOffset ?? 0) * scale;
-        const oy = (ea?.y ?? t.overlayY) + (ed?.yOffset ?? 0) * scale;
-        const ow = ea?.width ?? t.overlayWidth;
-        const oh = ea?.height ?? t.overlayHeight;
+        const scaledEa = ea ? scaleEraseArea(ea) : undefined;
+        const ox = (scaledEa?.x ?? t.overlayX) + (ed?.xOffset ?? 0) * scale;
+        const oy = (scaledEa?.y ?? t.overlayY) + (ed?.yOffset ?? 0) * scale;
+        const ow = scaledEa?.width ?? t.overlayWidth;
+        const oh = scaledEa?.height ?? t.overlayHeight;
         targetsV.push(ox, ox + ow / 2, ox + ow);
         targetsH.push(oy, oy + oh / 2, oy + oh);
       });
@@ -564,7 +565,7 @@ export function PDFEditor() {
       window.removeEventListener("mousemove", moveText);
       window.removeEventListener("mouseup", stopMoveText);
     };
-  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height, scale]);
+  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height, scale, scaleEraseArea]);
 
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
