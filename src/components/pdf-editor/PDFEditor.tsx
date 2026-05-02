@@ -2338,10 +2338,14 @@ export function PDFEditor() {
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         const metrics = getEditBoxMetrics(t, edit);
                         const eraseArea = getEraseAreaForVirtualText(t);
-                        const maxOffsetX = Math.max(0, (eraseArea?.width ?? pageDims.width - t.overlayX) - metrics.width);
-                        const maxOffsetY = Math.max(0, (eraseArea?.height ?? pageDims.height - t.overlayY) - metrics.height);
-                        const xOffset = clamp(edit?.xOffset ?? 0, 0, maxOffsetX);
-                        const yOffset = clamp(edit?.yOffset ?? 0, 0, maxOffsetY);
+                        const baseX = eraseArea?.x ?? t.overlayX;
+                        const baseY = eraseArea?.y ?? t.overlayY;
+                        const minOffsetX = -baseX;
+                        const maxOffsetX = Math.max(minOffsetX, pageDims.width - baseX - metrics.width);
+                        const minOffsetY = -baseY;
+                        const maxOffsetY = Math.max(minOffsetY, pageDims.height - baseY - metrics.height);
+                        const xOffset = clamp(edit?.xOffset ?? 0, minOffsetX, maxOffsetX);
+                        const yOffset = clamp(edit?.yOffset ?? 0, minOffsetY, maxOffsetY);
                         return (
                           <div
                             key={t.id}
@@ -2403,8 +2407,8 @@ export function PDFEditor() {
                             }}
                             style={{
                               position: "absolute",
-                              left: (eraseArea?.x ?? t.overlayX) + xOffset,
-                              top: (eraseArea?.y ?? t.overlayY) + yOffset,
+                              left: baseX + xOffset,
+                              top: baseY + yOffset,
                               width: metrics.width,
                               height: metrics.height,
                               cursor: isEditing ? "text" : "move",
