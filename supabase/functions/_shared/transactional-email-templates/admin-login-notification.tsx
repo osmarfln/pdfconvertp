@@ -14,6 +14,21 @@ import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = 'PDF Convert Pro'
 
+// Format a date in Brasília time (America/Sao_Paulo, UTC-3) regardless of
+// the server timezone. Edge Functions run in UTC, so calling toLocaleString
+// without timeZone would show UTC time labelled as pt-BR (3h ahead of BR).
+function formatBrasilia(date: Date = new Date()): string {
+  return date.toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }) + ' (Brasília)'
+}
+
 interface AdminLoginNotificationProps {
   userName?: string
   userEmail?: string
@@ -25,7 +40,7 @@ const AdminLoginNotificationEmail = ({
   userName = 'Usuário',
   userEmail = '-',
   provider = 'google',
-  loginAt = new Date().toLocaleString('pt-BR'),
+  loginAt = formatBrasilia(),
 }: AdminLoginNotificationProps) => (
   <Html lang="pt-BR" dir="ltr">
     <Head />
@@ -70,7 +85,7 @@ export const template = {
     userName: 'Maria Silva',
     userEmail: 'maria@example.com',
     provider: 'google',
-    loginAt: new Date().toLocaleString('pt-BR'),
+    loginAt: formatBrasilia(),
   },
 } satisfies TemplateEntry
 
