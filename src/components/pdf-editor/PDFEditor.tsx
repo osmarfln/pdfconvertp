@@ -987,11 +987,31 @@ export function PDFEditor() {
 
   const buildEditedPdfBytes = async (): Promise<Uint8Array> => {
     const doc = await PDFDocument.load(pdfBytes!.slice(0));
+    doc.registerFontkit(fontkit);
     const fontCache = new Map<FontKey, PDFFont>();
-    const getFont = async (k: FontKey) => {
-      if (fontCache.has(k)) return fontCache.get(k);
-      const opt = FONT_OPTIONS.find((f) => f.key === k)!;
-      const f = await doc.embedFont(opt.standard);
+    const getFont = async (k: FontKey): Promise<PDFFont> => {
+      if (fontCache.has(k)) return fontCache.get(k)!;
+      const opt = FONT_OPTIONS.find((f) => f.key === k);
+      if (!opt) {
+        // unknown key — fallback to Helvetica
+        const fb = await doc.embedFont(StandardFonts.Helvetica);
+        fontCache.set(k, fb);
+        return fb;
+      }
+      let f: PDFFont;
+      if (opt.standard) {
+        f = await doc.embedFont(opt.standard);
+      } else if (opt.googleUrl) {
+        try {
+          const bytes = await fetchFontBytes(opt.googleUrl);
+          f = await doc.embedFont(bytes, { subset: true });
+        } catch (err) {
+          console.warn(`Falha ao carregar fonte ${opt.label}, usando Helvetica`, err);
+          f = await doc.embedFont(StandardFonts.Helvetica);
+        }
+      } else {
+        f = await doc.embedFont(StandardFonts.Helvetica);
+      }
       fontCache.set(k, f);
       return f;
     };
