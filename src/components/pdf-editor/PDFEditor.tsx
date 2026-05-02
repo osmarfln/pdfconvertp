@@ -713,6 +713,7 @@ export function PDFEditor() {
       } catch (err) {
         console.warn("text extract failed", err);
       }
+      if (!cancelled) setLoadProgress(null);
     })();
     return () => {
       cancelled = true;
