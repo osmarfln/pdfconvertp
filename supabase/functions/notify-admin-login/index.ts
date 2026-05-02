@@ -104,17 +104,27 @@ Deno.serve(async (req) => {
       console.error("[notify-admin-login] upsert dedup row failed", upsertErr);
     }
 
-    // Send notification email to admin via transactional email system
+    // Send notification email to admin via transactional email system.
+    // We call the function via direct HTTP (not supabase.functions.invoke) so we
+    // can pass the service_role key explicitly as both Authorization Bearer and
+    // apikey. This avoids the gateway's UNAUTHORIZED_INVALID_JWT_FORMAT error
+    // that occurs when invoke() sends the wrong token after key rotation.
     let emailSent = false;
     let lastError: string | null = null;
     try {
       // Idempotency key tied to user, NOT login event — guarantees the
       // transactional system also dedupes if this is somehow called again.
       const idempotencyKey = `admin-login-user-${user.id}`;
-      const { error: invokeErr } = await admin.functions.invoke(
-        "send-transactional-email",
+      const resp = await fetch(
+        `${supabaseUrl}/functions/v1/send-transactional-email`,
         {
-          body: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+          },
+          body: JSON.stringify({
             templateName: "admin-login-notification",
             recipientEmail: ADMIN_EMAIL,
             idempotencyKey,
@@ -124,17 +134,18 @@ Deno.serve(async (req) => {
               provider,
               loginAt: new Date().toLocaleString("pt-BR"),
             },
-          },
+          }),
         },
       );
-      if (!invokeErr) {
+      if (resp.ok) {
         emailSent = true;
         console.log(
           `[notify-admin-login] SENT user=${user.id} email=${user.email} provider=${provider}`,
         );
       } else {
-        lastError = String(invokeErr);
-        console.warn("[notify-admin-login] send-transactional-email error:", invokeErr);
+        const text = await resp.text().catch(() => "");
+        lastError = `HTTP ${resp.status}: ${text.slice(0, 500)}`;
+        console.warn("[notify-admin-login] send-transactional-email error:", lastError);
       }
     } catch (e: any) {
       lastError = e?.message || String(e);
