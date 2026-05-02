@@ -373,7 +373,7 @@ export function PDFEditor() {
   } | null>(null);
   const moveTextRef = useRef<{
     extractedId: string;
-    eraseArea: EraseAnnotation;
+    eraseArea: { x: number; y: number; width: number; height: number };
     startClientX: number;
     startClientY: number;
     startOffsetX: number;
