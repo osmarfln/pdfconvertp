@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X, Clock, Gauge } from "lucide-react";
+import { Upload, Loader2, GraduationCap, Download, CheckCircle2, XCircle, AlertCircle, MinusCircle, FileText, X, Clock, Gauge, AlertTriangle, Save } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -211,7 +212,13 @@ function generateGradingPDF(g: GradingResult, studentName: string) {
   return doc;
 }
 
+// Round grade to nearest 0.5 (décimos de meio ponto)
+function roundToHalf(n: number): number {
+  return Math.round(n * 2) / 2;
+}
+
 export function ExamGrader() {
+  const { user } = useAuth();
   const [subject, setSubject] = useState("portugues");
   const [studentName, setStudentName] = useState("");
   const [examTitle, setExamTitle] = useState("");
@@ -220,12 +227,20 @@ export function ExamGrader() {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState("");
   const [result, setResult] = useState<GradingResult | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   // Per-page progress tracking
   const [pageProgress, setPageProgress] = useState<PageProgress[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [, forceTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const tickRef = useRef<number | null>(null);
+
+  // Apply 0.5-step rounding for the displayed grade
+  const displayResult = useMemo(() => {
+    if (!result) return null;
+    return { ...result, grade: roundToHalf(result.grade) };
+  }, [result]);
 
   const reset = () => {
     setFiles([]);
@@ -234,6 +249,7 @@ export function ExamGrader() {
     setStage("");
     setPageProgress([]);
     setStartedAt(null);
+    setSavedId(null);
   };
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,7 +412,13 @@ export function ExamGrader() {
 
       if (!finalGrading) throw new Error("A correção não foi finalizada");
       setResult(finalGrading);
-      toast.success(`Nota: ${finalGrading.grade.toFixed(1)} / 10`);
+      const finalGrade = roundToHalf(finalGrading.grade);
+      const errCount = finalGrading.incorrect_count;
+      if (errCount > 0) {
+        toast.warning(`Nota: ${finalGrade.toFixed(1)} / 10 — ${errCount} erro(s) encontrado(s)`);
+      } else {
+        toast.success(`Nota: ${finalGrade.toFixed(1)} / 10 — sem erros!`);
+      }
     } catch (err: any) {
       console.error("Grade error:", err);
       toast.error(err.message || "Erro ao corrigir prova");
@@ -409,11 +431,62 @@ export function ExamGrader() {
   };
 
   const handleDownloadPDF = () => {
-    if (!result) return;
-    const pdf = generateGradingPDF(result, studentName);
+    if (!displayResult) return;
+    const pdf = generateGradingPDF(displayResult, studentName);
     const filename = `correcao_${(studentName || "aluno").replace(/\s+/g, "_")}_${Date.now()}.pdf`;
     pdf.save(filename);
     toast.success("PDF da correção baixado!");
+  };
+
+  const handleSaveToFiles = async () => {
+    if (!displayResult || !user?.id) {
+      toast.error("Você precisa estar autenticado para salvar.");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const pdf = generateGradingPDF(displayResult, studentName);
+      const pdfBlob = pdf.output("blob");
+      const examName = examTitle?.trim() || `Prova ${SUBJECTS.find((s) => s.value === subject)?.label || ""}`.trim();
+      const studentPart = studentName?.trim() ? `_${studentName.trim().replace(/\s+/g, "_")}` : "";
+      const safeName = `${examName}${studentPart}_nota_${displayResult.grade.toFixed(1)}`
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w.-]/g, "_")
+        .replace(/_+/g, "_");
+      const fileName = `${safeName}.pdf`;
+      const filePath = `${user.id}/exams/${Date.now()}_${fileName}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("documents")
+        .upload(filePath, pdfBlob, { contentType: "application/pdf" });
+      if (upErr) throw upErr;
+
+      const { data, error: insErr } = await supabase
+        .from("file_conversions")
+        .insert({
+          user_id: user.id,
+          original_name: fileName,
+          original_format: "pdf",
+          target_format: "pdf",
+          status: "completed",
+          original_path: filePath,
+          converted_path: filePath,
+          file_size: pdfBlob.size,
+          is_backup: false,
+        })
+        .select("id")
+        .single();
+      if (insErr) throw insErr;
+
+      setSavedId((data as any)?.id ?? "saved");
+      toast.success("Prova salva em Meus Arquivos!");
+    } catch (err: any) {
+      console.error("Save exam error:", err);
+      toast.error(err.message || "Erro ao salvar a prova");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const statusIcon = (s: string) => {
@@ -599,55 +672,116 @@ export function ExamGrader() {
         </motion.div>
       )}
 
-      {result && (
+      {displayResult && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          <div className="glass rounded-xl p-5 space-y-4 border border-primary/20">
+          {/* Red alert banner when there are errors */}
+          {(displayResult.incorrect_count > 0 || displayResult.partial_count > 0) && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-xl border-2 border-destructive bg-destructive/10 p-4 flex items-start gap-3"
+            >
+              <AlertTriangle className="w-6 h-6 text-destructive shrink-0 mt-0.5 animate-pulse" />
+              <div className="flex-1">
+                <p className="font-semibold text-destructive">
+                  Esta prova tem {displayResult.incorrect_count} erro(s)
+                  {displayResult.partial_count > 0 && ` e ${displayResult.partial_count} parcial(is)`}
+                </p>
+                <p className="text-sm text-destructive/90 mt-0.5">
+                  Veja abaixo o detalhamento de cada questão. As questões em vermelho indicam onde o aluno errou e a resposta correta esperada.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          <div className={`glass rounded-xl p-5 space-y-4 border-2 ${
+            displayResult.grade >= 7 ? "border-success/40" : displayResult.grade >= 5 ? "border-warning/40" : "border-destructive/40"
+          }`}>
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Nota Final</p>
-                <p className={`text-5xl font-display font-bold ${result.grade >= 7 ? "text-success" : result.grade >= 5 ? "text-warning" : "text-destructive"}`}>
-                  {result.grade.toFixed(1)}<span className="text-2xl text-muted-foreground"> / 10</span>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Nota Final (décimos de 0,5)</p>
+                <p className={`text-5xl font-display font-bold ${displayResult.grade >= 7 ? "text-success" : displayResult.grade >= 5 ? "text-warning" : "text-destructive"}`}>
+                  {displayResult.grade.toFixed(1)}<span className="text-2xl text-muted-foreground"> / 10</span>
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Pontuação: {result.total_score.toFixed(0)}/100</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pontuação: {displayResult.total_score.toFixed(0)}/100 • Total de questões: {displayResult.total_questions}
+                </p>
               </div>
-              <Button variant="glow" onClick={handleDownloadPDF}>
-                <Download className="w-4 h-4 mr-1.5" />
-                Baixar PDF da correção
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="glow" onClick={handleDownloadPDF}>
+                  <Download className="w-4 h-4 mr-1.5" />
+                  Baixar PDF
+                </Button>
+                <Button
+                  variant="glass"
+                  onClick={handleSaveToFiles}
+                  disabled={isSaving || !!savedId}
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                  ) : savedId ? (
+                    <CheckCircle2 className="w-4 h-4 mr-1.5 text-success" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-1.5" />
+                  )}
+                  {savedId ? "Salvo em Meus Arquivos" : isSaving ? "Salvando..." : "Salvar em Meus Arquivos"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Summary: acertos x erros */}
+            <div className="rounded-lg bg-secondary/40 border border-border p-3 text-center">
+              <p className="text-sm text-foreground">
+                <span className="text-success font-bold">{displayResult.correct_count} acerto(s)</span>
+                {" • "}
+                <span className="text-warning font-bold">{displayResult.partial_count} parcial(is)</span>
+                {" • "}
+                <span className="text-destructive font-bold">{displayResult.incorrect_count} erro(s)</span>
+                {" "}de{" "}
+                <span className="font-bold">{displayResult.total_questions}</span> questão(ões)
+              </p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-lg bg-success/10 border border-success/30 p-3 text-center">
-                <p className="text-2xl font-bold text-success">{result.correct_count}</p>
+                <p className="text-2xl font-bold text-success">{displayResult.correct_count}</p>
                 <p className="text-xs text-muted-foreground">Acertos</p>
               </div>
               <div className="rounded-lg bg-warning/10 border border-warning/30 p-3 text-center">
-                <p className="text-2xl font-bold text-warning">{result.partial_count}</p>
+                <p className="text-2xl font-bold text-warning">{displayResult.partial_count}</p>
                 <p className="text-xs text-muted-foreground">Parciais</p>
               </div>
               <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-center">
-                <p className="text-2xl font-bold text-destructive">{result.incorrect_count}</p>
+                <p className="text-2xl font-bold text-destructive">{displayResult.incorrect_count}</p>
                 <p className="text-xs text-muted-foreground">Erros</p>
               </div>
             </div>
 
-            {result.overall_feedback && (
+            {displayResult.overall_feedback && (
               <div className="rounded-lg bg-secondary/50 border border-border p-3">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">Comentário geral</p>
-                <p className="text-sm text-foreground">{result.overall_feedback}</p>
+                <p className="text-sm text-foreground">{displayResult.overall_feedback}</p>
               </div>
             )}
           </div>
 
           <div className="space-y-2">
             <h4 className="font-display font-semibold text-foreground">Detalhamento por questão</h4>
-            {result.questions.map((q) => (
-              <div key={q.number} className="glass rounded-xl p-4 space-y-2">
+            {displayResult.questions.map((q) => (
+              <div
+                key={q.number}
+                className={`glass rounded-xl p-4 space-y-2 ${
+                  q.is_correct === "incorrect" ? "border-2 border-destructive/50" : ""
+                }`}
+              >
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     {statusIcon(q.is_correct)}
                     <span className="font-semibold text-foreground">Questão {q.number}</span>
                     <Badge variant="outline" className="text-xs">{statusLabel(q.is_correct)}</Badge>
+                    {q.is_correct === "incorrect" && (
+                      <Badge variant="destructive" className="text-xs animate-pulse">ERRO</Badge>
+                    )}
                   </div>
                   <span className="text-sm font-medium text-foreground">
                     {q.points_earned.toFixed(1)} / {q.max_points} pts
