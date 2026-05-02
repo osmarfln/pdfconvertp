@@ -92,8 +92,8 @@ interface TextEdit {
   fontKeyOverride?: FontKey;
   fontSizeOverride?: number; // PDF points
   colorOverride?: string;
-  xOffset?: number; // Overlay px from the original editable area
-  yOffset?: number; // Overlay px from the original editable area
+  xOffset?: number; // PDF points from the original editable area
+  yOffset?: number; // PDF points from the original editable area
   align?: "left" | "center" | "right";
   rotation?: number; // degrees, clockwise
 }
@@ -477,8 +477,8 @@ export function PDFEditor() {
           (a): a is EraseAnnotation =>
             a.type === "erase" && a.page === t.page && t.id === `tv-${t.page}-${a.id}`,
         );
-        const ox = (ea?.x ?? t.overlayX) + (ed?.xOffset ?? 0);
-        const oy = (ea?.y ?? t.overlayY) + (ed?.yOffset ?? 0);
+        const ox = (ea?.x ?? t.overlayX) + (ed?.xOffset ?? 0) * scale;
+        const oy = (ea?.y ?? t.overlayY) + (ed?.yOffset ?? 0) * scale;
         const ow = ea?.width ?? t.overlayWidth;
         const oh = ea?.height ?? t.overlayHeight;
         targetsV.push(ox, ox + ow / 2, ox + ow);
@@ -549,8 +549,8 @@ export function PDFEditor() {
       setSmartGuides({ v: matchedV, h: matchedH });
 
       updateTextEdit(current.extractedId, {
-        xOffset: nextX,
-        yOffset: nextY,
+        xOffset: nextX / scale,
+        yOffset: nextY / scale,
       });
     };
     const stopMoveText = () => {
@@ -564,7 +564,7 @@ export function PDFEditor() {
       window.removeEventListener("mousemove", moveText);
       window.removeEventListener("mouseup", stopMoveText);
     };
-  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height]);
+  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height, scale]);
 
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
