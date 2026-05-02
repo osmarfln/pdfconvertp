@@ -92,8 +92,8 @@ interface TextEdit {
   fontKeyOverride?: FontKey;
   fontSizeOverride?: number; // PDF points
   colorOverride?: string;
-  xOffset?: number; // Overlay px from the original editable area
-  yOffset?: number; // Overlay px from the original editable area
+  xOffset?: number; // PDF points from the original editable area
+  yOffset?: number; // PDF points from the original editable area
   align?: "left" | "center" | "right";
   rotation?: number; // degrees, clockwise
 }
@@ -424,6 +424,23 @@ export function PDFEditor() {
     }
   }, []);
 
+  const scaleEraseArea = useCallback(
+    (ann: EraseAnnotation): EraseAnnotation => {
+      const sx = ann.pageWidth && pageDims.width ? pageDims.width / ann.pageWidth : 1;
+      const sy = ann.pageHeight && pageDims.height ? pageDims.height / ann.pageHeight : 1;
+      return {
+        ...ann,
+        x: ann.x * sx,
+        y: ann.y * sy,
+        width: ann.width * sx,
+        height: ann.height * sy,
+        pageWidth: pageDims.width || ann.pageWidth,
+        pageHeight: pageDims.height || ann.pageHeight,
+      };
+    },
+    [pageDims.width, pageDims.height],
+  );
+
   useEffect(() => {
     if (!isPanning) return;
     const movePan = (event: MouseEvent) => {
@@ -453,17 +470,19 @@ export function PDFEditor() {
       event.preventDefault();
       const dx = event.clientX - current.startClientX;
       const dy = event.clientY - current.startClientY;
-      const maxX = Math.max(0, current.eraseArea.width - current.boxWidth);
-      const maxY = Math.max(0, current.eraseArea.height - current.boxHeight);
-      let nextX = clamp(current.startOffsetX + dx, 0, maxX);
-      let nextY = clamp(current.startOffsetY + dy, 0, maxY);
+      const baseX = current.eraseArea.x; // overlay px of the editable area's origin
+      const baseY = current.eraseArea.y;
+      const minX = -baseX;
+      const maxX = Math.max(minX, pageDims.width - baseX - current.boxWidth);
+      const minY = -baseY;
+      const maxY = Math.max(minY, pageDims.height - baseY - current.boxHeight);
+      let nextX = clamp(current.startOffsetX + dx, minX, maxX);
+      let nextY = clamp(current.startOffsetY + dy, minY, maxY);
 
       // Smart guides: snap to other text edges/centers + page center.
       // Threshold is in overlay px and stays constant in pixels regardless
       // of zoom (≈ 6 px). Hold Alt to disable snap.
       const SNAP = 6;
-      const baseX = current.eraseArea.x; // overlay px of the editable area
-      const baseY = current.eraseArea.y;
       const others = extractedTexts.filter(
         (t) => t.page === pageIndex && t.id !== current.extractedId,
       );
@@ -475,10 +494,11 @@ export function PDFEditor() {
           (a): a is EraseAnnotation =>
             a.type === "erase" && a.page === t.page && t.id === `tv-${t.page}-${a.id}`,
         );
-        const ox = (ea?.x ?? t.overlayX) + (ed?.xOffset ?? 0);
-        const oy = (ea?.y ?? t.overlayY) + (ed?.yOffset ?? 0);
-        const ow = ea?.width ?? t.overlayWidth;
-        const oh = ea?.height ?? t.overlayHeight;
+        const scaledEa = ea ? scaleEraseArea(ea) : undefined;
+        const ox = (scaledEa?.x ?? t.overlayX) + (ed?.xOffset ?? 0) * scale;
+        const oy = (scaledEa?.y ?? t.overlayY) + (ed?.yOffset ?? 0) * scale;
+        const ow = scaledEa?.width ?? t.overlayWidth;
+        const oh = scaledEa?.height ?? t.overlayHeight;
         targetsV.push(ox, ox + ow / 2, ox + ow);
         targetsH.push(oy, oy + oh / 2, oy + oh);
       });
@@ -502,7 +522,7 @@ export function PDFEditor() {
           });
         });
         if (Math.abs(bestDx) <= SNAP) {
-          nextX = clamp(nextX + bestShift, 0, maxX);
+          nextX = clamp(nextX + bestShift, minX, maxX);
           // Recompute matched guides at the snapped position
           [
             baseX + nextX,
@@ -532,7 +552,7 @@ export function PDFEditor() {
           });
         });
         if (Math.abs(bestDy) <= SNAP) {
-          nextY = clamp(nextY + bestShiftY, 0, maxY);
+          nextY = clamp(nextY + bestShiftY, minY, maxY);
           [
             baseY + nextY,
             baseY + nextY + current.boxHeight / 2,
@@ -547,8 +567,8 @@ export function PDFEditor() {
       setSmartGuides({ v: matchedV, h: matchedH });
 
       updateTextEdit(current.extractedId, {
-        xOffset: nextX,
-        yOffset: nextY,
+        xOffset: nextX / scale,
+        yOffset: nextY / scale,
       });
     };
     const stopMoveText = () => {
@@ -562,7 +582,7 @@ export function PDFEditor() {
       window.removeEventListener("mousemove", moveText);
       window.removeEventListener("mouseup", stopMoveText);
     };
-  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height]);
+  }, [isMovingText, extractedTexts, textEdits, annotations, pageIndex, pageDims.width, pageDims.height, scale, scaleEraseArea]);
 
   // Allow other parts of the app to open a PDF directly in the editor
   useEffect(() => {
@@ -1050,7 +1070,9 @@ export function PDFEditor() {
       const matches = annotations.filter(
         (ann): ann is EraseAnnotation =>
           ann.page === pageIndex &&
-          ann.type === "erase" &&
+          ann.type === "erase",
+      ).map(scaleEraseArea).filter(
+        (ann) =>
           x >= ann.x &&
           x <= ann.x + ann.width &&
           y >= ann.y &&
@@ -1058,23 +1080,24 @@ export function PDFEditor() {
       );
       return matches[matches.length - 1];
     },
-    [annotations, pageIndex],
+    [annotations, pageIndex, scaleEraseArea],
   );
 
   const isExtractedTextErased = useCallback(
     (text: ExtractedText) =>
       annotations.some((ann): ann is EraseAnnotation => {
         if (ann.type !== "erase" || ann.page !== text.page) return false;
+        const area = scaleEraseArea(ann);
         const padX = Math.max(6, text.overlayHeight * 0.4);
         const padY = Math.max(6, text.overlayHeight * 0.5);
-        return rectanglesIntersect(ann, {
+        return rectanglesIntersect(area, {
           x: text.overlayX - padX,
           y: text.overlayY - padY,
           width: Math.max(text.overlayWidth, 12) + padX * 2,
           height: Math.max(text.overlayHeight, 10) + padY * 2,
         });
       }),
-    [annotations],
+    [annotations, scaleEraseArea],
   );
 
   const findErasedTextAtPoint = useCallback(
@@ -1082,7 +1105,9 @@ export function PDFEditor() {
       const erasers = annotations.filter(
         (ann): ann is EraseAnnotation =>
           ann.page === pageIndex &&
-          ann.type === "erase" &&
+          ann.type === "erase",
+      ).map(scaleEraseArea).filter(
+        (ann) =>
           x >= ann.x &&
           x <= ann.x + ann.width &&
           y >= ann.y &&
@@ -1112,7 +1137,7 @@ export function PDFEditor() {
         })
         .sort((a, b) => a.distance - b.distance)[0]?.text;
     },
-    [annotations, extractedTexts, pageIndex],
+    [annotations, extractedTexts, pageIndex, scaleEraseArea],
   );
 
   const rotatePage = () => {
@@ -1205,8 +1230,8 @@ export function PDFEditor() {
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
-      let drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
-      const drawY = original.pdfY - (edit.yOffset ?? 0) / scale;
+      let drawX = original.pdfX + (edit.xOffset ?? 0);
+      const drawY = original.pdfY - (edit.yOffset ?? 0);
 
       // Apply horizontal alignment within the erased area for the final PDF
       if (eraseAreaForEdit && edit.align && edit.align !== "left" && edit.newText.trim()) {
@@ -1461,8 +1486,8 @@ export function PDFEditor() {
             const orig = extractedTexts.find((t) => t.id === e.extractedId)!;
             return {
               id: e.extractedId,
-              overlayX: (orig.overlayX + (e.xOffset ?? 0)) * ratio,
-              overlayY: (orig.overlayY + (e.yOffset ?? 0)) * ratio,
+              overlayX: (orig.overlayX + (e.xOffset ?? 0) * scale) * ratio,
+              overlayY: (orig.overlayY + (e.yOffset ?? 0) * scale) * ratio,
               overlayWidth: Math.max(orig.overlayWidth * ratio, 8),
               overlayHeight: orig.overlayHeight * ratio,
               originalText: orig.originalText,
@@ -1534,7 +1559,7 @@ export function PDFEditor() {
   };
 
   const getEditBoxMetrics = (text: ExtractedText, edit?: TextEdit) => {
-    const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * (text.overlayFontSize / text.fontSize));
+    const fontPx = Math.max(8, (edit?.fontSizeOverride ?? text.fontSize) * scale);
     const eraseArea = getEraseAreaForVirtualText(text);
     const isEraseAreaText = !!eraseArea;
     if (isEraseAreaText) {
@@ -1560,13 +1585,25 @@ export function PDFEditor() {
   const getEraseAreaForVirtualText = (text: ExtractedText) => {
     if (!text.id.startsWith(`tv-${text.page}-`)) return undefined;
     const eraseId = text.id.replace(`tv-${text.page}-`, "");
-    return annotations.find(
+    const area = annotations.find(
       (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === text.page && ann.id === eraseId,
     );
+    return area ? scaleEraseArea(area) : undefined;
   };
 
 
-  const visibleAnns = annotations.filter((a) => a.page === pageIndex);
+  const scaleAnnotationForDisplay = (ann: Annotation): Annotation => {
+    const sx = ann.pageWidth && pageDims.width ? pageDims.width / ann.pageWidth : 1;
+    const sy = ann.pageHeight && pageDims.height ? pageDims.height / ann.pageHeight : 1;
+    if (ann.type === "erase") return scaleEraseArea(ann);
+    if (ann.type === "text") return { ...ann, x: ann.x * sx, y: ann.y * sy, fontSize: ann.fontSize * sy, pageWidth: pageDims.width, pageHeight: pageDims.height };
+    if (ann.type === "rect" || ann.type === "ellipse" || ann.type === "highlight") return { ...ann, x: ann.x * sx, y: ann.y * sy, width: ann.width * sx, height: ann.height * sy, strokeWidth: ann.strokeWidth * Math.max(sx, sy), pageWidth: pageDims.width, pageHeight: pageDims.height };
+    if (ann.type === "line") return { ...ann, x1: ann.x1 * sx, y1: ann.y1 * sy, x2: ann.x2 * sx, y2: ann.y2 * sy, strokeWidth: ann.strokeWidth * Math.max(sx, sy), pageWidth: pageDims.width, pageHeight: pageDims.height };
+    if (ann.type === "draw") return { ...ann, points: ann.points.map((p) => ({ x: p.x * sx, y: p.y * sy })), strokeWidth: ann.strokeWidth * Math.max(sx, sy), pageWidth: pageDims.width, pageHeight: pageDims.height };
+    return ann;
+  };
+
+  const visibleAnns = annotations.filter((a) => a.page === pageIndex).map(scaleAnnotationForDisplay);
 
   const selectTool = (nextTool: Tool) => {
     setTool(nextTool);
@@ -2336,10 +2373,33 @@ export function PDFEditor() {
                         const showHoverPlaceholder = textIsErased && hoveredErasedTextId === t.id && !isEditing && !value;
                         const metrics = getEditBoxMetrics(t, edit);
                         const eraseArea = getEraseAreaForVirtualText(t);
-                        const maxOffsetX = Math.max(0, (eraseArea?.width ?? pageDims.width - t.overlayX) - metrics.width);
-                        const maxOffsetY = Math.max(0, (eraseArea?.height ?? pageDims.height - t.overlayY) - metrics.height);
-                        const xOffset = clamp(edit?.xOffset ?? 0, 0, maxOffsetX);
-                        const yOffset = clamp(edit?.yOffset ?? 0, 0, maxOffsetY);
+                        const baseX = eraseArea?.x ?? t.overlayX;
+                        const baseY = eraseArea?.y ?? t.overlayY;
+                        const minOffsetX = -baseX;
+                        const maxOffsetX = Math.max(minOffsetX, pageDims.width - baseX - metrics.width);
+                        const minOffsetY = -baseY;
+                        const maxOffsetY = Math.max(minOffsetY, pageDims.height - baseY - metrics.height);
+                        const xOffset = clamp((edit?.xOffset ?? 0) * scale, minOffsetX, maxOffsetX);
+                        const yOffset = clamp((edit?.yOffset ?? 0) * scale, minOffsetY, maxOffsetY);
+                        const areaForMove = eraseArea ?? {
+                          x: t.overlayX,
+                          y: t.overlayY,
+                          width: pageDims.width - t.overlayX,
+                          height: pageDims.height - t.overlayY,
+                        };
+                        const startTextMove = (clientX: number, clientY: number) => {
+                          moveTextRef.current = {
+                            extractedId: t.id,
+                            eraseArea: areaForMove,
+                            startClientX: clientX,
+                            startClientY: clientY,
+                            startOffsetX: xOffset,
+                            startOffsetY: yOffset,
+                            boxWidth: metrics.width,
+                            boxHeight: metrics.height,
+                          };
+                          setIsMovingText(true);
+                        };
                         return (
                           <div
                             key={t.id}
@@ -2354,26 +2414,10 @@ export function PDFEditor() {
                               // a click and enter edit mode.
                               const startX = e.clientX;
                               const startY = e.clientY;
-                              const areaForMove = eraseArea ?? {
-                                x: t.overlayX,
-                                y: t.overlayY,
-                                width: pageDims.width - t.overlayX,
-                                height: pageDims.height - t.overlayY,
-                              };
                               let started = false;
                               const beginMove = () => {
                                 started = true;
-                                moveTextRef.current = {
-                                  extractedId: t.id,
-                                  eraseArea: areaForMove,
-                                  startClientX: startX,
-                                  startClientY: startY,
-                                  startOffsetX: xOffset,
-                                  startOffsetY: yOffset,
-                                  boxWidth: metrics.width,
-                                  boxHeight: metrics.height,
-                                };
-                                setIsMovingText(true);
+                                startTextMove(startX, startY);
                               };
                               const onMove = (ev: MouseEvent) => {
                                 if (started) return;
@@ -2401,8 +2445,8 @@ export function PDFEditor() {
                             }}
                             style={{
                               position: "absolute",
-                              left: (eraseArea?.x ?? t.overlayX) + xOffset,
-                              top: (eraseArea?.y ?? t.overlayY) + yOffset,
+                              left: baseX + xOffset,
+                              top: baseY + yOffset,
                               width: metrics.width,
                               height: metrics.height,
                               cursor: isEditing ? "text" : "move",
@@ -2418,22 +2462,7 @@ export function PDFEditor() {
                                   onMouseDown={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    moveTextRef.current = {
-                                      extractedId: t.id,
-                                      eraseArea: eraseArea ?? {
-                                        x: t.overlayX,
-                                        y: t.overlayY,
-                                        width: pageDims.width - t.overlayX,
-                                        height: pageDims.height - t.overlayY,
-                                      },
-                                      startClientX: e.clientX,
-                                      startClientY: e.clientY,
-                                      startOffsetX: xOffset,
-                                      startOffsetY: yOffset,
-                                      boxWidth: metrics.width,
-                                      boxHeight: metrics.height,
-                                    };
-                                    setIsMovingText(true);
+                                    startTextMove(e.clientX, e.clientY);
                                   }}
                                   title="Arraste para mover (qualquer direção)"
                                   className="absolute -top-3 left-0 right-0 h-3 z-30 cursor-move bg-primary/60 hover:bg-primary rounded-t flex items-center justify-center"
@@ -2444,7 +2473,27 @@ export function PDFEditor() {
                                   autoFocus
                                   value={value}
                                   placeholder="Digite o novo texto..."
-                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    const input = e.currentTarget;
+                                    const startX = e.clientX;
+                                    const startY = e.clientY;
+                                    let started = false;
+                                    const onMove = (ev: MouseEvent) => {
+                                      if (started) return;
+                                      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4) {
+                                        started = true;
+                                        input.blur();
+                                        startTextMove(startX, startY);
+                                      }
+                                    };
+                                    const onUp = () => {
+                                      window.removeEventListener("mousemove", onMove);
+                                      window.removeEventListener("mouseup", onUp);
+                                    };
+                                    window.addEventListener("mousemove", onMove);
+                                    window.addEventListener("mouseup", onUp);
+                                  }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.currentTarget.focus();
@@ -2642,22 +2691,7 @@ export function PDFEditor() {
                                     onMouseDown={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      moveTextRef.current = {
-                                        extractedId: t.id,
-                                        eraseArea: eraseArea ?? {
-                                          x: t.overlayX,
-                                          y: t.overlayY,
-                                          width: pageDims.width - t.overlayX,
-                                          height: pageDims.height - t.overlayY,
-                                        },
-                                        startClientX: e.clientX,
-                                        startClientY: e.clientY,
-                                        startOffsetX: xOffset,
-                                        startOffsetY: yOffset,
-                                        boxWidth: metrics.width,
-                                        boxHeight: metrics.height,
-                                      };
-                                      setIsMovingText(true);
+                                      startTextMove(e.clientX, e.clientY);
                                     }}
                                     className="h-7 w-7 rounded border border-border bg-secondary/50 hover:bg-secondary flex items-center justify-center cursor-move"
                                     title="Mover texto (arraste)"
@@ -2938,11 +2972,29 @@ export function PDFEditor() {
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
-                                  setEditingExtractedId(t.id);
+                                  const startX = e.clientX;
+                                  const startY = e.clientY;
+                                  let started = false;
+                                  const onMove = (ev: MouseEvent) => {
+                                    if (started) return;
+                                    if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4) {
+                                      started = true;
+                                      startTextMove(startX, startY);
+                                    }
+                                  };
+                                  const onUp = () => {
+                                    window.removeEventListener("mousemove", onMove);
+                                    window.removeEventListener("mouseup", onUp);
+                                    if (!started) {
+                                      updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
+                                      setEditingExtractedId(t.id);
+                                    }
+                                  };
+                                  window.addEventListener("mousemove", onMove);
+                                  window.addEventListener("mouseup", onUp);
                                 }}
-                                title={value ? `Clique para editar: "${value}"` : "Clique para digitar"}
-                                className="w-full h-full cursor-text overflow-visible bg-transparent border-0"
+                                title={value ? `Arraste para mover ou clique para editar: "${value}"` : "Arraste para mover ou clique para digitar"}
+                                className="w-full h-full cursor-move overflow-visible bg-transparent border-0"
                                 style={{
                                   color: edit?.colorOverride || "black",
                                   fontSize: metrics.fontPx,
