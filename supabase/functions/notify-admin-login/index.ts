@@ -25,7 +25,9 @@ Deno.serve(async (req) => {
     const supabaseAuth = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(token);
+    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(
+      token,
+    );
     if (userErr || !userData.user) {
       return new Response(JSON.stringify({ error: "unauthorized" }), {
         status: 401,
@@ -46,51 +48,48 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Insert login record (drives realtime counter)
-    const { error: insertErr } = await admin.from("user_logins").insert({
-      user_id: user.id,
-      email: user.email,
-      display_name: displayName,
-      provider,
-    });
+    // Insert login record (drives realtime counter in admin panel)
+    const { data: loginRow, error: insertErr } = await admin
+      .from("user_logins")
+      .insert({
+        user_id: user.id,
+        email: user.email,
+        display_name: displayName,
+        provider,
+      })
+      .select("id")
+      .maybeSingle();
+
     if (insertErr) console.error("insert login error", insertErr);
 
-    // Try to enqueue email to admin (only works if email infra is set up)
-    let emailQueued = false;
+    // Send notification email to admin via transactional email system
+    let emailSent = false;
     try {
-      const { error: rpcErr } = await admin.rpc("enqueue_email", {
-        queue_name: "transactional_emails",
-        message: {
-          to: ADMIN_EMAIL,
-          subject: `🔔 Novo login na plataforma — ${displayName}`,
-          html: `
-            <div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#ffffff;color:#111318;">
-              <h2 style="color:#3B82F6;margin:0 0 16px;">Novo login detectado</h2>
-              <p style="font-size:15px;line-height:1.6;margin:0 0 12px;">
-                O usuário <strong>${displayName}</strong> acabou de se conectar à plataforma.
-              </p>
-              <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#f5f7fb;border-radius:8px;">
-                <tr><td style="padding:10px 14px;color:#6b7280;">Nome</td><td style="padding:10px 14px;font-weight:600;">${displayName}</td></tr>
-                <tr><td style="padding:10px 14px;color:#6b7280;">Email</td><td style="padding:10px 14px;">${user.email || "-"}</td></tr>
-                <tr><td style="padding:10px 14px;color:#6b7280;">Provedor</td><td style="padding:10px 14px;">${provider}</td></tr>
-                <tr><td style="padding:10px 14px;color:#6b7280;">Data</td><td style="padding:10px 14px;">${new Date().toLocaleString("pt-BR")}</td></tr>
-              </table>
-              <p style="font-size:13px;color:#6b7280;margin:16px 0 0;">
-                Vamos dar as boas-vindas! 🎉
-              </p>
-            </div>
-          `,
-          purpose: "transactional",
+      const idempotencyKey = `admin-login-${loginRow?.id || crypto.randomUUID()}`;
+      const { error: invokeErr } = await admin.functions.invoke(
+        "send-transactional-email",
+        {
+          body: {
+            templateName: "admin-login-notification",
+            recipientEmail: ADMIN_EMAIL,
+            idempotencyKey,
+            templateData: {
+              userName: displayName,
+              userEmail: user.email,
+              provider,
+              loginAt: new Date().toLocaleString("pt-BR"),
+            },
+          },
         },
-      });
-      if (!rpcErr) emailQueued = true;
-      else console.warn("enqueue_email not available:", rpcErr.message);
+      );
+      if (!invokeErr) emailSent = true;
+      else console.warn("send-transactional-email error:", invokeErr);
     } catch (e) {
-      console.warn("email infra not configured", e);
+      console.warn("transactional email failed", e);
     }
 
     return new Response(
-      JSON.stringify({ ok: true, emailQueued }),
+      JSON.stringify({ ok: true, emailSent }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e: any) {
