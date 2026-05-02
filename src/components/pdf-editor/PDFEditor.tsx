@@ -1047,12 +1047,31 @@ export function PDFEditor() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  const scaleEraseArea = useCallback(
+    (ann: EraseAnnotation): EraseAnnotation => {
+      const sx = ann.pageWidth && pageDims.width ? pageDims.width / ann.pageWidth : 1;
+      const sy = ann.pageHeight && pageDims.height ? pageDims.height / ann.pageHeight : 1;
+      return {
+        ...ann,
+        x: ann.x * sx,
+        y: ann.y * sy,
+        width: ann.width * sx,
+        height: ann.height * sy,
+        pageWidth: pageDims.width || ann.pageWidth,
+        pageHeight: pageDims.height || ann.pageHeight,
+      };
+    },
+    [pageDims.width, pageDims.height],
+  );
+
   const findEraseAtPoint = useCallback(
     (x: number, y: number) => {
       const matches = annotations.filter(
         (ann): ann is EraseAnnotation =>
           ann.page === pageIndex &&
-          ann.type === "erase" &&
+          ann.type === "erase",
+      ).map(scaleEraseArea).filter(
+        (ann) =>
           x >= ann.x &&
           x <= ann.x + ann.width &&
           y >= ann.y &&
@@ -1060,23 +1079,24 @@ export function PDFEditor() {
       );
       return matches[matches.length - 1];
     },
-    [annotations, pageIndex],
+    [annotations, pageIndex, scaleEraseArea],
   );
 
   const isExtractedTextErased = useCallback(
     (text: ExtractedText) =>
       annotations.some((ann): ann is EraseAnnotation => {
         if (ann.type !== "erase" || ann.page !== text.page) return false;
+        const area = scaleEraseArea(ann);
         const padX = Math.max(6, text.overlayHeight * 0.4);
         const padY = Math.max(6, text.overlayHeight * 0.5);
-        return rectanglesIntersect(ann, {
+        return rectanglesIntersect(area, {
           x: text.overlayX - padX,
           y: text.overlayY - padY,
           width: Math.max(text.overlayWidth, 12) + padX * 2,
           height: Math.max(text.overlayHeight, 10) + padY * 2,
         });
       }),
-    [annotations],
+    [annotations, scaleEraseArea],
   );
 
   const findErasedTextAtPoint = useCallback(
@@ -1084,7 +1104,9 @@ export function PDFEditor() {
       const erasers = annotations.filter(
         (ann): ann is EraseAnnotation =>
           ann.page === pageIndex &&
-          ann.type === "erase" &&
+          ann.type === "erase",
+      ).map(scaleEraseArea).filter(
+        (ann) =>
           x >= ann.x &&
           x <= ann.x + ann.width &&
           y >= ann.y &&
@@ -1114,7 +1136,7 @@ export function PDFEditor() {
         })
         .sort((a, b) => a.distance - b.distance)[0]?.text;
     },
-    [annotations, extractedTexts, pageIndex],
+    [annotations, extractedTexts, pageIndex, scaleEraseArea],
   );
 
   const rotatePage = () => {
