@@ -29,6 +29,7 @@ import {
   Italic,
   Edit3,
   Move,
+  GripVertical,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -325,6 +326,9 @@ export function PDFEditor() {
   const [extractedTexts, setExtractedTexts] = useState<ExtractedText[]>([]);
   const [textEdits, setTextEdits] = useState<Record<string, TextEdit>>({});
   const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
+  // Draggable offset for the floating style toolbar (per extracted text id)
+  const [toolbarOffsets, setToolbarOffsets] = useState<Record<string, { dx: number; dy: number }>>({});
+  const toolbarDragRef = useRef<{ id: string; startX: number; startY: number; startDx: number; startDy: number } | null>(null);
   const [hoveredEraseId, setHoveredEraseId] = useState<string | null>(null);
   const [hoveredErasedTextId, setHoveredErasedTextId] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
@@ -2204,13 +2208,54 @@ export function PDFEditor() {
                                      fontStyle: getFontStyle(edit?.fontKeyOverride),
                                   }}
                                 />
-                                {/* Floating style panel — anchored to original text height to avoid jumping when font/size changes */}
+                                {/* Floating style panel — draggable; anchored to original text height to avoid jumping when font/size changes */}
                                 <div
-                                  className="absolute z-20 left-0 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
-                                  style={{ top: t.overlayHeight + 4 }}
+                                  className="absolute z-20 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
+                                  style={{
+                                    top: t.overlayHeight + 4 + (toolbarOffsets[t.id]?.dy ?? 0),
+                                    left: 0 + (toolbarOffsets[t.id]?.dx ?? 0),
+                                  }}
                                   onClick={(e) => e.stopPropagation()}
                                   onMouseDown={(e) => e.stopPropagation()}
                                 >
+                                  {/* Drag handle for the whole toolbar */}
+                                  <button
+                                    type="button"
+                                    className="h-7 w-5 rounded border border-border bg-secondary/50 hover:bg-secondary flex items-center justify-center cursor-grab active:cursor-grabbing"
+                                    title="Arrastar barra de ferramentas"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const cur = toolbarOffsets[t.id] ?? { dx: 0, dy: 0 };
+                                      toolbarDragRef.current = {
+                                        id: t.id,
+                                        startX: e.clientX,
+                                        startY: e.clientY,
+                                        startDx: cur.dx,
+                                        startDy: cur.dy,
+                                      };
+                                      const onMove = (ev: MouseEvent) => {
+                                        const d = toolbarDragRef.current;
+                                        if (!d) return;
+                                        setToolbarOffsets((prev) => ({
+                                          ...prev,
+                                          [d.id]: {
+                                            dx: d.startDx + (ev.clientX - d.startX),
+                                            dy: d.startDy + (ev.clientY - d.startY),
+                                          },
+                                        }));
+                                      };
+                                      const onUp = () => {
+                                        toolbarDragRef.current = null;
+                                        window.removeEventListener("mousemove", onMove);
+                                        window.removeEventListener("mouseup", onUp);
+                                      };
+                                      window.addEventListener("mousemove", onMove);
+                                      window.addEventListener("mouseup", onUp);
+                                    }}
+                                  >
+                                    <GripVertical className="w-3.5 h-3.5" />
+                                  </button>
                                   {eraseArea && (
                                     <button
                                       type="button"
