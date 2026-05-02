@@ -35,8 +35,10 @@ export function InstallPWAFloating() {
   const handleInstall = async () => {
     setInstalling(true);
     try {
-      await install();
-      handleDismiss();
+      const outcome = await install();
+      if (outcome === "accepted") {
+        handleDismiss();
+      }
     } catch (e) {
       console.error("[PWA] install error:", e);
     } finally {
