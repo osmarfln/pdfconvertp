@@ -30,6 +30,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { saveCorrectedTextAsBackup } from "@/lib/textToPdf";
+
+interface DetectedError {
+  snippet: string;
+  type: string;
+  suggestion: string;
+}
 
 interface CorrectionRecord {
   id: string;
