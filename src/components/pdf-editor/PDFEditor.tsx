@@ -1207,8 +1207,8 @@ export function PDFEditor() {
       const fk = edit.fontKeyOverride ?? guessFontKey(original.fontName);
       const fontSize = edit.fontSizeOverride ?? original.fontSize;
       const font = await getFont(fk);
-      let drawX = original.pdfX + (edit.xOffset ?? 0) / scale;
-      const drawY = original.pdfY - (edit.yOffset ?? 0) / scale;
+      let drawX = original.pdfX + (edit.xOffset ?? 0);
+      const drawY = original.pdfY - (edit.yOffset ?? 0);
 
       // Apply horizontal alignment within the erased area for the final PDF
       if (eraseAreaForEdit && edit.align && edit.align !== "left" && edit.newText.trim()) {
@@ -1463,8 +1463,8 @@ export function PDFEditor() {
             const orig = extractedTexts.find((t) => t.id === e.extractedId)!;
             return {
               id: e.extractedId,
-              overlayX: (orig.overlayX + (e.xOffset ?? 0)) * ratio,
-              overlayY: (orig.overlayY + (e.yOffset ?? 0)) * ratio,
+              overlayX: (orig.overlayX + (e.xOffset ?? 0) * scale) * ratio,
+              overlayY: (orig.overlayY + (e.yOffset ?? 0) * scale) * ratio,
               overlayWidth: Math.max(orig.overlayWidth * ratio, 8),
               overlayHeight: orig.overlayHeight * ratio,
               originalText: orig.originalText,
