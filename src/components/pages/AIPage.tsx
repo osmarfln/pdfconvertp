@@ -278,6 +278,7 @@ export function AIPage() {
       if (!data?.success) throw new Error(data?.error || "Erro na correção");
 
       setCorrected(data.correctedText);
+      setDetectedErrors([]);
       await saveToHistory(text, data.correctedText, "typed");
       addNotification({ title: "Correção concluída", message: "Texto corrigido com IA", type: "correction" });
       finishProgress();
