@@ -28,7 +28,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth" replace />;
-  return <>{children}</>;
+  return (
+    <>
+      <PhoneGate />
+      {children}
+    </>
+  );
 }
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
