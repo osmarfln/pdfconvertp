@@ -11,6 +11,7 @@ import { InstallPWAFloating } from "@/components/InstallPWAFloating";
 import { PhoneGate } from "@/components/PhoneGate";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
+import Unsubscribe from "./pages/Unsubscribe.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ const App = () => {
             <NotificationProvider>
               <Routes>
                 <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
