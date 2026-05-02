@@ -2413,6 +2413,33 @@ export function PDFEditor() {
                           >
                             {isEditing ? (
                               <>
+                                {/* Drag handle (top bar) — grab and move while editing */}
+                                <div
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    moveTextRef.current = {
+                                      extractedId: t.id,
+                                      eraseArea: eraseArea ?? {
+                                        x: t.overlayX,
+                                        y: t.overlayY,
+                                        width: pageDims.width - t.overlayX,
+                                        height: pageDims.height - t.overlayY,
+                                      },
+                                      startClientX: e.clientX,
+                                      startClientY: e.clientY,
+                                      startOffsetX: xOffset,
+                                      startOffsetY: yOffset,
+                                      boxWidth: metrics.width,
+                                      boxHeight: metrics.height,
+                                    };
+                                    setIsMovingText(true);
+                                  }}
+                                  title="Arraste para mover (qualquer direção)"
+                                  className="absolute -top-3 left-0 right-0 h-3 z-30 cursor-move bg-primary/60 hover:bg-primary rounded-t flex items-center justify-center"
+                                >
+                                  <div className="w-8 h-0.5 bg-primary-foreground/80 rounded-full" />
+                                </div>
                                 <input
                                   autoFocus
                                   value={value}
