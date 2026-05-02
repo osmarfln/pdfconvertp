@@ -12,31 +12,24 @@ export function InstallPWAFloating() {
   const isStandalone =
     typeof window !== "undefined" &&
     (window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true);
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
 
   useEffect(() => {
-    try {
-      if (sessionStorage.getItem("pwa-banner-dismissed") === "true") {
-        setDismissed(true);
-        return;
-      }
-    } catch {}
     const t = setTimeout(() => setShow(true), 600);
     return () => clearTimeout(t);
   }, []);
 
   const handleDismiss = () => {
     setDismissed(true);
-    try {
-      sessionStorage.setItem("pwa-banner-dismissed", "true");
-    } catch {}
   };
 
   const handleInstall = async () => {
     setInstalling(true);
     try {
-      await install();
-      handleDismiss();
+      const outcome = await install();
+      if (outcome === "accepted") {
+        handleDismiss();
+      }
     } catch (e) {
       console.error("[PWA] install error:", e);
     } finally {
