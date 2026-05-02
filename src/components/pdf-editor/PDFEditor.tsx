@@ -2221,7 +2221,8 @@ export function PDFEditor() {
                                 {/* Floating style panel */}
                                 <div
                                   className="absolute z-20 left-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-xl p-2 flex items-center gap-1.5 flex-nowrap whitespace-nowrap"
-                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
                                 >
                                   {eraseArea && (
                                     <button
