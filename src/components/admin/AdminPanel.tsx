@@ -92,6 +92,25 @@ export function AdminPanel() {
 
   useEffect(() => {
     fetchUsers();
+
+    // Realtime: refresh user list whenever a profile changes or a new login is recorded
+    const channel = supabase
+      .channel("admin-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        () => fetchUsers(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "user_logins" },
+        () => fetchUsers(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filtered = users.filter(
