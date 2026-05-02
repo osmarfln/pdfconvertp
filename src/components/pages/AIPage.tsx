@@ -653,6 +653,65 @@ export function AIPage() {
                 </div>
               </motion.div>
             )}
+            {/* Error detection banner — RED ALERT */}
+            <AnimatePresence>
+              {isDetecting && text.trim().length >= 20 && detectedErrors.length === 0 && !corrected && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="glass rounded-xl p-3 flex items-center gap-3 border border-border"
+                >
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">Analisando o texto em busca de erros...</span>
+                </motion.div>
+              )}
+              {detectedErrors.length > 0 && !corrected && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-xl p-4 space-y-3 border-2 border-destructive bg-destructive/10"
+                >
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span className="font-semibold text-sm">
+                        Temos {detectedErrors.length} erro{detectedErrors.length > 1 ? "s" : ""} neste texto — verificar
+                      </span>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleCorrect}
+                      disabled={isProcessing}
+                      className="animate-pulse"
+                    >
+                      {isProcessing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Wand2 className="w-4 h-4 mr-1.5" />}
+                      Corrigir com IA
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {detectedErrors.map((err, i) => (
+                      <div
+                        key={i}
+                        className="text-xs bg-background/40 border border-destructive/30 rounded-md p-2 space-y-0.5"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="destructive" className="text-[10px] uppercase">{err.type}</Badge>
+                          <span className="text-destructive font-mono line-through">"{err.snippet}"</span>
+                        </div>
+                        <div className="text-success/90 pl-1">→ {err.suggestion}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground italic">
+                    Aperte <strong>Corrigir com IA</strong> e fazemos o serviço de correção para você (pareceres jurídicos, acadêmicos e textos longos).
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="space-y-2">
                 <div className="flex items-center gap-2">
