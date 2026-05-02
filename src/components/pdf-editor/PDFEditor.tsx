@@ -1584,9 +1584,10 @@ export function PDFEditor() {
   const getEraseAreaForVirtualText = (text: ExtractedText) => {
     if (!text.id.startsWith(`tv-${text.page}-`)) return undefined;
     const eraseId = text.id.replace(`tv-${text.page}-`, "");
-    return annotations.find(
+    const area = annotations.find(
       (ann): ann is EraseAnnotation => ann.type === "erase" && ann.page === text.page && ann.id === eraseId,
     );
+    return area ? scaleEraseArea(area) : undefined;
   };
 
 
