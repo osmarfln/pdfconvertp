@@ -263,10 +263,32 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const getFontFamily = (fontKeyOrName?: string) => {
+  if (fontKeyOrName) {
+    const opt = FONT_OPTIONS.find((f) => f.key === fontKeyOrName);
+    if (opt) {
+      ensureWebFontLoaded(opt.webFontHref);
+      return opt.cssFamily;
+    }
+  }
   const name = (fontKeyOrName || "").toLowerCase();
-  if (name.includes("times") || name.includes("serif")) return "Times, serif";
+  if (name.includes("times") || name.includes("serif")) return "'Times New Roman', Times, serif";
   if (name.includes("courier") || name.includes("mono")) return "Courier, monospace";
   return "Helvetica, Arial, sans-serif";
+};
+
+const getFontWeight = (fontKey?: string): number | string => {
+  if (!fontKey) return "normal";
+  const opt = FONT_OPTIONS.find((f) => f.key === fontKey);
+  if (opt?.cssWeight) return opt.cssWeight;
+  return fontKey.toLowerCase().includes("bold") ? 700 : "normal";
+};
+
+const getFontStyle = (fontKey?: string): "normal" | "italic" => {
+  if (!fontKey) return "normal";
+  const opt = FONT_OPTIONS.find((f) => f.key === fontKey);
+  if (opt?.cssStyle) return opt.cssStyle;
+  const n = fontKey.toLowerCase();
+  return n.includes("oblique") || n.includes("italic") ? "italic" : "normal";
 };
 
 const rectanglesIntersect = (
