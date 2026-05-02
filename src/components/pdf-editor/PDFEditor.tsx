@@ -2438,7 +2438,27 @@ export function PDFEditor() {
                                   autoFocus
                                   value={value}
                                   placeholder="Digite o novo texto..."
-                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    const input = e.currentTarget;
+                                    const startX = e.clientX;
+                                    const startY = e.clientY;
+                                    let started = false;
+                                    const onMove = (ev: MouseEvent) => {
+                                      if (started) return;
+                                      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4) {
+                                        started = true;
+                                        input.blur();
+                                        startTextMove(startX, startY);
+                                      }
+                                    };
+                                    const onUp = () => {
+                                      window.removeEventListener("mousemove", onMove);
+                                      window.removeEventListener("mouseup", onUp);
+                                    };
+                                    window.addEventListener("mousemove", onMove);
+                                    window.addEventListener("mouseup", onUp);
+                                  }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.currentTarget.focus();
@@ -2932,11 +2952,29 @@ export function PDFEditor() {
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
-                                  setEditingExtractedId(t.id);
+                                  const startX = e.clientX;
+                                  const startY = e.clientY;
+                                  let started = false;
+                                  const onMove = (ev: MouseEvent) => {
+                                    if (started) return;
+                                    if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4) {
+                                      started = true;
+                                      startTextMove(startX, startY);
+                                    }
+                                  };
+                                  const onUp = () => {
+                                    window.removeEventListener("mousemove", onMove);
+                                    window.removeEventListener("mouseup", onUp);
+                                    if (!started) {
+                                      updateTextEdit(t.id, { newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText) });
+                                      setEditingExtractedId(t.id);
+                                    }
+                                  };
+                                  window.addEventListener("mousemove", onMove);
+                                  window.addEventListener("mouseup", onUp);
                                 }}
-                                title={value ? `Clique para editar: "${value}"` : "Clique para digitar"}
-                                className="w-full h-full cursor-text overflow-visible bg-transparent border-0"
+                                title={value ? `Arraste para mover ou clique para editar: "${value}"` : "Arraste para mover ou clique para digitar"}
+                                className="w-full h-full cursor-move overflow-visible bg-transparent border-0"
                                 style={{
                                   color: edit?.colorOverride || "black",
                                   fontSize: metrics.fontPx,
