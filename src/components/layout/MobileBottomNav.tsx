@@ -170,7 +170,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "relative flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0",
+                  "relative flex flex-col items-center justify-center gap-1 px-0.5 py-1.5 rounded-lg transition-all duration-300 min-w-0 leading-none",
                   isActive
                     ? "text-primary bg-primary/10 scale-105"
                     : "text-muted-foreground hover:text-foreground active:bg-sidebar-accent",
