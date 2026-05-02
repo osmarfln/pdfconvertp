@@ -326,6 +326,9 @@ export function PDFEditor() {
   const [extractedTexts, setExtractedTexts] = useState<ExtractedText[]>([]);
   const [textEdits, setTextEdits] = useState<Record<string, TextEdit>>({});
   const [editingExtractedId, setEditingExtractedId] = useState<string | null>(null);
+  // Draggable offset for the floating style toolbar (per extracted text id)
+  const [toolbarOffsets, setToolbarOffsets] = useState<Record<string, { dx: number; dy: number }>>({});
+  const toolbarDragRef = useRef<{ id: string; startX: number; startY: number; startDx: number; startDy: number } | null>(null);
   const [hoveredEraseId, setHoveredEraseId] = useState<string | null>(null);
   const [hoveredErasedTextId, setHoveredErasedTextId] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
