@@ -2157,20 +2157,70 @@ export function PDFEditor() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  <Input
-                                    type="number"
-                                    min={4}
-                                    max={144}
-                                    step={0.5}
-                                    value={Number((edit?.fontSizeOverride ?? t.fontSize).toFixed(1))}
-                                    onChange={(e) => {
-                                      const n = parseFloat(e.target.value);
-                                      updateTextEdit(t.id, {
-                                        fontSizeOverride: isNaN(n) ? undefined : n,
-                                      });
-                                    }}
-                                    className="h-7 w-16 text-xs"
-                                  />
+                                  {/* Font size: spinner + wheel + drag to resize */}
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const cur = edit?.fontSizeOverride ?? t.fontSize;
+                                        updateTextEdit(t.id, { fontSizeOverride: clamp(cur - 1, 4, 144) });
+                                      }}
+                                      className="h-7 w-6 rounded border border-border bg-secondary/50 hover:bg-secondary text-xs font-bold"
+                                      title="Diminuir tamanho"
+                                    >
+                                      −
+                                    </button>
+                                    <Input
+                                      type="text"
+                                      inputMode="decimal"
+                                      value={String(Number((edit?.fontSizeOverride ?? t.fontSize).toFixed(1))).replace(".", ",")}
+                                      onChange={(e) => {
+                                        const raw = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+                                        const n = parseFloat(raw);
+                                        if (!isNaN(n) && n >= 4 && n <= 144) {
+                                          updateTextEdit(t.id, { fontSizeOverride: n });
+                                        }
+                                      }}
+                                      onWheel={(e) => {
+                                        e.preventDefault();
+                                        const cur = edit?.fontSizeOverride ?? t.fontSize;
+                                        const delta = e.deltaY < 0 ? 0.5 : -0.5;
+                                        updateTextEdit(t.id, { fontSizeOverride: clamp(cur + delta, 4, 144) });
+                                      }}
+                                      onMouseDown={(e) => {
+                                        // Drag-to-resize like Photoshop: shift+drag horizontally
+                                        if (!e.shiftKey) return;
+                                        e.preventDefault();
+                                        const startX = e.clientX;
+                                        const startVal = edit?.fontSizeOverride ?? t.fontSize;
+                                        const move = (ev: MouseEvent) => {
+                                          const dx = ev.clientX - startX;
+                                          updateTextEdit(t.id, { fontSizeOverride: clamp(startVal + dx * 0.25, 4, 144) });
+                                        };
+                                        const up = () => {
+                                          window.removeEventListener("mousemove", move);
+                                          window.removeEventListener("mouseup", up);
+                                        };
+                                        window.addEventListener("mousemove", move);
+                                        window.addEventListener("mouseup", up);
+                                      }}
+                                      className="h-7 w-14 text-xs text-center cursor-ew-resize"
+                                      title="Tamanho — role o mouse ou shift+arraste para ajustar"
+                                    />
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const cur = edit?.fontSizeOverride ?? t.fontSize;
+                                        updateTextEdit(t.id, { fontSizeOverride: clamp(cur + 1, 4, 144) });
+                                      }}
+                                      className="h-7 w-6 rounded border border-border bg-secondary/50 hover:bg-secondary text-xs font-bold"
+                                      title="Aumentar tamanho"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() => {
