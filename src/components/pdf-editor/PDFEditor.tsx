@@ -617,7 +617,10 @@ export function PDFEditor() {
     if (!pdfDoc) return;
     let cancelled = false;
     (async () => {
+      setLoadProgress({ phase: "render", percent: 10 });
       const page = await pdfDoc.getPage(pageIndex + 1);
+      if (cancelled) return;
+      setLoadProgress({ phase: "render", percent: 35 });
       const rotation = pageRotation[pageIndex] ?? 0;
       const viewport = page.getViewport({ scale, rotation });
       const canvas = canvasRef.current;
@@ -626,7 +629,10 @@ export function PDFEditor() {
       canvas.height = viewport.height;
       setPageDims({ width: viewport.width, height: viewport.height });
       const ctx = canvas.getContext("2d")!;
+      setLoadProgress({ phase: "render", percent: 60 });
       await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+      if (cancelled) return;
+      setLoadProgress({ phase: "render", percent: 90 });
 
       try {
         const textContent = await page.getTextContent();
