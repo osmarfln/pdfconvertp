@@ -2127,6 +2127,45 @@ export function PDFEditor() {
                 }}
               >
                 <canvas ref={canvasRef} className="block bg-white select-none" />
+                {/* Smart guides overlay (alignment lines + snap badges) */}
+                {(smartGuides.v.length > 0 || smartGuides.h.length > 0 || smartGuides.angleSnap !== undefined || smartGuides.sizeSnap !== undefined) && (
+                  <div className="pointer-events-none absolute inset-0 z-40">
+                    {smartGuides.v.map((x, i) => (
+                      <div
+                        key={`gv-${i}-${x}`}
+                        className="absolute top-0 bottom-0"
+                        style={{
+                          left: x,
+                          width: 1,
+                          background: "hsl(var(--primary))",
+                          boxShadow: "0 0 4px hsl(var(--primary) / 0.7)",
+                        }}
+                      />
+                    ))}
+                    {smartGuides.h.map((y, i) => (
+                      <div
+                        key={`gh-${i}-${y}`}
+                        className="absolute left-0 right-0"
+                        style={{
+                          top: y,
+                          height: 1,
+                          background: "hsl(var(--primary))",
+                          boxShadow: "0 0 4px hsl(var(--primary) / 0.7)",
+                        }}
+                      />
+                    ))}
+                    {smartGuides.angleSnap !== undefined && (
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-mono shadow-lg">
+                        {Math.round(smartGuides.angleSnap)}°
+                      </div>
+                    )}
+                    {smartGuides.sizeSnap !== undefined && (
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-primary text-primary-foreground text-xs font-mono shadow-lg">
+                        {smartGuides.sizeSnap}pt
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div
                   ref={overlayRef}
                   onMouseDown={onCanvasMouseDown}
