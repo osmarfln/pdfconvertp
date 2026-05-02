@@ -2325,18 +2325,35 @@ export function PDFEditor() {
                                     const onMove = (ev: MouseEvent) => {
                                       const a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI;
                                       let next = startRot + (a - startAngle);
-                                      if (ev.shiftKey) next = Math.round(next / 15) * 15;
+                                      // Auto-snap when within 3° of common angles
+                                      // unless Alt is held (disable snap).
+                                      const SNAPS = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, -15, -30, -45, -60, -75, -90, -105, -120, -135, -150, -165, -180];
+                                      let snapped: number | undefined;
+                                      if (ev.shiftKey) {
+                                        next = Math.round(next / 15) * 15;
+                                        snapped = next;
+                                      } else if (!ev.altKey) {
+                                        for (const s of SNAPS) {
+                                          if (Math.abs(((next - s + 540) % 360) - 180) < 3) {
+                                            next = s;
+                                            snapped = s;
+                                            break;
+                                          }
+                                        }
+                                      }
                                       next = ((next + 180) % 360 + 360) % 360 - 180;
                                       updateTextEdit(t.id, { rotation: next });
+                                      setSmartGuides((g) => ({ ...g, angleSnap: snapped }));
                                     };
                                     const onUp = () => {
                                       window.removeEventListener("mousemove", onMove);
                                       window.removeEventListener("mouseup", onUp);
+                                      setSmartGuides((g) => ({ ...g, angleSnap: undefined }));
                                     };
                                     window.addEventListener("mousemove", onMove);
                                     window.addEventListener("mouseup", onUp);
                                   }}
-                                  title="Girar (segure Shift para 15°)"
+                                  title="Girar (snap automático em ângulos comuns; Alt desativa, Shift força 15°)"
                                   className="absolute -top-7 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-primary border-2 border-background shadow-md cursor-grab active:cursor-grabbing z-30 flex items-center justify-center"
                                   style={{ touchAction: "none" }}
                                 >
