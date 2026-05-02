@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Search, User, Clock, LogOut, Sun, Moon, Trash2, Menu } from "lucide-react";
+import { Bell, User, Clock, LogOut, Sun, Moon, Trash2, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -66,14 +66,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
             <Menu className="w-4 h-4 text-muted-foreground" />
           </button>
         )}
-        <div className="relative flex-1 max-w-xs md:max-w-md">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar..."
-            className="w-full h-8 pl-8 pr-3 rounded-lg bg-secondary border border-border text-xs md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-          />
-        </div>
+        <div className="flex-1" />
       </div>
 
       <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
