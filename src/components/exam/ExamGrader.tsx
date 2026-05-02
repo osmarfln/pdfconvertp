@@ -666,55 +666,116 @@ export function ExamGrader() {
         </motion.div>
       )}
 
-      {result && (
+      {displayResult && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          <div className="glass rounded-xl p-5 space-y-4 border border-primary/20">
+          {/* Red alert banner when there are errors */}
+          {(displayResult.incorrect_count > 0 || displayResult.partial_count > 0) && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-xl border-2 border-destructive bg-destructive/10 p-4 flex items-start gap-3"
+            >
+              <AlertTriangle className="w-6 h-6 text-destructive shrink-0 mt-0.5 animate-pulse" />
+              <div className="flex-1">
+                <p className="font-semibold text-destructive">
+                  Esta prova tem {displayResult.incorrect_count} erro(s)
+                  {displayResult.partial_count > 0 && ` e ${displayResult.partial_count} parcial(is)`}
+                </p>
+                <p className="text-sm text-destructive/90 mt-0.5">
+                  Veja abaixo o detalhamento de cada questão. As questões em vermelho indicam onde o aluno errou e a resposta correta esperada.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          <div className={`glass rounded-xl p-5 space-y-4 border-2 ${
+            displayResult.grade >= 7 ? "border-success/40" : displayResult.grade >= 5 ? "border-warning/40" : "border-destructive/40"
+          }`}>
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Nota Final</p>
-                <p className={`text-5xl font-display font-bold ${result.grade >= 7 ? "text-success" : result.grade >= 5 ? "text-warning" : "text-destructive"}`}>
-                  {result.grade.toFixed(1)}<span className="text-2xl text-muted-foreground"> / 10</span>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Nota Final (décimos de 0,5)</p>
+                <p className={`text-5xl font-display font-bold ${displayResult.grade >= 7 ? "text-success" : displayResult.grade >= 5 ? "text-warning" : "text-destructive"}`}>
+                  {displayResult.grade.toFixed(1)}<span className="text-2xl text-muted-foreground"> / 10</span>
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Pontuação: {result.total_score.toFixed(0)}/100</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pontuação: {displayResult.total_score.toFixed(0)}/100 • Total de questões: {displayResult.total_questions}
+                </p>
               </div>
-              <Button variant="glow" onClick={handleDownloadPDF}>
-                <Download className="w-4 h-4 mr-1.5" />
-                Baixar PDF da correção
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="glow" onClick={handleDownloadPDF}>
+                  <Download className="w-4 h-4 mr-1.5" />
+                  Baixar PDF
+                </Button>
+                <Button
+                  variant="glass"
+                  onClick={handleSaveToFiles}
+                  disabled={isSaving || !!savedId}
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                  ) : savedId ? (
+                    <CheckCircle2 className="w-4 h-4 mr-1.5 text-success" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-1.5" />
+                  )}
+                  {savedId ? "Salvo em Meus Arquivos" : isSaving ? "Salvando..." : "Salvar em Meus Arquivos"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Summary: acertos x erros */}
+            <div className="rounded-lg bg-secondary/40 border border-border p-3 text-center">
+              <p className="text-sm text-foreground">
+                <span className="text-success font-bold">{displayResult.correct_count} acerto(s)</span>
+                {" • "}
+                <span className="text-warning font-bold">{displayResult.partial_count} parcial(is)</span>
+                {" • "}
+                <span className="text-destructive font-bold">{displayResult.incorrect_count} erro(s)</span>
+                {" "}de{" "}
+                <span className="font-bold">{displayResult.total_questions}</span> questão(ões)
+              </p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-lg bg-success/10 border border-success/30 p-3 text-center">
-                <p className="text-2xl font-bold text-success">{result.correct_count}</p>
+                <p className="text-2xl font-bold text-success">{displayResult.correct_count}</p>
                 <p className="text-xs text-muted-foreground">Acertos</p>
               </div>
               <div className="rounded-lg bg-warning/10 border border-warning/30 p-3 text-center">
-                <p className="text-2xl font-bold text-warning">{result.partial_count}</p>
+                <p className="text-2xl font-bold text-warning">{displayResult.partial_count}</p>
                 <p className="text-xs text-muted-foreground">Parciais</p>
               </div>
               <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-center">
-                <p className="text-2xl font-bold text-destructive">{result.incorrect_count}</p>
+                <p className="text-2xl font-bold text-destructive">{displayResult.incorrect_count}</p>
                 <p className="text-xs text-muted-foreground">Erros</p>
               </div>
             </div>
 
-            {result.overall_feedback && (
+            {displayResult.overall_feedback && (
               <div className="rounded-lg bg-secondary/50 border border-border p-3">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">Comentário geral</p>
-                <p className="text-sm text-foreground">{result.overall_feedback}</p>
+                <p className="text-sm text-foreground">{displayResult.overall_feedback}</p>
               </div>
             )}
           </div>
 
           <div className="space-y-2">
             <h4 className="font-display font-semibold text-foreground">Detalhamento por questão</h4>
-            {result.questions.map((q) => (
-              <div key={q.number} className="glass rounded-xl p-4 space-y-2">
+            {displayResult.questions.map((q) => (
+              <div
+                key={q.number}
+                className={`glass rounded-xl p-4 space-y-2 ${
+                  q.is_correct === "incorrect" ? "border-2 border-destructive/50" : ""
+                }`}
+              >
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     {statusIcon(q.is_correct)}
                     <span className="font-semibold text-foreground">Questão {q.number}</span>
                     <Badge variant="outline" className="text-xs">{statusLabel(q.is_correct)}</Badge>
+                    {q.is_correct === "incorrect" && (
+                      <Badge variant="destructive" className="text-xs animate-pulse">ERRO</Badge>
+                    )}
                   </div>
                   <span className="text-sm font-medium text-foreground">
                     {q.points_earned.toFixed(1)} / {q.max_points} pts
