@@ -2256,57 +2256,59 @@ export function PDFEditor() {
                                   >
                                     <GripVertical className="w-3.5 h-3.5" />
                                   </button>
-                                  {eraseArea && (
-                                    <button
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        moveTextRef.current = {
-                                          extractedId: t.id,
-                                          eraseArea,
-                                          startClientX: e.clientX,
-                                          startClientY: e.clientY,
-                                          startOffsetX: xOffset,
-                                          startOffsetY: yOffset,
-                                          boxWidth: metrics.width,
-                                          boxHeight: metrics.height,
-                                        };
-                                        setIsMovingText(true);
-                                      }}
-                                      className="h-7 w-7 rounded border border-border bg-secondary/50 flex items-center justify-center cursor-move"
-                                      title="Mover texto dentro da área apagada"
-                                    >
-                                      <Move className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                  {/* Alignment buttons (only meaningful when there is an erase area) */}
-                                  {eraseArea && (
-                                    <div className="flex items-center gap-0.5 border border-border rounded bg-secondary/30 p-0.5">
-                                      {([
-                                        { v: "left", Icon: AlignLeft, title: "Alinhar à esquerda" },
-                                        { v: "center", Icon: AlignCenter, title: "Centralizar" },
-                                        { v: "right", Icon: AlignRight, title: "Alinhar à direita" },
-                                      ] as const).map(({ v, Icon, title }) => {
-                                        const active = (edit?.align ?? "left") === v;
-                                        return (
-                                          <button
-                                            key={v}
-                                            type="button"
-                                            onMouseDown={(e) => e.preventDefault()}
-                                            onClick={() => updateTextEdit(t.id, { align: v })}
-                                            className={cn(
-                                              "h-6 w-6 rounded flex items-center justify-center",
-                                              active ? "bg-primary/20 text-primary" : "hover:bg-secondary",
-                                            )}
-                                            title={title}
-                                          >
-                                            <Icon className="w-3.5 h-3.5" />
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
+                                  {/* Move button — always available so users can reposition text */}
+                                  <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      moveTextRef.current = {
+                                        extractedId: t.id,
+                                        eraseArea: eraseArea ?? {
+                                          x: t.overlayX,
+                                          y: t.overlayY,
+                                          width: pageDims.width - t.overlayX,
+                                          height: pageDims.height - t.overlayY,
+                                        },
+                                        startClientX: e.clientX,
+                                        startClientY: e.clientY,
+                                        startOffsetX: xOffset,
+                                        startOffsetY: yOffset,
+                                        boxWidth: metrics.width,
+                                        boxHeight: metrics.height,
+                                      };
+                                      setIsMovingText(true);
+                                    }}
+                                    className="h-7 w-7 rounded border border-border bg-secondary/50 hover:bg-secondary flex items-center justify-center cursor-move"
+                                    title="Mover texto (arraste)"
+                                  >
+                                    <Move className="w-3.5 h-3.5" />
+                                  </button>
+                                  {/* Alignment buttons — always available */}
+                                  <div className="flex items-center gap-0.5 border border-border rounded bg-secondary/30 p-0.5">
+                                    {([
+                                      { v: "left", Icon: AlignLeft, title: "Alinhar à esquerda" },
+                                      { v: "center", Icon: AlignCenter, title: "Centralizar" },
+                                      { v: "right", Icon: AlignRight, title: "Alinhar à direita" },
+                                    ] as const).map(({ v, Icon, title }) => {
+                                      const active = (edit?.align ?? "left") === v;
+                                      return (
+                                        <button
+                                          key={v}
+                                          type="button"
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => updateTextEdit(t.id, { align: v })}
+                                          className={cn(
+                                            "h-6 w-6 rounded flex items-center justify-center",
+                                            active ? "bg-primary/20 text-primary" : "hover:bg-secondary",
+                                          )}
+                                          title={title}
+                                        >
+                                          <Icon className="w-3.5 h-3.5" />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                   <Select
                                     value={edit?.fontKeyOverride ?? "__auto__"}
                                     onValueChange={(v) => {
@@ -2317,10 +2319,20 @@ export function PDFEditor() {
                                       });
                                     }}
                                   >
-                                    <SelectTrigger className="h-7 w-[170px] text-xs">
+                                    <SelectTrigger
+                                      className="h-7 w-[170px] text-xs"
+                                      onPointerDown={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent className="max-h-80">
+                                    <SelectContent
+                                      className="max-h-80 z-[100] bg-popover"
+                                      onPointerDown={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       <SelectItem value="__auto__">Auto ({t.fontName.slice(0, 16)})</SelectItem>
                                       {(["Padrão PDF", "Sans-serif", "Serif", "Monospace", "Display", "Manuscrita"] as const).map((cat) => {
                                         const items = FONT_OPTIONS.filter((f) => f.category === cat);
