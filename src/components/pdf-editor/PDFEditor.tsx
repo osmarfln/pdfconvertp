@@ -1681,16 +1681,36 @@ export function PDFEditor() {
             <TabsContent value="text" className="space-y-3 mt-3">
               <div>
                 <Label className="text-xs text-muted-foreground">Fonte</Label>
-                <Select value={fontKey} onValueChange={(v) => setFontKey(v as FontKey)}>
+                <Select value={fontKey} onValueChange={(v) => {
+                  const opt = FONT_OPTIONS.find((f) => f.key === v);
+                  ensureWebFontLoaded(opt?.webFontHref);
+                  setFontKey(v as FontKey);
+                }}>
                   <SelectTrigger className="h-9 mt-1">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    {FONT_OPTIONS.map((f) => (
-                      <SelectItem key={f.key} value={f.key}>
-                        {f.label}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-80">
+                    {(["Padrão PDF", "Sans-serif", "Serif", "Monospace", "Display", "Manuscrita"] as const).map((cat) => {
+                      const items = FONT_OPTIONS.filter((f) => f.category === cat);
+                      if (!items.length) return null;
+                      return (
+                        <Fragment key={cat}>
+                          <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-secondary/40 sticky top-0">
+                            {cat}
+                          </div>
+                          {items.map((f) => {
+                            ensureWebFontLoaded(f.webFontHref);
+                            return (
+                              <SelectItem key={f.key} value={f.key}>
+                                <span style={{ fontFamily: f.cssFamily, fontWeight: f.cssWeight ?? "normal", fontStyle: f.cssStyle ?? "normal" }}>
+                                  {f.label}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
