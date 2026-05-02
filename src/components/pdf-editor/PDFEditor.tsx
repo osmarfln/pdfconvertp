@@ -2296,12 +2296,56 @@ export function PDFEditor() {
                               // re-triggering / stealing focus while the
                               // user interacts with this editable block.
                               e.stopPropagation();
-                              if (!isEditing) {
-                                updateTextEdit(t.id, {
-                                  newText: textEdits[t.id]?.newText ?? (textIsErased ? "" : t.originalText),
-                                });
-                                setEditingExtractedId(t.id);
-                              }
+                              if (isEditing) return;
+                              // Click-and-drag to move directly. If the user
+                              // doesn't move past a small threshold, treat as
+                              // a click and enter edit mode.
+                              const startX = e.clientX;
+                              const startY = e.clientY;
+                              const areaForMove = eraseArea ?? {
+                                x: t.overlayX,
+                                y: t.overlayY,
+                                width: pageDims.width - t.overlayX,
+                                height: pageDims.height - t.overlayY,
+                              };
+                              let started = false;
+                              const beginMove = () => {
+                                started = true;
+                                moveTextRef.current = {
+                                  extractedId: t.id,
+                                  eraseArea: areaForMove,
+                                  startClientX: startX,
+                                  startClientY: startY,
+                                  startOffsetX: xOffset,
+                                  startOffsetY: yOffset,
+                                  boxWidth: metrics.width,
+                                  boxHeight: metrics.height,
+                                };
+                                setIsMovingText(true);
+                              };
+                              const onMove = (ev: MouseEvent) => {
+                                if (started) return;
+                                const dx = ev.clientX - startX;
+                                const dy = ev.clientY - startY;
+                                if (Math.hypot(dx, dy) > 4) {
+                                  beginMove();
+                                }
+                              };
+                              const onUp = () => {
+                                window.removeEventListener("mousemove", onMove);
+                                window.removeEventListener("mouseup", onUp);
+                                if (!started) {
+                                  // Treat as a click → open editor
+                                  updateTextEdit(t.id, {
+                                    newText:
+                                      textEdits[t.id]?.newText ??
+                                      (textIsErased ? "" : t.originalText),
+                                  });
+                                  setEditingExtractedId(t.id);
+                                }
+                              };
+                              window.addEventListener("mousemove", onMove);
+                              window.addEventListener("mouseup", onUp);
                             }}
                             style={{
                               position: "absolute",
@@ -2309,7 +2353,7 @@ export function PDFEditor() {
                               top: (eraseArea?.y ?? t.overlayY) + yOffset,
                               width: metrics.width,
                               height: metrics.height,
-                              cursor: "text",
+                              cursor: isEditing ? "text" : "move",
                               transform: edit?.rotation ? `rotate(${edit.rotation}deg)` : undefined,
                               transformOrigin: "0% 100%",
                             }}
