@@ -29,6 +29,7 @@ import {
   Italic,
   Edit3,
   Move,
+  GripVertical,
   AlignLeft,
   AlignCenter,
   AlignRight,
