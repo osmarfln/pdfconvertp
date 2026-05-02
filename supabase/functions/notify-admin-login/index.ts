@@ -62,26 +62,32 @@ Deno.serve(async (req) => {
 
     if (insertErr) console.error("[notify-admin-login] insert login error", insertErr);
 
-    // ---- DEDUPLICATION ----
-    // Only notify the admin ONCE per user, ever. Subsequent logins are skipped.
+    // ---- DEDUPLICATION (cooldown) ----
+    // Notify the admin again on each new login, but never more than once
+    // per hour for the same user — protects against React StrictMode double
+    // mounts, page reloads, and OAuth re-redirects.
+    const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
     const { data: existingNotif } = await admin
       .from("admin_login_notifications")
-      .select("id, email_sent, attempts")
+      .select("id, email_sent, attempts, notified_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (existingNotif?.email_sent) {
-      console.log(
-        `[notify-admin-login] SKIP (already notified) user=${user.id} email=${user.email}`,
-      );
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          deduplicated: true,
-          reason: "admin already notified for this user",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    if (existingNotif?.email_sent && existingNotif.notified_at) {
+      const lastMs = new Date(existingNotif.notified_at).getTime();
+      if (!Number.isNaN(lastMs) && Date.now() - lastMs < COOLDOWN_MS) {
+        console.log(
+          `[notify-admin-login] SKIP (cooldown) user=${user.id} email=${user.email}`,
+        );
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            deduplicated: true,
+            reason: "admin already notified within cooldown window",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // Reserve the slot via UPSERT before sending — atomic guard against
