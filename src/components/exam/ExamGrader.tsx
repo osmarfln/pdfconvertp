@@ -412,7 +412,13 @@ export function ExamGrader() {
 
       if (!finalGrading) throw new Error("A correção não foi finalizada");
       setResult(finalGrading);
-      toast.success(`Nota: ${finalGrading.grade.toFixed(1)} / 10`);
+      const finalGrade = roundToHalf(finalGrading.grade);
+      const errCount = finalGrading.incorrect_count;
+      if (errCount > 0) {
+        toast.warning(`Nota: ${finalGrade.toFixed(1)} / 10 — ${errCount} erro(s) encontrado(s)`);
+      } else {
+        toast.success(`Nota: ${finalGrade.toFixed(1)} / 10 — sem erros!`);
+      }
     } catch (err: any) {
       console.error("Grade error:", err);
       toast.error(err.message || "Erro ao corrigir prova");
