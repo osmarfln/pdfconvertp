@@ -38,7 +38,7 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
       className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-sidebar/95 backdrop-blur-md border-t border-sidebar-border pb-[env(safe-area-inset-bottom)]"
       aria-label="Navegação rápida"
     >
-      <div className="flex items-stretch justify-around px-1 py-1.5 overflow-x-auto">
+      <div className="grid grid-flow-col auto-cols-fr items-stretch px-1 py-1">
         {items.map((item) => {
           const isActive = activeTab === item.id;
           return (
@@ -46,19 +46,19 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
               key={item.id}
               onClick={() => onTabChange(item.id)}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 min-w-[58px] rounded-lg transition-colors",
+                "flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 rounded-md transition-colors min-w-0",
                 isActive
                   ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
+                  : "text-muted-foreground hover:text-foreground active:bg-sidebar-accent",
               )}
             >
               <item.icon
                 className={cn(
-                  "w-5 h-5 shrink-0",
+                  "w-[18px] h-[18px] shrink-0",
                   isActive && "drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)]",
                 )}
               />
-              <span className="text-[10px] font-medium leading-none">
+              <span className="text-[9.5px] font-medium leading-none truncate max-w-full">
                 {item.label}
               </span>
             </button>
