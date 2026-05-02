@@ -2386,12 +2386,34 @@ export function PDFEditor() {
                                             (corner.includes("s") ? (ev.clientY - startY) : -(ev.clientY - startY));
                                           const deltaPt = sign * dCombined * pxToPt * 0.5;
                                           let nextSize = clamp(startSize + deltaPt, 4, 144);
-                                          if (ev.shiftKey) nextSize = Math.round(nextSize); // snap to 1pt
+                                          // Snap to common sizes + sizes used by
+                                          // other texts on the page (within ~0.6pt).
+                                          let snapped: number | undefined;
+                                          if (ev.shiftKey) {
+                                            nextSize = Math.round(nextSize);
+                                            snapped = nextSize;
+                                          } else if (!ev.altKey) {
+                                            const targets = new Set<number>([8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72]);
+                                            extractedTexts.forEach((other) => {
+                                              if (other.id === t.id) return;
+                                              const sz = textEdits[other.id]?.fontSizeOverride ?? other.fontSize;
+                                              targets.add(Math.round(sz * 10) / 10);
+                                            });
+                                            for (const s of targets) {
+                                              if (Math.abs(nextSize - s) <= 0.6) {
+                                                nextSize = s;
+                                                snapped = s;
+                                                break;
+                                              }
+                                            }
+                                          }
                                           updateTextEdit(t.id, { fontSizeOverride: nextSize });
+                                          setSmartGuides((g) => ({ ...g, sizeSnap: snapped }));
                                         };
                                         const onUp = () => {
                                           window.removeEventListener("mousemove", onMove);
                                           window.removeEventListener("mouseup", onUp);
+                                          setSmartGuides((g) => ({ ...g, sizeSnap: undefined }));
                                         };
                                         window.addEventListener("mousemove", onMove);
                                         window.addEventListener("mouseup", onUp);
