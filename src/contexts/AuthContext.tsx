@@ -50,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const notifyAdminOnce = (u: User) => {
+      // Dedupe per browser session so a page reload doesn't re-trigger,
+      // but a fresh login from a new tab/session WILL trigger again.
+      // The edge function itself enforces a longer per-user cooldown.
       const key = `login-notified-${u.id}`;
       if (sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, "1");
@@ -68,7 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = session.user;
         setTimeout(async () => {
           await ensureProfile(u);
-          if (event === "SIGNED_IN") notifyAdminOnce(u);
+          // Notify on SIGNED_IN (email/password) AND on the OAuth callback
+          // restoration (INITIAL_SESSION right after redirect). The
+          // sessionStorage guard prevents duplicate fires within the same tab.
+          if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+            notifyAdminOnce(u);
+          }
           const { data } = await supabase
             .from("user_roles")
             .select("role")
