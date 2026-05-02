@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 interface DiffSegment {
   type: "unchanged" | "added" | "removed" | "modified";
