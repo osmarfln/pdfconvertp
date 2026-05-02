@@ -1376,6 +1376,7 @@ export function PDFEditor() {
         xOffset: existing?.xOffset,
         yOffset: existing?.yOffset,
         align: existing?.align,
+        rotation: existing?.rotation,
         ...patch,
       };
       const isUnchanged =
@@ -1386,7 +1387,8 @@ export function PDFEditor() {
         !merged.colorOverride &&
         !merged.xOffset &&
         !merged.yOffset &&
-        !merged.align;
+        !merged.align &&
+        !merged.rotation;
       if (isUnchanged) {
         const { [extractedId]: _, ...rest } = prev;
         return rest;
