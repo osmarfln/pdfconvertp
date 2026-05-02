@@ -5,11 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export function InstallPWAFloating() {
   const { isInstallable, isInstalled, install } = useInstallPWA();
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      return sessionStorage.getItem("pwa-banner-dismissed") === "true";
-    } catch { return false; }
-  });
+  const [dismissed, setDismissed] = useState(false);
   const [show, setShow] = useState(false);
 
   const isStandalone = typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
