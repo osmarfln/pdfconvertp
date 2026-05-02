@@ -248,11 +248,11 @@ export function TextComparison() {
             </Button>
             <Button variant="glass" size="sm" onClick={handleCopy}>
               <Copy className="w-4 h-4 mr-1" />
-              Copiar
+              Copiar texto corrigido
             </Button>
-            <Button variant="glow" size="sm" onClick={handleExport}>
+            <Button variant="glow" size="sm" onClick={handleExportPDF}>
               <Download className="w-4 h-4 mr-1" />
-              Exportar
+              Baixar PDF
             </Button>
           </div>
         )}
