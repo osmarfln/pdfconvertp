@@ -158,10 +158,11 @@ export function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps
       />
 
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-sidebar/95 backdrop-blur-md border-t border-sidebar-border pb-[env(safe-area-inset-bottom)]"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-sidebar/95 backdrop-blur-md border-t border-sidebar-border"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
         aria-label="Navegação rápida"
       >
-        <div className="grid grid-flow-col auto-cols-fr items-stretch px-1 py-1">
+        <div className="grid grid-flow-col auto-cols-fr items-stretch px-1 pt-1.5 pb-1 min-h-[60px]">
           {items.map((item) => {
             const isActive = activeTab === item.id;
             return (
