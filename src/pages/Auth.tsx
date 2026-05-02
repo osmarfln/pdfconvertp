@@ -233,8 +233,11 @@ export default function Auth() {
               {isLogin ? "Cadastre-se" : "Entrar"}
             </button>
           </p>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
+
