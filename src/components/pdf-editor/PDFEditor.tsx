@@ -386,6 +386,12 @@ export function PDFEditor() {
   const [drawingPreview, setDrawingPreview] = useState<Annotation | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isMovingText, setIsMovingText] = useState(false);
+  const [smartGuides, setSmartGuides] = useState<{
+    v: number[]; // vertical guide x positions in overlay px
+    h: number[]; // horizontal guide y positions in overlay px
+    angleSnap?: number; // snapped angle (deg) being shown
+    sizeSnap?: number; // snapped font size (pt) being shown
+  }>({ v: [], h: [] });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
