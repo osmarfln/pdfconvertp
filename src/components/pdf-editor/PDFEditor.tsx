@@ -424,6 +424,23 @@ export function PDFEditor() {
     }
   }, []);
 
+  const scaleEraseArea = useCallback(
+    (ann: EraseAnnotation): EraseAnnotation => {
+      const sx = ann.pageWidth && pageDims.width ? pageDims.width / ann.pageWidth : 1;
+      const sy = ann.pageHeight && pageDims.height ? pageDims.height / ann.pageHeight : 1;
+      return {
+        ...ann,
+        x: ann.x * sx,
+        y: ann.y * sy,
+        width: ann.width * sx,
+        height: ann.height * sy,
+        pageWidth: pageDims.width || ann.pageWidth,
+        pageHeight: pageDims.height || ann.pageHeight,
+      };
+    },
+    [pageDims.width, pageDims.height],
+  );
+
   useEffect(() => {
     if (!isPanning) return;
     const movePan = (event: MouseEvent) => {
