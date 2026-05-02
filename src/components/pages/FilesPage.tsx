@@ -337,6 +337,24 @@ function FileListGrid({
               </Button>
             )}
 
+            {/* Direct download button for PDF backups */}
+            {isBackupView && displayFormat === "pdf" && (file.converted_path || file.original_path) && (
+              <Button
+                variant="glow"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  const path = file.converted_path || file.original_path!;
+                  const name = file.original_name.toLowerCase().endsWith(".pdf")
+                    ? file.original_name
+                    : `${file.original_name.replace(/\.[^.]+$/, "")}.pdf`;
+                  downloadFile(path, name);
+                }}
+              >
+                <Download className="w-3.5 h-3.5 mr-1" /> Baixar PDF
+              </Button>
+            )}
+
             {!isBackupView && targets.length > 0 && file.original_path && (
               <div className="flex items-center gap-2">
                 <Select

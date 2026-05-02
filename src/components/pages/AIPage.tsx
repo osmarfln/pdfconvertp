@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight, PartyPopper, GraduationCap } from "lucide-react";
+import { Wand2, CheckCircle2, FileText, RotateCcw, Image, Loader2, History, Trash2, Clock, Filter, Search, ChevronLeft, ChevronRight, PartyPopper, GraduationCap, AlertTriangle, Save } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ExamGrader } from "@/components/exam/ExamGrader";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { saveCorrectedTextAsBackup } from "@/lib/textToPdf";
+
+interface DetectedError {
+  snippet: string;
+  type: string;
+  suggestion: string;
+}
 
 interface CorrectionRecord {
   id: string;
@@ -65,6 +72,49 @@ export function AIPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+
+  // Error detection state
+  const [detectedErrors, setDetectedErrors] = useState<DetectedError[]>([]);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [savingBackup, setSavingBackup] = useState(false);
+  const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runDetection = async (raw: string) => {
+    if (!raw || raw.trim().length < 20) {
+      setDetectedErrors([]);
+      return;
+    }
+    setIsDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-correct", {
+        body: { action: "detect", text: raw },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        setDetectedErrors(data.errors || []);
+      }
+    } catch (err) {
+      console.error("Detect error:", err);
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  // Debounced auto-detection when text changes
+  useEffect(() => {
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    if (!text.trim()) {
+      setDetectedErrors([]);
+      return;
+    }
+    detectTimerRef.current = setTimeout(() => {
+      runDetection(text);
+    }, 1200);
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
 
   const fetchHistory = async () => {
     if (!user) return;
@@ -228,6 +278,7 @@ export function AIPage() {
       if (!data?.success) throw new Error(data?.error || "Erro na correção");
 
       setCorrected(data.correctedText);
+      setDetectedErrors([]);
       await saveToHistory(text, data.correctedText, "typed");
       addNotification({ title: "Correção concluída", message: "Texto corrigido com IA", type: "correction" });
       finishProgress();
@@ -312,7 +363,27 @@ export function AIPage() {
     e.target.value = "";
   };
 
-  const handleClear = () => { setText(""); setCorrected(""); };
+  const handleClear = () => { setText(""); setCorrected(""); setDetectedErrors([]); };
+
+  const handleSaveBackup = async () => {
+    if (!user || !corrected.trim()) return;
+    setSavingBackup(true);
+    try {
+      const title = `Texto corrigido — ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      const id = await saveCorrectedTextAsBackup({ userId: user.id, title, text: corrected });
+      if (id) {
+        toast.success("Salvo em Meus Arquivos → Backup como PDF!");
+        addNotification({ title: "Backup criado", message: "Texto corrigido salvo como PDF em Meus Arquivos", type: "correction" });
+      } else {
+        toast.error("Não foi possível salvar o backup.");
+      }
+    } catch (err: any) {
+      console.error("Save backup error:", err);
+      toast.error(err.message || "Erro ao salvar backup");
+    } finally {
+      setSavingBackup(false);
+    }
+  };
 
   const handleCopy = () => {
     if (corrected) {
@@ -515,9 +586,14 @@ export function AIPage() {
                 </SelectContent>
               </Select>
 
-              <Button variant="glow" onClick={handleCorrect} disabled={!text.trim() || isProcessing}>
+              <Button
+                variant="glow"
+                onClick={handleCorrect}
+                disabled={!text.trim() || isProcessing}
+                className={detectedErrors.length > 0 ? "animate-pulse ring-2 ring-destructive/60" : ""}
+              >
                 {isProcessing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Wand2 className="w-4 h-4 mr-1.5" />}
-                {isProcessing ? "Corrigindo..." : "Corrigir com IA"}
+                {isProcessing ? "Corrigindo..." : detectedErrors.length > 0 ? `Corrigir ${detectedErrors.length} erro${detectedErrors.length > 1 ? "s" : ""} com IA` : "Corrigir com IA"}
               </Button>
 
               <Button variant="glass" onClick={() => fileInputRef.current?.click()} disabled={isOcrProcessing}>
@@ -577,6 +653,65 @@ export function AIPage() {
                 </div>
               </motion.div>
             )}
+            {/* Error detection banner — RED ALERT */}
+            <AnimatePresence>
+              {isDetecting && text.trim().length >= 20 && detectedErrors.length === 0 && !corrected && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="glass rounded-xl p-3 flex items-center gap-3 border border-border"
+                >
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">Analisando o texto em busca de erros...</span>
+                </motion.div>
+              )}
+              {detectedErrors.length > 0 && !corrected && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-xl p-4 space-y-3 border-2 border-destructive bg-destructive/10"
+                >
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span className="font-semibold text-sm">
+                        Temos {detectedErrors.length} erro{detectedErrors.length > 1 ? "s" : ""} neste texto — verificar
+                      </span>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleCorrect}
+                      disabled={isProcessing}
+                      className="animate-pulse"
+                    >
+                      {isProcessing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Wand2 className="w-4 h-4 mr-1.5" />}
+                      Corrigir com IA
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {detectedErrors.map((err, i) => (
+                      <div
+                        key={i}
+                        className="text-xs bg-background/40 border border-destructive/30 rounded-md p-2 space-y-0.5"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="destructive" className="text-[10px] uppercase">{err.type}</Badge>
+                          <span className="text-destructive font-mono line-through">"{err.snippet}"</span>
+                        </div>
+                        <div className="text-success/90 pl-1">→ {err.suggestion}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground italic">
+                    Aperte <strong>Corrigir com IA</strong> e fazemos o serviço de correção para você (pareceres jurídicos, acadêmicos e textos longos).
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -587,7 +722,7 @@ export function AIPage() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Cole ou digite seu texto aqui, ou use o botão OCR para extrair de uma imagem..."
-                  className="min-h-[300px] bg-secondary border-border resize-none"
+                  className={`min-h-[300px] bg-secondary resize-none ${detectedErrors.length > 0 && !corrected ? "border-2 border-destructive" : "border border-border"}`}
                 />
                 <p className="text-xs text-muted-foreground">{text.length} caracteres</p>
               </motion.div>
@@ -599,9 +734,21 @@ export function AIPage() {
                     <span className="text-sm font-medium text-foreground">Texto Corrigido</span>
                   </div>
                   {corrected && (
-                    <Button variant="ghost" size="sm" onClick={handleCopy} className="text-xs">
-                      Copiar
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={handleCopy} className="text-xs">
+                        Copiar
+                      </Button>
+                      <Button
+                        variant="glow"
+                        size="sm"
+                        onClick={handleSaveBackup}
+                        disabled={savingBackup}
+                        className="text-xs"
+                      >
+                        {savingBackup ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                        Salvar PDF (Backup)
+                      </Button>
+                    </div>
                   )}
                 </div>
                 <div className="min-h-[300px] bg-secondary border border-border rounded-md p-3 text-sm text-foreground/80 overflow-y-auto">
