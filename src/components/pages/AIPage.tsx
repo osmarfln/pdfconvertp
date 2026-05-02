@@ -722,7 +722,7 @@ export function AIPage() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Cole ou digite seu texto aqui, ou use o botão OCR para extrair de uma imagem..."
-                  className="min-h-[300px] bg-secondary border-border resize-none"
+                  className={`min-h-[300px] bg-secondary resize-none ${detectedErrors.length > 0 && !corrected ? "border-2 border-destructive" : "border border-border"}`}
                 />
                 <p className="text-xs text-muted-foreground">{text.length} caracteres</p>
               </motion.div>
