@@ -308,6 +308,7 @@ function hexToRgb01(hex: string) {
 
 export function PDFEditor() {
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
+  const [loadProgress, setLoadProgress] = useState<{ phase: "read" | "parse" | "render"; percent: number } | null>(null);
   const [pdfName, setPdfName] = useState<string>("");
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -587,14 +588,23 @@ export function PDFEditor() {
     let cancelled = false;
     (async () => {
       try {
-        const doc = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+        setLoadProgress({ phase: "parse", percent: 0 });
+        const task = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
+        task.onProgress = (p: { loaded: number; total: number }) => {
+          if (cancelled) return;
+          const pct = p.total ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : 0;
+          setLoadProgress({ phase: "parse", percent: pct });
+        };
+        const doc = await task.promise;
         if (cancelled) return;
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setPageIndex(0);
+        setLoadProgress({ phase: "render", percent: 0 });
       } catch (e) {
         toast.error("Erro ao abrir PDF");
         console.error(e);
+        setLoadProgress(null);
       }
     })();
     return () => {
@@ -607,7 +617,10 @@ export function PDFEditor() {
     if (!pdfDoc) return;
     let cancelled = false;
     (async () => {
+      setLoadProgress({ phase: "render", percent: 10 });
       const page = await pdfDoc.getPage(pageIndex + 1);
+      if (cancelled) return;
+      setLoadProgress({ phase: "render", percent: 35 });
       const rotation = pageRotation[pageIndex] ?? 0;
       const viewport = page.getViewport({ scale, rotation });
       const canvas = canvasRef.current;
@@ -616,7 +629,10 @@ export function PDFEditor() {
       canvas.height = viewport.height;
       setPageDims({ width: viewport.width, height: viewport.height });
       const ctx = canvas.getContext("2d")!;
+      setLoadProgress({ phase: "render", percent: 60 });
       await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+      if (cancelled) return;
+      setLoadProgress({ phase: "render", percent: 90 });
 
       try {
         const textContent = await page.getTextContent();
@@ -697,6 +713,7 @@ export function PDFEditor() {
       } catch (err) {
         console.warn("text extract failed", err);
       }
+      if (!cancelled) setLoadProgress(null);
     })();
     return () => {
       cancelled = true;
@@ -739,8 +756,18 @@ export function PDFEditor() {
       toast.error("Selecione um arquivo PDF");
       return;
     }
+    setLoadProgress({ phase: "read", percent: 0 });
     const reader = new FileReader();
+    reader.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setLoadProgress({
+          phase: "read",
+          percent: Math.min(100, Math.round((e.loaded / e.total) * 100)),
+        });
+      }
+    };
     reader.onload = (e) => {
+      setLoadProgress({ phase: "parse", percent: 0 });
       setPdfBytes(e.target?.result as ArrayBuffer);
       setPdfName(file.name);
       setAnnotations([]);
@@ -750,6 +777,10 @@ export function PDFEditor() {
       setRedoStack([]);
       setTool("pan");
       toast.success("PDF carregado");
+    };
+    reader.onerror = () => {
+      setLoadProgress(null);
+      toast.error("Erro ao ler arquivo");
     };
     reader.readAsArrayBuffer(file);
   };
@@ -2127,6 +2158,27 @@ export function PDFEditor() {
                 }}
               >
                 <canvas ref={canvasRef} className="block bg-white select-none" />
+                {/* Loading progress overlay */}
+                {loadProgress && (
+                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-3 px-6 py-5 rounded-xl border border-border bg-card shadow-2xl min-w-[260px]">
+                      <div className="text-sm font-medium text-foreground">
+                        {loadProgress.phase === "read" && "Lendo arquivo..."}
+                        {loadProgress.phase === "parse" && "Processando PDF..."}
+                        {loadProgress.phase === "render" && "Renderizando página..."}
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-200 ease-out"
+                          style={{ width: `${loadProgress.percent}%` }}
+                        />
+                      </div>
+                      <div className="text-xs font-mono text-muted-foreground tabular-nums">
+                        {loadProgress.percent}%
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* Smart guides overlay (alignment lines + snap badges) */}
                 {(smartGuides.v.length > 0 || smartGuides.h.length > 0 || smartGuides.angleSnap !== undefined || smartGuides.sizeSnap !== undefined) && (
                   <div className="pointer-events-none absolute inset-0 z-40">
