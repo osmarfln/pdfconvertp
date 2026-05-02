@@ -150,6 +150,83 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
       });
     }
 
+    if (action === "detect") {
+      if (!text || !text.trim()) {
+        return new Response(JSON.stringify({ error: "Texto vazio" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const systemPrompt = `Você é um revisor profissional de textos em português brasileiro (pareceres jurídicos, acadêmicos, profissionais).
+Analise o texto do usuário e identifique TODOS os erros: ortografia, gramática, pontuação, concordância, regência, coesão e estilo.
+Para CADA erro encontrado, retorne:
+- snippet: o trecho EXATO com erro (copie literalmente do texto, máx 80 caracteres)
+- type: tipo do erro ("ortografia" | "gramática" | "pontuação" | "concordância" | "estilo")
+- suggestion: como deveria ser escrito corretamente
+Use a função report_errors. Se não houver erros, retorne lista vazia.`;
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: text },
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "report_errors",
+              description: "Reporta os erros encontrados no texto",
+              parameters: {
+                type: "object",
+                properties: {
+                  errors: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        snippet: { type: "string" },
+                        type: { type: "string" },
+                        suggestion: { type: "string" },
+                      },
+                      required: ["snippet", "type", "suggestion"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["errors"],
+                additionalProperties: false,
+              },
+            },
+          }],
+          tool_choice: { type: "function", function: { name: "report_errors" } },
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (response.status === 402) return new Response(JSON.stringify({ error: "Créditos de IA esgotados." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const errText = await response.text();
+        console.error("Detect error:", response.status, errText);
+        throw new Error("Erro na detecção");
+      }
+
+      const result = await response.json();
+      const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
+      let errors: Array<{ snippet: string; type: string; suggestion: string }> = [];
+      try {
+        const args = JSON.parse(toolCall?.function?.arguments || "{}");
+        errors = Array.isArray(args.errors) ? args.errors : [];
+      } catch (e) {
+        console.error("Parse tool args failed:", e);
+      }
+
+      return new Response(JSON.stringify({ success: true, hasErrors: errors.length > 0, errors }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
     if (action === "ocr") {
       // Synchronous OCR (legacy, still works for quick jobs)
       if (!imageBase64) {
