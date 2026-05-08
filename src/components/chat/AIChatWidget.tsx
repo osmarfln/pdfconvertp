@@ -374,7 +374,7 @@ export function AIChatWidget() {
             {a.status === "done" && `✅ Pronto — escolha o formato para baixar`}
             {a.status === "error" && `❌ ${a.error || "Erro"}`}
           </div>
-          {inProgress && (
+          {(inProgress || a.status === "ocr") && (
             <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
               <div
                 className="h-full bg-primary transition-all duration-300"
@@ -452,7 +452,7 @@ export function AIChatWidget() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx,.xlsx,.pptx"
+        accept=".pdf,.docx,.xlsx,.pptx,image/*"
         multiple
         className="hidden"
         onChange={(e) => {
