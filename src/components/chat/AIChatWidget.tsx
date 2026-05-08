@@ -20,6 +20,11 @@ type AttachmentMsg = {
   downloadName?: string;
   originalDownloadName?: string;
   error?: string;
+  ocrOptions?: {
+    contrast: number;
+    rotation: number;
+    autoCrop: boolean;
+  };
 };
 type CorrectionMsg = {
   kind: "correction";
@@ -257,6 +262,7 @@ export function AIChatWidget() {
           sourceFormat: q.source,
           downloadName: q.downloadName,
           originalDownloadName: q.originalDownloadName,
+          ocrOptions: q.isImg ? { contrast: 1.0, rotation: 0, autoCrop: true } : undefined,
         },
       })),
     ]);
