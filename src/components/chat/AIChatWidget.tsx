@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, User, Sparkles, Paperclip, Wand2, Download, FileText, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User, Sparkles, Paperclip, Wand2, Download, FileText, Loader2, Image as ImageIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useFileConversions } from "@/hooks/useFileConversions";
@@ -11,7 +11,7 @@ import { downloadFromStorage, triggerBlobDownload } from "@/lib/download";
 type AttachmentMsg = {
   kind: "attachment";
   fileName: string;
-  status: "uploading" | "uploaded" | "converting" | "done" | "error";
+  status: "uploading" | "uploaded" | "converting" | "done" | "error" | "ocr";
   progress?: number; // 0-100 individual progress
   targetFormat?: string;
   sourceFormat?: string;
@@ -44,6 +44,7 @@ function getGreeting(): string {
 }
 
 const suggestions = [
+  "📷 Foto de texto/manuscrito para PDF",
   "📎 Anexe um ou mais PDFs/DOCX para converter",
   "✨ Cole um texto para correção ortográfica",
   "Como usar o OCR para extrair texto?",
@@ -54,6 +55,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
 const isPdf = (name: string) => /\.pdf$/i.test(name);
 const isDoc = (name: string) => /\.(docx|xlsx|pptx)$/i.test(name);
+const isImage = (name: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(name);
 
 export function AIChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -67,7 +69,7 @@ export function AIChatWidget() {
 
   const greeting = useMemo(() => getGreeting(), []);
   const welcomeMessage = useMemo(
-    () => `${greeting} Sou o assistente do PDF Convert Pro! 🚀\n\n• 📎 Anexe um arquivo para **converter PDF↔Word**\n• ✨ Use o botão **Corrigir** para revisar ortografia/gramática com comparação **antes/depois**\n• Ou faça uma pergunta!`,
+    () => `${greeting} Sou o assistente do PDF Convert Pro! 🚀\n\n• 📷 Envie uma **foto de texto ou manuscrito** para converter em PDF\n• 📎 Anexe um arquivo para **converter PDF↔Word**\n• ✨ Use o botão **Corrigir** para revisar ortografia/gramática\n• Ou faça uma pergunta!`,
     [greeting]
   );
 
@@ -170,6 +172,10 @@ export function AIChatWidget() {
   };
 
   const handleSuggestion = (text: string) => {
+    if (text.startsWith("📷")) {
+      fileInputRef.current?.click();
+      return;
+    }
     if (text.startsWith("📎")) {
       fileInputRef.current?.click();
       return;
@@ -217,22 +223,23 @@ export function AIChatWidget() {
   };
 
   const handleFiles = async (files: File[]) => {
-    const valid = files.filter((f) => isPdf(f.name) || isDoc(f.name));
+    const valid = files.filter((f) => isPdf(f.name) || isDoc(f.name) || isImage(f.name));
     const invalid = files.length - valid.length;
     if (invalid > 0) {
-      toast.error(`${invalid} arquivo(s) ignorado(s). Envie apenas PDF, DOCX, XLSX ou PPTX.`);
+      toast.error(`${invalid} arquivo(s) ignorado(s). Envie PDF, DOCX, XLSX, PPTX ou Imagens.`);
     }
     if (!valid.length) return;
 
-    // Create one message per file (so each has its own progress card)
+    // Create one message per file
     const queued = valid.map((file) => {
-      const target = isPdf(file.name) ? "docx" : "pdf";
-      const source = isPdf(file.name) ? "pdf" : file.name.split(".").pop()!.toLowerCase();
+      const isImg = isImage(file.name);
+      const target = isImg ? "pdf" : (isPdf(file.name) ? "docx" : "pdf");
+      const source = file.name.split(".").pop()!.toLowerCase();
       const baseName = file.name.replace(/\.[^.]+$/, "");
       const downloadName = `${baseName}.${target}`;
       const originalDownloadName = file.name;
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      return { id, file, target, source, downloadName, originalDownloadName };
+      return { id, file, target, source, downloadName, originalDownloadName, isImg };
     });
 
     setMessages((prev) => [
@@ -254,31 +261,69 @@ export function AIChatWidget() {
       })),
     ]);
 
-    // Process sequentially to avoid hammering the conversion API but keep individual progress
     for (const q of queued) {
       try {
         updateMsg(q.id, (m) => ({
           rich: { ...(m.rich as AttachmentMsg), status: "uploading", progress: 10 },
         }));
+        
         const conv = await uploadFile(q.file);
         if (!conv) throw new Error("Falha no upload");
 
+        if (q.isImg) {
+          updateMsg(q.id, (m) => ({
+            rich: { ...(m.rich as AttachmentMsg), status: "ocr", progress: 30, originalPath: conv.original_path ?? undefined },
+          }));
+          
+          // Use the ai-correct OCR capability for images
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve((reader.result as string).split(",")[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(q.file);
+          });
+
+          updateMsg(q.id, (m) => ({ rich: { ...(m.rich as AttachmentMsg), progress: 50 } }));
+          
+          const { data, error } = await supabase.functions.invoke("ai-correct", {
+            body: { action: "ocr", imageBase64: base64, mimeType: q.file.type },
+          });
+
+          if (error || !data?.success) throw new Error(data?.error || "OCR failed");
+          
+          const extractedText = data.text || "Sem texto detectado.";
+          updateMsg(q.id, (m) => ({ rich: { ...(m.rich as AttachmentMsg), progress: 80 } }));
+
+          // Convert the extracted text back to PDF
+          const { saveCorrectedTextAsBackup } = await import("@/lib/textToPdf");
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const pdfPath = await saveCorrectedTextAsBackup({
+              userId: session.user.id,
+              title: q.originalDownloadName,
+              text: extractedText
+            });
+
+            if (pdfPath) {
+              updateMsg(q.id, (m) => ({
+                rich: { ...(m.rich as AttachmentMsg), status: "done", progress: 100, convertedPath: pdfPath },
+              }));
+              // Auto download
+              downloadFromStorage(pdfPath, q.downloadName);
+              continue;
+            }
+          }
+          throw new Error("Falha ao gerar PDF final");
+        }
+
         updateMsg(q.id, (m) => ({
-          rich: {
-            ...(m.rich as AttachmentMsg),
-            status: "converting",
-            progress: 40,
-            originalPath: conv.original_path ?? undefined,
-          },
+          rich: { ...(m.rich as AttachmentMsg), status: "converting", progress: 40, originalPath: conv.original_path ?? undefined },
         }));
 
-        // Smooth progress simulation while waiting for the conversion
         let cur = 40;
         const interval = window.setInterval(() => {
           cur = Math.min(cur + Math.random() * 6, 88);
-          updateMsg(q.id, (m) => ({
-            rich: { ...(m.rich as AttachmentMsg), progress: cur },
-          }));
+          updateMsg(q.id, (m) => ({ rich: { ...(m.rich as AttachmentMsg), progress: cur } }));
         }, 600);
 
         const convertedPath = await convertFile(conv.id, conv.original_path!, q.target);
@@ -286,12 +331,7 @@ export function AIChatWidget() {
         if (!convertedPath) throw new Error("Falha na conversão");
 
         updateMsg(q.id, (m) => ({
-          rich: {
-            ...(m.rich as AttachmentMsg),
-            status: "done",
-            progress: 100,
-            convertedPath,
-          },
+          rich: { ...(m.rich as AttachmentMsg), status: "done", progress: 100, convertedPath },
         }));
       } catch (err: any) {
         updateMsg(q.id, (m) => ({
@@ -320,16 +360,21 @@ export function AIChatWidget() {
       return (
         <div className="rounded-xl bg-secondary border border-border p-3 max-w-[85%] space-y-2 w-full">
           <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-primary shrink-0" />
+            {isImage(a.fileName) ? (
+              <ImageIcon className="w-4 h-4 text-primary shrink-0" />
+            ) : (
+              <FileText className="w-4 h-4 text-primary shrink-0" />
+            )}
             <span className="text-sm font-medium text-foreground truncate">{a.fileName}</span>
           </div>
           <div className="text-xs text-muted-foreground">
             {a.status === "uploading" && `📤 Enviando... ${progress}%`}
+            {a.status === "ocr" && `🔍 Extraindo texto e gerando PDF... ${progress}%`}
             {a.status === "converting" && `🔄 Convertendo para ${convertedExt}... ${progress}%`}
             {a.status === "done" && `✅ Pronto — escolha o formato para baixar`}
             {a.status === "error" && `❌ ${a.error || "Erro"}`}
           </div>
-          {inProgress && (
+          {(inProgress || a.status === "ocr") && (
             <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
               <div
                 className="h-full bg-primary transition-all duration-300"
@@ -407,7 +452,7 @@ export function AIChatWidget() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx,.xlsx,.pptx"
+        accept=".pdf,.docx,.xlsx,.pptx,image/*"
         multiple
         className="hidden"
         onChange={(e) => {
