@@ -359,10 +359,21 @@ export function AIChatWidget() {
       const a = msg.rich;
       const progress = Math.round(a.progress ?? 0);
       const inProgress = a.status === "uploading" || a.status === "converting";
-      // When source is PDF -> converted is DOCX, original is PDF
-      // When source is DOCX/etc -> converted is PDF, original is the source format
       const convertedExt = (a.targetFormat || "").toUpperCase();
       const originalExt = (a.sourceFormat || "").toUpperCase();
+
+      const updateOcrOption = (key: "contrast" | "rotation" | "autoCrop", value: any) => {
+        updateMsg(msg.id, (m) => ({
+          rich: {
+            ...(m.rich as AttachmentMsg),
+            ocrOptions: {
+              ...(m.rich as AttachmentMsg).ocrOptions!,
+              [key]: value
+            }
+          }
+        }));
+      };
+
       return (
         <div className="rounded-xl bg-secondary border border-border p-3 max-w-[85%] space-y-2 w-full">
           <div className="flex items-center gap-2">
@@ -373,38 +384,105 @@ export function AIChatWidget() {
             )}
             <span className="text-sm font-medium text-foreground truncate">{a.fileName}</span>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {a.status === "uploading" && `📤 Enviando... ${progress}%`}
-            {a.status === "ocr" && `🔍 Extraindo texto e gerando PDF... ${progress}%`}
-            {a.status === "converting" && `🔄 Convertendo para ${convertedExt}... ${progress}%`}
-            {a.status === "done" && `✅ Pronto — escolha o formato para baixar`}
-            {a.status === "error" && `❌ ${a.error || "Erro"}`}
-          </div>
-          {(inProgress || a.status === "ocr") && (
-            <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all duration-300"
-                style={{ width: `${Math.max(5, progress)}%` }}
-              />
+
+          {a.status === "uploading" && (
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">📤 Enviando... {progress}%</div>
+              <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
+                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.max(5, progress)}%` }} />
+              </div>
             </div>
           )}
-          {a.status === "done" && a.convertedPath && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <button
-                onClick={() => downloadConverted(a.convertedPath!, a.downloadName!)}
-                className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90"
-              >
-                <Download className="w-3.5 h-3.5" /> Baixar {convertedExt}
-              </button>
-              {a.originalPath && a.originalDownloadName && (
-                <button
-                  onClick={() => downloadConverted(a.originalPath!, a.originalDownloadName!)}
-                  className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-secondary border border-border text-foreground text-xs font-medium hover:bg-muted"
-                >
-                  <Download className="w-3.5 h-3.5" /> Baixar {originalExt}
-                </button>
+
+          {a.status === "ocr" && (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-3 h-3 animate-spin" /> 🔍 Extraindo texto... {progress}%
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
+                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.max(5, progress)}%` }} />
+              </div>
+              
+              {a.ocrOptions && (
+                <div className="bg-background/40 rounded-lg p-2 space-y-2 border border-border/40">
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">Opções de Melhoria OCR</div>
+                  
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-foreground/80">Contraste: {a.ocrOptions.contrast.toFixed(1)}x</span>
+                      <input 
+                        type="range" min="1" max="3" step="0.1" 
+                        value={a.ocrOptions.contrast} 
+                        onChange={(e) => updateOcrOption("contrast", parseFloat(e.target.value))}
+                        className="w-20 h-1 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-foreground/80">Rotação: {a.ocrOptions.rotation}°</span>
+                      <div className="flex gap-1">
+                        {[0, 90, 180, 270].map(deg => (
+                          <button 
+                            key={deg}
+                            onClick={() => updateOcrOption("rotation", deg)}
+                            className={`text-[9px] px-1 rounded border ${a.ocrOptions?.rotation === deg ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground'}`}
+                          >
+                            {deg}°
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-foreground/80">Recorte Automático</span>
+                      <button 
+                        onClick={() => updateOcrOption("autoCrop", !a.ocrOptions?.autoCrop)}
+                        className={`w-7 h-3.5 rounded-full relative transition-colors ${a.ocrOptions.autoCrop ? 'bg-primary' : 'bg-muted'}`}
+                      >
+                        <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-all ${a.ocrOptions.autoCrop ? 'right-0.5' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
+          )}
+
+          {a.status === "converting" && (
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">🔄 Convertendo para {convertedExt}... {progress}%</div>
+              <div className="h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
+                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.max(5, progress)}%` }} />
+              </div>
+            </div>
+          )}
+
+          {a.status === "done" && (
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">✅ Pronto — escolha o formato para baixar</div>
+              {a.convertedPath && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => downloadConverted(a.convertedPath!, a.downloadName!)}
+                    className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Baixar {convertedExt}
+                  </button>
+                  {a.originalPath && a.originalDownloadName && (
+                    <button
+                      onClick={() => downloadConverted(a.originalPath!, a.originalDownloadName!)}
+                      className="flex items-center gap-2 justify-center px-3 py-2 rounded-lg bg-secondary border border-border text-foreground text-xs font-medium hover:bg-muted"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Baixar {originalExt}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {a.status === "error" && (
+            <div className="text-xs text-destructive">❌ {a.error || "Erro"}</div>
           )}
         </div>
       );
