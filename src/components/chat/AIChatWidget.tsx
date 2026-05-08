@@ -292,7 +292,12 @@ export function AIChatWidget() {
           updateMsg(q.id, (m) => ({ rich: { ...(m.rich as AttachmentMsg), progress: 50 } }));
           
           const { data, error } = await supabase.functions.invoke("ai-correct", {
-            body: { action: "ocr", imageBase64: base64, mimeType: q.file.type },
+            body: { 
+              action: "ocr", 
+              imageBase64: base64, 
+              mimeType: q.file.type,
+              options: q.isImg ? (messages.find(m => m.id === q.id)?.rich as AttachmentMsg)?.ocrOptions : undefined
+            },
           });
 
           if (error || !data?.success) throw new Error(data?.error || "OCR failed");
