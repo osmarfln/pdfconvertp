@@ -14,7 +14,7 @@ function getSupabaseAdmin() {
   );
 }
 
-async function processOcrInBackground(jobId: string, imageBase64: string, ocrMime: string, apiKey: string) {
+async function processOcrInBackground(jobId: string, imageBase64: string, ocrMime: string, apiKey: string, options?: any) {
   const supabaseAdmin = getSupabaseAdmin();
   
   try {
@@ -34,7 +34,10 @@ async function processOcrInBackground(jobId: string, imageBase64: string, ocrMim
             content: [
               {
                 type: "text",
-                text: "Extraia todo o texto desta imagem/documento. Retorne apenas o texto extraído, preservando a estrutura e formatação original (parágrafos, listas, etc). Se não houver texto, responda 'Nenhum texto encontrado.'",
+                text: `Extraia todo o texto desta imagem/documento. 
+                ${options ? `Aplique estas melhorias se necessário: Contraste ${options.contrast}x, Rotação ${options.rotation} graus, Recorte automático: ${options.autoCrop}.` : ""}
+                Identifique AUTOMATICAMENTE o idioma do texto (português, inglês, espanhol, manuscrito, etc) e extraia com precisão.
+                Retorne apenas o texto extraído, preservando a estrutura e formatação original (parágrafos, listas, etc). Se não houver texto, responda 'Nenhum texto encontrado.'`,
               },
               {
                 type: "image_url",
@@ -81,7 +84,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, text, tone, imageBase64, mimeType, jobId } = body;
+    const { action, text, tone, imageBase64, mimeType, jobId, options } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -249,7 +252,9 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
           messages: [{
             role: "user",
             content: [
-              { type: "text", text: "Extraia todo o texto desta imagem/documento. Retorne apenas o texto extraído, preservando a estrutura e formatação original (parágrafos, listas, etc). Se não houver texto, responda 'Nenhum texto encontrado.'" },
+              { type: "text", text: `Extraia todo o texto desta imagem/documento. 
+              ${options ? `Melhorias: Contraste ${options.contrast}x, Rotação ${options.rotation}°, Recorte: ${options.autoCrop}.` : ""}
+              Identifique AUTOMATICAMENTE o idioma e mantenha a formatação original. Retorne apenas o texto extraído.` },
               { type: "image_url", image_url: { url: `data:${ocrMime};base64,${imageBase64}` } },
             ],
           }],
@@ -281,7 +286,7 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
       const ocrMime = mimeType || "image/png";
 
       // Start background processing
-      EdgeRuntime.waitUntil(processOcrInBackground(jobId, imageBase64, ocrMime, LOVABLE_API_KEY));
+      EdgeRuntime.waitUntil(processOcrInBackground(jobId, imageBase64, ocrMime, LOVABLE_API_KEY, options));
 
       return new Response(
         JSON.stringify({ success: true, message: "Processamento iniciado", jobId }),
