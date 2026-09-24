@@ -49,7 +49,7 @@ function aiHeaders(apiKey: string) {
 }
 
 async function callAI(body: Record<string, unknown>, apiKey: string) {
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+  const resp = await fetch(`${Deno.env.get("AI_API_URL") || ""}/v1/chat/completions`, {
     method: "POST",
     headers: aiHeaders(apiKey),
     body: JSON.stringify(body),
@@ -150,7 +150,7 @@ Use a função grade_page para retornar as questões desta página. Se a página
 
   const result = await callAI(
     {
-      model: "gpt-5-mini",
+      model: Deno.env.get("AI_MODEL") || "configured-model",
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -185,7 +185,7 @@ async function generateOverallFeedback(grading: any, subject: string, apiKey: st
       .join("\n");
     const result = await callAI(
       {
-        model: "gpt-5-mini",
+        model: Deno.env.get("AI_MODEL") || "configured-model",
         messages: [
           {
             role: "system",
@@ -220,8 +220,9 @@ serve(async (req) => {
       });
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
+    const AI_API_KEY = Deno.env.get("AI_API_KEY");
+    const AI_API_URL = Deno.env.get("AI_API_URL");
+    if (!AI_API_KEY || !AI_API_URL) throw new Error("AI provider is not configured");
 
     // ===== Streaming SSE mode: page-by-page =====
     if (stream) {
@@ -251,7 +252,7 @@ serve(async (req) => {
                   i,
                   imagesBase64.length,
                   subject,
-                  OPENAI_API_KEY,
+                  AI_API_KEY,
                 );
                 allQuestions.push(...pageQuestions);
                 const dur = Date.now() - pageStart;
@@ -273,7 +274,7 @@ serve(async (req) => {
             send("aggregating", { totalQuestions: allQuestions.length });
             const grading = gradeFromQuestions(allQuestions, subject, examTitle);
             send("overall_feedback_start", {});
-            grading.overall_feedback = await generateOverallFeedback(grading, subject, OPENAI_API_KEY);
+            grading.overall_feedback = await generateOverallFeedback(grading, subject, AI_API_KEY);
 
             send("done", {
               grading,
@@ -369,7 +370,7 @@ Use a função grade_exam para retornar o resultado estruturado. NÃO escreva te
 
     const result = await callAI(
       {
-        model: "gpt-5-mini",
+        model: Deno.env.get("AI_MODEL") || "configured-model",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -377,7 +378,7 @@ Use a função grade_exam para retornar o resultado estruturado. NÃO escreva te
         tools,
         tool_choice: { type: "function", function: { name: "grade_exam" } },
       },
-      OPENAI_API_KEY,
+      AI_API_KEY,
     );
 
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
