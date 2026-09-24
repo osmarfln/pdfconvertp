@@ -20,7 +20,7 @@ async function processOcrInBackground(jobId: string, imageBase64: string, ocrMim
   try {
     await supabaseAdmin.from("extraction_jobs").update({ status: "processing" }).eq("id", jobId);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -85,8 +85,8 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const { action, text, tone, imageBase64, mimeType, jobId, options } = body;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     if (action === "correct") {
       if (!text || !text.trim()) {
@@ -114,10 +114,10 @@ Sua tarefa é:
 
 Responda APENAS com o texto corrigido, sem explicações adicionais.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -168,9 +168,9 @@ Para CADA erro encontrado, retorne:
 - suggestion: como deveria ser escrito corretamente
 Use a função report_errors. Se não houver erros, retorne lista vazia.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [
@@ -241,10 +241,10 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
 
       const ocrMime = mimeType || "image/png";
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -286,7 +286,7 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
       const ocrMime = mimeType || "image/png";
 
       // Start background processing
-      EdgeRuntime.waitUntil(processOcrInBackground(jobId, imageBase64, ocrMime, LOVABLE_API_KEY, options));
+      EdgeRuntime.waitUntil(processOcrInBackground(jobId, imageBase64, ocrMime, OPENAI_API_KEY, options));
 
       return new Response(
         JSON.stringify({ success: true, message: "Processamento iniciado", jobId }),
@@ -297,10 +297,10 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
     if (action === "chat") {
       const { messages } = body;
       
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
