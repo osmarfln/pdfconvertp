@@ -6,9 +6,7 @@ import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 // Configuration baked in at scaffold time — do NOT change these manually.
 // To update, re-run the email domain setup flow.
 const SITE_NAME = "Fenix Convert PDF"
-// SENDER_DOMAIN is the verified sender subdomain FQDN (e.g., "notify.example.com").
-// It MUST match the subdomain delegated to Lovable's nameservers — never the root domain.
-// The email API looks up this exact domain; a mismatch causes "No email domain record found".
+// SENDER_DOMAIN is the verified sender domain configured in the email provider.
 const SENDER_DOMAIN = "fenixconvertpdf.com.br"
 // FROM_DOMAIN is the domain shown in the From: header (e.g., "example.com").
 // When display_from_root is enabled, this can be the root domain for cleaner branding,
