@@ -150,7 +150,7 @@ Use a função grade_page para retornar as questões desta página. Se a página
 
   const result = await callAI(
     {
-      model: "openai/gpt-5-mini",
+      model: "gpt-5-mini",
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -185,7 +185,7 @@ async function generateOverallFeedback(grading: any, subject: string, apiKey: st
       .join("\n");
     const result = await callAI(
       {
-        model: "openai/gpt-5-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -369,7 +369,7 @@ Use a função grade_exam para retornar o resultado estruturado. NÃO escreva te
 
     const result = await callAI(
       {
-        model: "openai/gpt-5-mini",
+        model: "gpt-5-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
