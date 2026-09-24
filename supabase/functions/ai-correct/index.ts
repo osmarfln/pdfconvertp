@@ -27,7 +27,7 @@ async function processOcrInBackground(jobId: string, imageBase64: string, ocrMim
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/gpt-5-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "user",
@@ -121,7 +121,7 @@ Responda APENAS com o texto corrigido, sem explicações adicionais.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-5-mini",
+          model: "gpt-5-mini",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: text },
@@ -172,7 +172,7 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
         method: "POST",
         headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gpt-5-mini",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: text },
@@ -248,7 +248,7 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-5-mini",
+          model: "gpt-5-mini",
           messages: [{
             role: "user",
             content: [
@@ -304,7 +304,7 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-5-mini",
+          model: "gpt-5-mini",
           messages: [
             {
               role: "system",
