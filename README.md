@@ -1,3 +1,10 @@
-# Welcome to your Lovable project
+# Fenix Convert PDF
 
-TODO: Document your project here
+Aplicação web de conversão e processamento de documentos.
+
+- Domínio oficial: https://fenixconvertpdf.com.br
+- Frontend: React + Vite
+- Backend: Supabase
+- Autenticação: Supabase Auth
+
+O projeto não depende do runtime da Lovable.
