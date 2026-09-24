@@ -8,14 +8,14 @@ const corsHeaders = {
 }
 
 // Renders all registered templates with their previewData.
-// Gated by LOVABLE_API_KEY — only the Go API calls this.
+// Gated by INTERNAL_FUNCTION_SECRET — only the Go API calls this.
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
-  const apiKey = Deno.env.get('LOVABLE_API_KEY')
+  const apiKey = Deno.env.get('INTERNAL_FUNCTION_SECRET')
   if (!apiKey) {
     return new Response(
       JSON.stringify({ error: 'Server configuration error' }),
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Verify the caller is authorized with LOVABLE_API_KEY
+  // Verify the caller is authorized with INTERNAL_FUNCTION_SECRET
   const authHeader = req.headers.get('Authorization')
   const token = authHeader?.replace(/^Bearer\s+/i, '')
   if (token !== apiKey) {

@@ -20,14 +20,14 @@ async function processOcrInBackground(jobId: string, imageBase64: string, ocrMim
   try {
     await supabaseAdmin.from("extraction_jobs").update({ status: "processing" }).eq("id", jobId);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(`${Deno.env.get("AI_API_URL") || ""}/v1/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/gpt-5-mini",
+        model: Deno.env.get("AI_MODEL") || "configured-model",
         messages: [
           {
             role: "user",
@@ -85,8 +85,9 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const { action, text, tone, imageBase64, mimeType, jobId, options } = body;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const AI_API_KEY = Deno.env.get("AI_API_KEY");
+    const AI_API_URL = Deno.env.get("AI_API_URL");
+    if (!AI_API_KEY || !AI_API_URL) throw new Error("AI provider is not configured");
 
     if (action === "correct") {
       if (!text || !text.trim()) {
@@ -114,14 +115,14 @@ Sua tarefa é:
 
 Responda APENAS com o texto corrigido, sem explicações adicionais.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(`${Deno.env.get("AI_API_URL") || ""}/v1/chat/completions`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${AI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-5-mini",
+          model: Deno.env.get("AI_MODEL") || "configured-model",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: text },
@@ -168,11 +169,11 @@ Para CADA erro encontrado, retorne:
 - suggestion: como deveria ser escrito corretamente
 Use a função report_errors. Se não houver erros, retorne lista vazia.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(`${Deno.env.get("AI_API_URL") || ""}/v1/chat/completions`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${AI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: Deno.env.get("AI_MODEL") || "configured-model",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: text },
@@ -241,14 +242,14 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
 
       const ocrMime = mimeType || "image/png";
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(`${Deno.env.get("AI_API_URL") || ""}/v1/chat/completions`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${AI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-5-mini",
+          model: Deno.env.get("AI_MODEL") || "configured-model",
           messages: [{
             role: "user",
             content: [
@@ -286,7 +287,7 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
       const ocrMime = mimeType || "image/png";
 
       // Start background processing
-      EdgeRuntime.waitUntil(processOcrInBackground(jobId, imageBase64, ocrMime, LOVABLE_API_KEY, options));
+      EdgeRuntime.waitUntil(processOcrInBackground(jobId, imageBase64, ocrMime, AI_API_KEY, options));
 
       return new Response(
         JSON.stringify({ success: true, message: "Processamento iniciado", jobId }),
@@ -297,14 +298,14 @@ Use a função report_errors. Se não houver erros, retorne lista vazia.`;
     if (action === "chat") {
       const { messages } = body;
       
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(`${Deno.env.get("AI_API_URL") || ""}/v1/chat/completions`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${AI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-5-mini",
+          model: Deno.env.get("AI_MODEL") || "configured-model",
           messages: [
             {
               role: "system",
