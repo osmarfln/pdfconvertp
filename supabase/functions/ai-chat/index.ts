@@ -90,8 +90,9 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
+    const AI_API_KEY = Deno.env.get("AI_API_KEY");
+    const AI_API_URL = Deno.env.get("AI_API_URL");
+    if (!AI_API_KEY || !AI_API_URL) throw new Error("AI provider is not configured");
 
     // Try to load user context (best-effort, never blocks the chat)
     let userContext = "";
@@ -138,14 +139,14 @@ serve(async (req) => {
 
     const systemPrompt = APP_KNOWLEDGE + userContext;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${Deno.env.get("AI_API_URL") || ""}/v1/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
+        model: Deno.env.get("AI_MODEL") || "configured-model",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,
